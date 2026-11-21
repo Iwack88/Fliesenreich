@@ -1,5 +1,5 @@
 import { TILES, RARITY, TICK_MS, PACKS, RESOURCES, SHUFFLE_COST } from './config.js';
-import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, sellAll, buffCount } from './logic.js';
+import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, sellAll, buffersOf, ratePerTick, buffCount } from './logic.js';
 
 const SAVE_KEY = 'fliesenreich-save-v4';
 const TILE = 96;
@@ -92,7 +92,7 @@ function onTap(sx, sy) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
       placeHand(state, target.x, target.y);
-      selected = tileAt(state, target.x, target.y);
+      selected = null;
       refreshTargets();
       save();
     }
@@ -108,21 +108,44 @@ function refreshTargets() {
 }
 
 // ---------- UI ----------
+const fmt = (n) => String(Math.round(n * 100) / 100);
+const rateText = (rates) => Object.entries(rates).map(([r, n]) => `${RESOURCES[r].icon} ${fmt(n)}`).join('  ');
+
 function updatePanel() {
   const panel = $('panel');
   const hand = state.hand && TILES[state.hand];
-  if (!hand && !selected) { panel.classList.add('hidden'); return; }
-  panel.classList.remove('hidden');
-  let info;
   if (hand) {
-    info = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>Grünes Feld antippen, um das Tile zu platzieren`;
+    panel.classList.remove('hidden');
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>Grünes Feld antippen, um das Tile zu platzieren`;
   } else {
-    const def = TILES[selected.type];
-    info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
-    if (def.buffedBy) info += ` – Buffs: ${buffCount(state, selected)}`;
+    panel.classList.add('hidden');
   }
-  $('panel-info').innerHTML = info;
-  $('panel-btns').style.display = hand ? 'none' : '';
+  updateTilePopup();
+}
+
+// Tile-Daten als Popup: Seltenheit, Produktion (Basis + Buffs), buffende Nachbarn.
+function updateTilePopup() {
+  const el = $('tile-popup');
+  if (!selected || state.hand) { el.classList.add('hidden'); return; }
+  const def = TILES[selected.type];
+  const rates = ratePerTick(state, selected);
+  const buffers = buffersOf(state, selected);
+  let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
+  html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
+  if (def.produces) {
+    html += `<div>Produziert pro Tick:<br><b>${rateText(rates)}</b></div>`;
+    html += `<div class="dim">Basis ${rateText(def.produces)}</div>`;
+  } else {
+    html += '<div class="dim">Produziert nichts</div>';
+  }
+  if (def.buffedBy) {
+    const names = Object.entries(def.buffedBy).map(([id, b]) => `${TILES[id].name} (+${fmt(b)} je Nachbar)`).join(', ');
+    html += `<div>Gebufft von: ${names}</div>`;
+    html += `<div>Aktive Buffs: <b>${buffers.length}</b> <span class="dim">(orange markiert)</span></div>`;
+  }
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+  $('tile-close').onclick = () => { selected = null; updatePanel(); };
 }
 
 let queueKey = '';
@@ -213,9 +236,50 @@ function showShop(result) {
   }
 }
 
+let archiveFilter = 'all';
+
+function jumpTo(tile) {
+  cam.x = (tile.x + 0.5) * TILE; cam.y = (tile.y + 0.5) * TILE;
+  selected = tile;
+  closeOverlay();
+  updatePanel();
+}
+
+function showArchive() {
+  const body = openOverlay('Tile-Archiv');
+  body.innerHTML = '';
+  const tiles = Object.values(state.tiles);
+  const counts = {};
+  for (const t of tiles) counts[t.type] = (counts[t.type] || 0) + 1;
+  if (archiveFilter !== 'all' && !counts[archiveFilter]) archiveFilter = 'all';
+
+  const filters = document.createElement('div');
+  filters.className = 'filters';
+  const addFilter = (id, label, color) => {
+    const f = document.createElement('span');
+    f.className = 'chip' + (archiveFilter === id ? ' active' : '');
+    f.style.background = color;
+    f.textContent = label;
+    f.onclick = () => { archiveFilter = id; showArchive(); };
+    filters.appendChild(f);
+  };
+  addFilter('all', `Alle (${tiles.length})`, '#ddd');
+  for (const id of Object.keys(TILES)) if (counts[id]) addFilter(id, `${TILES[id].icon} ${TILES[id].name} (${counts[id]})`, TILES[id].color);
+  body.appendChild(filters);
+
+  for (const t of tiles.filter(t => archiveFilter === 'all' || t.type === archiveFilter)) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const rates = ratePerTick(state, t);
+    row.innerHTML = `${chip(t.type)}<span>${t.x}, ${t.y}</span><span>${Object.keys(rates).length ? rateText(rates) + ' /Tick' : ''}</span>`;
+    row.onclick = () => jumpTo(t);
+    body.appendChild(row);
+  }
+}
+
+$('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = showInventory;
 $('btn-shop').onclick = () => showShop();
-$('btn-cancel').onclick = () => { selected = null; updatePanel(); };
 $('btn-shuffle').onclick = () => {
   if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);
 };
@@ -271,6 +335,13 @@ function draw() {
   }
 
   if (selected && !state.hand) {
+    for (const b of buffersOf(state, selected)) {
+      ctx.fillStyle = 'rgba(255,152,0,.35)';
+      ctx.fillRect(b.x * TILE, b.y * TILE, TILE, TILE);
+      ctx.strokeStyle = '#ff9800';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(b.x * TILE + 2, b.y * TILE + 2, TILE - 4, TILE - 4);
+    }
     ctx.strokeStyle = '#ffeb3b';
     ctx.lineWidth = 4;
     ctx.strokeRect(selected.x * TILE, selected.y * TILE, TILE, TILE);

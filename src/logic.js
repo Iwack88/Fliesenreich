@@ -111,6 +111,19 @@ export function buffCount(s, tile) {
   return n;
 }
 
+// Nachbarn (8 Felder rundherum), die dieses Tile buffen.
+export function buffersOf(s, tile) {
+  const def = TILES[tile.type];
+  if (!def.buffedBy) return [];
+  const list = [];
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    if (!dx && !dy) continue;
+    const o = s.tiles[key(tile.x + dx, tile.y + dy)];
+    if (o && def.buffedBy[o.type]) list.push(o);
+  }
+  return list;
+}
+
 export function ratePerTick(s, tile) {
   const def = TILES[tile.type];
   const rates = { ...(def.produces || {}) };
