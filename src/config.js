@@ -7,8 +7,6 @@ export const START_GOLD = 0;
 // Start-Inventar (Karten pro Tile-Typ).
 export const START_DECK = { gras: 2, wald: 4, feld: 4, holzfaeller: 2, windmuehle: 2, wasser: 1, erde: 1 };
 
-// "Next" erzeugt zufällig eines dieser Tiles (nicht aus dem Inventar, Gewichtung über weight).
-export const NEXT_TYPES = ['gras', 'erde', 'wasser'];
 export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
 
 // Kartenpacks: Kosten in Ressourcen, Anzahl Karten (Typ nach weight, begrenzt durch maxRarity).
@@ -23,14 +21,12 @@ export const RESOURCES = {
   grain: { name: 'Korn',  icon: '🌾', sellValue: 3 },
 };
 
-// Seltenheit bestimmt, wie oft ein Tile verschoben werden darf.
 export const RARITY = {
-  common:   { name: 'Gewöhnlich', maxMoves: 3 },
-  uncommon: { name: 'Selten',     maxMoves: 2 },
-  rare:     { name: 'Episch',     maxMoves: 1 },
+  common:   { name: 'Gewöhnlich' },
+  uncommon: { name: 'Selten' },
+  rare:     { name: 'Episch' },
 };
 
-// maxMoves (optional) überschreibt die Moves der Seltenheit.
 // produces: Grundproduktion pro Tick (nur Gebäude, Landschafts-Tiles produzieren vorerst nichts).
 // buffedBy: Nachbar-Tile (8 Felder rundherum) -> Bonus pro Nachbar.
 export const TILES = {
@@ -39,8 +35,8 @@ export const TILES = {
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 15 },
   wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20 },
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20 },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  maxMoves: 6, produces: { wood: 0.2 },  buffedBy: { wald: 0.2 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  maxMoves: 6, produces: { grain: 0.2 }, buffedBy: { feld: 0.2 } },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  produces: { wood: 0.2 },  buffedBy: { wald: 0.2 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  produces: { grain: 0.2 }, buffedBy: { feld: 0.2 } },
 };
 
 export const START_TILE = 'gras';

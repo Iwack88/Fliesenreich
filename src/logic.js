@@ -1,26 +1,23 @@
-import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, START_DECK, NEXT_TYPES, RARITY_ORDER, PACKS } from './config.js';
+import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export function newState() {
-  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, inventory: { ...START_DECK } };
+  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, hand: null, inventory: { ...START_DECK } };
   addTile(s, START_TILE, 0, 0);
   return s;
 }
 
-export const maxMovesOf = (type) => TILES[type].maxMoves ?? RARITY[TILES[type].rarity].maxMoves;
-
-export function addTile(s, type, x, y, unplaced = false) {
-  const maxMoves = maxMovesOf(type);
-  const t = { id: s.nextId++, type, x, y, movesLeft: maxMoves, acc: {}, unplaced };
+export function addTile(s, type, x, y) {
+  const t = { id: s.nextId++, type, x, y, acc: {} };
   s.tiles[key(x, y)] = t;
   return t;
 }
 
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
 
-function freeCellsNextToTiles(s) {
+export function placeCells(s) {
   const cells = new Map();
   for (const t of Object.values(s.tiles)) {
     for (const [dx, dy] of DIRS4) {
@@ -41,16 +38,23 @@ function pickWeighted(entries) {
 
 export const cardCount = (s) => Object.values(s.inventory).reduce((a, n) => a + n, 0);
 
-// Zufälliges Tile für "Next" (unabhängig vom Inventar).
-export const drawNextType = () => pickWeighted(NEXT_TYPES.map(id => [id, TILES[id].weight]));
+// Zieht zufällig eine Karte aus dem Inventar (gewichtet nach Anzahl) auf die Hand.
+export function drawCard(s) {
+  if (s.hand) return null;
+  const entries = Object.entries(s.inventory).filter(([, n]) => n > 0);
+  if (!entries.length) return null;
+  const type = pickWeighted(entries);
+  s.inventory[type]--;
+  s.hand = type;
+  return type;
+}
 
-// Spielt eine Karte: verbraucht sie und legt das Tile an eine freie Seite.
-export function playCard(s, type, fromInventory = true) {
-  if (hasUnplaced(s) || (fromInventory && !(s.inventory[type] > 0))) return null;
-  const cells = freeCellsNextToTiles(s);
-  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  if (fromInventory) s.inventory[type]--;
-  return addTile(s, type, x, y, true);
+// Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.
+export function placeHand(s, x, y) {
+  if (!s.hand || !placeCells(s).some(c => c[0] === x && c[1] === y)) return null;
+  const t = addTile(s, s.hand, x, y);
+  s.hand = null;
+  return t;
 }
 
 export function canAfford(s, cost) {
@@ -70,57 +74,6 @@ export function buyPack(s, packId) {
   }
   return drawn;
 }
-
-function isConnected(tiles) {
-  if (tiles.length <= 1) return true;
-  const set = new Set(tiles.map(t => key(t.x, t.y)));
-  const seen = new Set([key(tiles[0].x, tiles[0].y)]);
-  const stack = [[tiles[0].x, tiles[0].y]];
-  while (stack.length) {
-    const [x, y] = stack.pop();
-    for (const [dx, dy] of DIRS4) {
-      const k = key(x + dx, y + dy);
-      if (set.has(k) && !seen.has(k)) { seen.add(k); stack.push([x + dx, y + dy]); }
-    }
-  }
-  return seen.size === set.size;
-}
-
-// Freie Zielfelder (nur über freie Felder erreichbar), Kosten = Schritte.
-// Das Tile muss am Ziel an ein anderes Tile angrenzen und das Netz darf nicht zerfallen.
-export function moveTargets(s, tile) {
-  if (!tile.unplaced || tile.movesLeft <= 0) return [];
-  const others = Object.values(s.tiles).filter(t => t !== tile);
-  const dist = new Map([[key(tile.x, tile.y), 0]]);
-  const queue = [[tile.x, tile.y]];
-  const result = [];
-  while (queue.length) {
-    const [x, y] = queue.shift();
-    const d = dist.get(key(x, y));
-    if (d >= tile.movesLeft) continue;
-    for (const [dx, dy] of DIRS4) {
-      const nx = x + dx, ny = y + dy, k = key(nx, ny);
-      if (dist.has(k) || (s.tiles[k] && s.tiles[k] !== tile)) continue;
-      dist.set(k, d + 1);
-      queue.push([nx, ny]);
-      const adjacent = DIRS4.some(([ax, ay]) => others.some(o => o.x === nx + ax && o.y === ny + ay));
-      if (adjacent && isConnected([...others, { x: nx, y: ny }])) result.push({ x: nx, y: ny, cost: d + 1 });
-    }
-  }
-  return result;
-}
-
-export function moveTile(s, tile, target) {
-  delete s.tiles[key(tile.x, tile.y)];
-  tile.x = target.x; tile.y = target.y;
-  tile.movesLeft -= target.cost;
-  tile.unplaced = false;
-  s.tiles[key(tile.x, tile.y)] = tile;
-}
-
-export const hasUnplaced = (s) => Object.values(s.tiles).some(t => t.unplaced);
-
-export function placeTile(tile) { tile.unplaced = false; }
 
 // Anzahl buffender Nachbarn (8 Felder rundherum).
 export function buffCount(s, tile) {

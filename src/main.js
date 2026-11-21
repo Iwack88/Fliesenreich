@@ -1,8 +1,9 @@
 import { TILES, RARITY, TICK_MS, PACKS, RESOURCES } from './config.js';
-import { newState, moveTargets, moveTile, tick, tileAt, drawNextType, maxMovesOf, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
+import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, buffCount } from './logic.js';
 
-const SAVE_KEY = 'fliesenreich-save-v2';
+const SAVE_KEY = 'fliesenreich-save-v3';
 const TILE = 96;
+const BG = '#1e5aa8';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -10,9 +11,9 @@ const $ = (id) => document.getElementById(id);
 
 let state = load() || newState();
 let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
-let selected = null;   // Tile
-let targets = [];      // mögliche Zielfelder
-let pending = null;    // gewähltes Ziel
+let selected = null;   // angetipptes Tile (nur Info)
+let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
+let pending = null;    // gewähltes Zielfeld
 let dpr = 1;
 
 const images = {};
@@ -88,43 +89,46 @@ function setZoom(z) { cam.zoom = Math.min(2.5, Math.max(0.4, z)); }
 
 function onTap(sx, sy) {
   const c = toCell(sx, sy);
-  const target = targets.find(t => t.x === c.x && t.y === c.y);
-  if (selected && target) { pending = target; updatePanel(); return; }
-  const tile = tileAt(state, c.x, c.y);
-  if (tile) { select(tile); } else { deselect(); }
-}
-
-function select(tile) {
-  selected = tile;
-  pending = null;
-  targets = moveTargets(state, tile);
+  if (state.hand) {
+    const target = targets.find(t => t.x === c.x && t.y === c.y);
+    if (target) { pending = target; updatePanel(); }
+    return;
+  }
+  selected = tileAt(state, c.x, c.y) || null;
   updatePanel();
 }
-function deselect() {
-  selected = null; pending = null; targets = [];
+
+function refreshTargets() {
+  targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
+  pending = null;
   updatePanel();
 }
 
 // ---------- UI ----------
 function updatePanel() {
   const panel = $('panel');
-  if (!selected) { panel.classList.add('hidden'); return; }
+  const hand = state.hand && TILES[state.hand];
+  if (!hand && !selected) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
-  const def = TILES[selected.type];
-  const max = maxMovesOf(selected.type);
-  let info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
-  if (selected.unplaced) info += ` – Moves: ${selected.movesLeft}/${max}`;
-  const buffs = buffCount(state, selected);
-  if (def.buffedBy) info += ` – Buffs: ${buffs}`;
-  if (pending) info += `<br>Kosten: ${pending.cost} Move → danach ${selected.movesLeft - pending.cost} übrig`;
-  else if (selected.unplaced) info += targets.length ? '<br>Grünes Feld antippen zum Verschieben oder hier Place drücken' : '<br>Kein Zielfeld möglich – Place drücken';
+  let info;
+  if (hand) {
+    info = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>` +
+      (pending ? 'Place drücken zum Platzieren' : 'Grünes Feld antippen, an dem das Tile liegen soll');
+  } else {
+    const def = TILES[selected.type];
+    info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
+    if (def.buffedBy) info += ` – Buffs: ${buffCount(state, selected)}`;
+  }
   $('panel-info').innerHTML = info;
-  $('btn-place').style.display = selected.unplaced ? '' : 'none';
+  $('btn-place').style.display = hand ? '' : 'none';
+  $('btn-place').disabled = !pending;
+  $('btn-cancel').textContent = hand ? 'Auswahl aufheben' : 'Schließen';
 }
 
 function updateHud() {
   for (const r of ['wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
-  $('btn-next').disabled = hasUnplaced(state);
+  $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
+  $('btn-next').textContent = `Next (${cardCount(state)})`;
 }
 
 let toastTimer;
@@ -136,16 +140,11 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
 }
 
-function startCard(type, fromInventory = true) {
-  const t = playCard(state, type, fromInventory);
-  if (!t) { toast(hasUnplaced(state) ? 'Erst das aktuelle Tile platzieren' : 'Keine Karte'); return; }
-  cam.x = (t.x + 0.5) * TILE; cam.y = (t.y + 0.5) * TILE;
-  closeOverlay();
-  select(t); save();
-}
-
 $('btn-next').onclick = () => {
-  startCard(drawNextType(), false);
+  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
+  selected = null;
+  refreshTargets();
+  save();
 };
 
 function openOverlay(title) {
@@ -167,9 +166,9 @@ function showInventory() {
     const d = TILES[id];
     const el = document.createElement('div');
     el.className = `card ${d.rarity}`;
+    el.style.cursor = 'default';
     el.style.background = d.color;
     el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>×${state.inventory[id]}`;
-    el.onclick = () => startCard(id);
     body.appendChild(el);
   }
 }
@@ -199,12 +198,17 @@ function showShop(result) {
 $('btn-cards').onclick = showInventory;
 $('btn-shop').onclick = () => showShop();
 $('btn-place').onclick = () => {
-  if (!selected || !selected.unplaced) return;
-  if (pending) moveTile(state, selected, pending); else placeTile(selected);
+  if (!state.hand || !pending) return;
+  const t = placeHand(state, pending.x, pending.y);
+  if (!t) return;
+  selected = t;
+  refreshTargets();
   save();
-  deselect();
 };
-$('btn-cancel').onclick = deselect;
+$('btn-cancel').onclick = () => {
+  if (state.hand) { pending = null; } else { selected = null; }
+  updatePanel();
+};
 
 // ---------- Zeichnen ----------
 function drawTile(t, x, y, alpha = 1) {
@@ -230,27 +234,20 @@ function drawTile(t, x, y, alpha = 1) {
 
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#1b2a1f';
+  ctx.fillStyle = BG;
   ctx.fillRect(0, 0, innerWidth, innerHeight);
   ctx.translate(innerWidth / 2, innerHeight / 2);
   ctx.scale(cam.zoom, cam.zoom);
   ctx.translate(-cam.x, -cam.y);
 
   for (const t of Object.values(state.tiles)) {
-    const moving = pending && t === selected;
-    drawTile(t.type, t.x * TILE, t.y * TILE, moving ? 0.35 : 1);
+    drawTile(t.type, t.x * TILE, t.y * TILE);
     const buffs = buffCount(state, t);
     if (buffs) {
       ctx.fillStyle = '#ffd54f';
       ctx.font = `bold ${TILE * 0.22}px sans-serif`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`+${buffs}`, t.x * TILE + 6, t.y * TILE + 4);
-    }
-    if (t.unplaced) {
-      ctx.fillStyle = '#fff';
-      ctx.font = `${TILE * 0.2}px sans-serif`;
-      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-      ctx.fillText(`↔${t.movesLeft}`, (t.x + 1) * TILE - 6, (t.y + 1) * TILE - 4);
     }
   }
 
@@ -261,14 +258,10 @@ function draw() {
     ctx.strokeStyle = isPending ? '#fff' : '#3cdc5a';
     ctx.lineWidth = 3;
     ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${TILE * 0.35}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(g.cost, (g.x + 0.5) * TILE, (g.y + 0.5) * TILE);
   }
-  if (pending) drawTile(selected.type, pending.x * TILE, pending.y * TILE, 0.8);
+  if (pending) drawTile(state.hand, pending.x * TILE, pending.y * TILE, 0.8);
 
-  if (selected) {
+  if (selected && !state.hand) {
     ctx.strokeStyle = '#ffeb3b';
     ctx.lineWidth = 4;
     ctx.strokeRect(selected.x * TILE, selected.y * TILE, TILE, TILE);
@@ -282,7 +275,7 @@ function frame() {
 }
 
 setInterval(() => { tick(state); save(); }, TICK_MS);
-updatePanel();
+refreshTargets();
 frame();
 
 $('btn-full').onclick = () => {
