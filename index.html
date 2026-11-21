@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fliesenreich</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="res">
+    <span>🪙 <b id="r-gold">0</b></span>
+    <span>🪵 <b id="r-wood">0</b></span>
+    <span>🌾 <b id="r-grain">0</b></span>
+  </div>
+  <div id="actions">
+    <button id="btn-sell">Verkaufen</button>
+    <button id="btn-next">Next</button>
+  </div>
+</div>
+
+<div id="panel" class="hidden">
+  <div id="panel-info"></div>
+  <div id="panel-btns">
+    <button id="btn-place">Place</button>
+    <button id="btn-cancel">Abbrechen</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
