@@ -1,4 +1,4 @@
-import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, RESOURCES, SHUFFLE_COST } from './config.js';
+import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -13,13 +13,13 @@ function shuffled(arr) {
 }
 
 export function newState() {
-  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  const s = { gold: START_GOLD, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   addTile(s, START_TILE, 0, 0);
   return s;
 }
 
 export function addTile(s, type, x, y) {
-  const t = { id: s.nextId++, type, x, y, acc: {} };
+  const t = { id: s.nextId++, type, x, y, earned: 0 };
   s.tiles[key(x, y)] = t;
   return t;
 }
@@ -61,33 +61,44 @@ export function shuffleDeck(s) {
   return true;
 }
 
-export function sellAll(s) {
-  let gold = 0;
-  for (const [res, def] of Object.entries(RESOURCES)) {
-    if (!def.sellValue) continue;
-    gold += s[res] * def.sellValue;
-    s[res] = 0;
-  }
-  s.gold += gold;
-  return gold;
+// Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.
+const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
+
+// Gold-Wert eines Nachbar-Paares.
+export function pairValue(a, b) {
+  const ga = TILES[a.type].gives?.[b.type] || 0;
+  if (a.type === b.type) return ga;
+  return ga + (TILES[b.type].gives?.[a.type] || 0);
 }
 
-// Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.
+// Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Gold-Paar bildet.
+export function partnersOf(s, tile) {
+  return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o && pairValue(tile, o) > 0);
+}
+
+// Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile
+// und zahlt einmalig Gold für alle neuen Paare aus.
 export function placeHand(s, x, y) {
   if (!s.hand || !placeCells(s).some(c => c[0] === x && c[1] === y)) return null;
-  const t = addTile(s, s.hand, x, y);
+  const tile = addTile(s, s.hand, x, y);
   s.hand = null;
-  return t;
+  let gold = 0;
+  for (const o of partnersOf(s, tile)) {
+    const v = pairValue(tile, o);
+    gold += v;
+    o.earned = (o.earned || 0) + v;
+    tile.earned += v;
+  }
+  s.gold += gold;
+  return { tile, gold };
 }
 
-export function canAfford(s, cost) {
-  return Object.entries(cost).every(([r, n]) => s[r] >= n);
-}
+export const canAfford = (s, cost) => s.gold >= cost;
 
 export function buyPack(s, packId) {
   const pack = PACKS[packId];
   if (!canAfford(s, pack.cost)) return null;
-  for (const [r, n] of Object.entries(pack.cost)) s[r] -= n;
+  s.gold -= pack.cost;
   const pool = Object.entries(TILES).filter(([id]) => rarityOk(id, pack.maxRarity)).map(([id, d]) => [id, d.weight]);
   const drawn = [];
   for (let i = 0; i < pack.cards; i++) {
@@ -96,55 +107,4 @@ export function buyPack(s, packId) {
   }
   s.deck.push(...drawn);
   return drawn;
-}
-
-// Anzahl buffender Nachbarn (8 Felder rundherum).
-export function buffCount(s, tile) {
-  const def = TILES[tile.type];
-  if (!def.buffedBy) return 0;
-  let n = 0;
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-    if (!dx && !dy) continue;
-    const o = s.tiles[key(tile.x + dx, tile.y + dy)];
-    if (o && def.buffedBy[o.type]) n += 1;
-  }
-  return n;
-}
-
-// Nachbarn (8 Felder rundherum), die dieses Tile buffen.
-export function buffersOf(s, tile) {
-  const def = TILES[tile.type];
-  if (!def.buffedBy) return [];
-  const list = [];
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-    if (!dx && !dy) continue;
-    const o = s.tiles[key(tile.x + dx, tile.y + dy)];
-    if (o && def.buffedBy[o.type]) list.push(o);
-  }
-  return list;
-}
-
-export function ratePerTick(s, tile) {
-  const def = TILES[tile.type];
-  const rates = { ...(def.produces || {}) };
-  if (def.buffedBy) {
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-      if (!dx && !dy) continue;
-      const o = s.tiles[key(tile.x + dx, tile.y + dy)];
-      const bonus = o && def.buffedBy[o.type];
-      if (bonus) for (const r of Object.keys(def.produces)) rates[r] += bonus;
-    }
-  }
-  return rates;
-}
-
-export function tick(s) {
-  for (const t of Object.values(s.tiles)) {
-    const rates = ratePerTick(s, t);
-    for (const [res, rate] of Object.entries(rates)) {
-      t.acc[res] = (t.acc[res] || 0) + rate;
-      const whole = Math.floor(t.acc[res]);
-      if (whole > 0) { s[res] += whole; t.acc[res] -= whole; }
-    }
-  }
 }

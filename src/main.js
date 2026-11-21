@@ -1,7 +1,7 @@
-import { TILES, RARITY, TICK_MS, PACKS, RESOURCES, SHUFFLE_COST } from './config.js';
-import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, sellAll, buffersOf, ratePerTick, buffCount } from './logic.js';
+import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST } from './config.js';
+import { newState, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js';
 
-const SAVE_KEY = 'fliesenreich-save-v4';
+const SAVE_KEY = 'fliesenreich-save-v5';
 const TILE = 96;
 const BG = '#1e5aa8';
 
@@ -91,7 +91,8 @@ function onTap(sx, sy) {
   if (state.hand) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
-      placeHand(state, target.x, target.y);
+      const res = placeHand(state, target.x, target.y);
+      if (res && res.gold) toast(`+${res.gold} ${GOLD_ICON}`);
       selected = null;
       refreshTargets();
       save();
@@ -109,7 +110,7 @@ function refreshTargets() {
 
 // ---------- UI ----------
 const fmt = (n) => String(Math.round(n * 100) / 100);
-const rateText = (rates) => Object.entries(rates).map(([r, n]) => `${RESOURCES[r].icon} ${fmt(n)}`).join('  ');
+const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${TILES[id].name} +${n}`).join(', ');
 
 function updatePanel() {
   const panel = $('panel');
@@ -128,21 +129,17 @@ function updateTilePopup() {
   const el = $('tile-popup');
   if (!selected || state.hand) { el.classList.add('hidden'); return; }
   const def = TILES[selected.type];
-  const rates = ratePerTick(state, selected);
-  const buffers = buffersOf(state, selected);
+  const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
-  if (def.produces) {
-    html += `<div>Produziert pro Tick:<br><b>${rateText(rates)}</b></div>`;
-    html += `<div class="dim">Basis ${rateText(def.produces)}</div>`;
+  html += `<div>Bisher eingebracht: <b>${selected.earned || 0} ${GOLD_ICON}</b></div>`;
+  if (def.gives) {
+    html += `<div>Gold-Bonus je Nachbar: <b>${givesText(def)}</b></div>`;
+    html += '<div class="dim">Einmalig, sobald das Paar entsteht</div>';
   } else {
-    html += '<div class="dim">Produziert nichts</div>';
+    html += '<div class="dim">Gibt keinen Gold-Bonus</div>';
   }
-  if (def.buffedBy) {
-    const names = Object.entries(def.buffedBy).map(([id, b]) => `${TILES[id].name} (+${fmt(b)} je Nachbar)`).join(', ');
-    html += `<div>Gebufft von: ${names}</div>`;
-    html += `<div>Aktive Buffs: <b>${buffers.length}</b> <span class="dim">(orange markiert)</span></div>`;
-  }
+  html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
   el.innerHTML = html;
   el.classList.remove('hidden');
   $('tile-close').onclick = () => { selected = null; updatePanel(); };
@@ -164,12 +161,11 @@ function renderQueue() {
 }
 
 function updateHud() {
-  for (const r of ['gold', 'wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
+  $('r-gold').textContent = state.gold;
   $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
   $('btn-next').textContent = `Next (${cardCount(state)})`;
   $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
-  $('btn-sell').disabled = state.wood + state.grain < 1;
   renderQueue();
 }
 
@@ -197,7 +193,7 @@ function openOverlay(title) {
 function closeOverlay() { $('overlay').classList.add('hidden'); }
 $('overlay-close').onclick = closeOverlay;
 
-const costText = (cost) => Object.entries(cost).map(([r, n]) => `${n} ${RESOURCES[r].icon}`).join(' ');
+const costText = (cost) => `${cost} ${GOLD_ICON}`;
 
 function showInventory() {
   const body = openOverlay(`Deck (${cardCount(state)}) – Reihenfolge der Ziehung`);
@@ -270,8 +266,7 @@ function showArchive() {
   for (const t of tiles.filter(t => archiveFilter === 'all' || t.type === archiveFilter)) {
     const row = document.createElement('div');
     row.className = 'row';
-    const rates = ratePerTick(state, t);
-    row.innerHTML = `${chip(t.type)}<span>${t.x}, ${t.y}</span><span>${Object.keys(rates).length ? rateText(rates) + ' /Tick' : ''}</span>`;
+    row.innerHTML = `${chip(t.type)}<span>${t.x}, ${t.y}</span><span>${t.earned || 0} ${GOLD_ICON}</span>`;
     row.onclick = () => jumpTo(t);
     body.appendChild(row);
   }
@@ -283,7 +278,6 @@ $('btn-shop').onclick = () => showShop();
 $('btn-shuffle').onclick = () => {
   if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);
 };
-$('btn-sell').onclick = () => { toast(`+${sellAll(state)} 🪙`); save(); };
 
 // ---------- Zeichnen ----------
 function drawTile(t, x, y, alpha = 1) {
@@ -317,12 +311,12 @@ function draw() {
 
   for (const t of Object.values(state.tiles)) {
     drawTile(t.type, t.x * TILE, t.y * TILE);
-    const buffs = buffCount(state, t);
-    if (buffs) {
+    const partners = partnersOf(state, t).length;
+    if (partners) {
       ctx.fillStyle = '#ffd54f';
       ctx.font = `bold ${TILE * 0.22}px sans-serif`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`+${buffs}`, t.x * TILE + 6, t.y * TILE + 4);
+      ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
     }
   }
 
@@ -335,7 +329,7 @@ function draw() {
   }
 
   if (selected && !state.hand) {
-    for (const b of buffersOf(state, selected)) {
+    for (const b of partnersOf(state, selected)) {
       ctx.fillStyle = 'rgba(255,152,0,.35)';
       ctx.fillRect(b.x * TILE, b.y * TILE, TILE, TILE);
       ctx.strokeStyle = '#ff9800';
@@ -354,7 +348,6 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-setInterval(() => { tick(state); save(); }, TICK_MS);
 refreshTargets();
 frame();
 
