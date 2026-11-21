@@ -1,7 +1,7 @@
-import { TILES, RARITY, TICK_MS } from './config.js';
-import { newState, spawnTile, moveTargets, moveTile, tick, sellAll, nextCost, tileAt, buffCount, hasUnplaced, placeTile } from './logic.js';
+import { TILES, RARITY, TICK_MS, PACKS, RESOURCES } from './config.js';
+import { newState, spawnTile, moveTargets, moveTile, tick, tileAt, drawRandomType, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
 
-const SAVE_KEY = 'fliesenreich-save-v1';
+const SAVE_KEY = 'fliesenreich-save-v2';
 const TILE = 96;
 
 const canvas = document.getElementById('game');
@@ -123,11 +123,10 @@ function updatePanel() {
 }
 
 function updateHud() {
-  for (const r of ['gold', 'wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
-  const cost = nextCost(state);
-  $('btn-next').textContent = cost ? `Next (${cost} 🪙)` : 'Next';
-  $('btn-next').disabled = state.gold < cost || hasUnplaced(state);
-  $('btn-sell').disabled = state.wood + state.grain < 1;
+  for (const r of ['wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
+  const n = cardCount(state);
+  $('btn-next').textContent = `Next (${n})`;
+  $('btn-next').disabled = n < 1 || hasUnplaced(state);
 }
 
 let toastTimer;
@@ -139,11 +138,69 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
 }
 
+function startCard(type) {
+  const t = playCard(state, type);
+  if (!t) { toast(hasUnplaced(state) ? 'Erst das aktuelle Tile platzieren' : 'Keine Karte'); return; }
+  cam.x = (t.x + 0.5) * TILE; cam.y = (t.y + 0.5) * TILE;
+  closeOverlay();
+  select(t); save();
+}
+
 $('btn-next').onclick = () => {
-  const t = spawnTile(state);
-  if (t) { cam.x = (t.x + 0.5) * TILE; cam.y = (t.y + 0.5) * TILE; select(t); save(); }
+  const type = drawRandomType(state);
+  if (type) startCard(type);
 };
-$('btn-sell').onclick = () => { toast(`+${sellAll(state)} 🪙`); save(); };
+
+function openOverlay(title) {
+  $('overlay-title').textContent = title;
+  $('overlay').classList.remove('hidden');
+  return $('overlay-body');
+}
+function closeOverlay() { $('overlay').classList.add('hidden'); }
+$('overlay-close').onclick = closeOverlay;
+
+const costText = (cost) => Object.entries(cost).map(([r, n]) => `${n} ${RESOURCES[r].icon}`).join(' ');
+
+function showInventory() {
+  const body = openOverlay(`Karten (${cardCount(state)})`);
+  body.innerHTML = '';
+  const types = Object.keys(TILES).filter(id => state.inventory[id] > 0);
+  if (!types.length) body.textContent = 'Keine Karten. Kaufe ein Pack im Shop.';
+  for (const id of types) {
+    const d = TILES[id];
+    const el = document.createElement('div');
+    el.className = `card ${d.rarity}`;
+    el.style.background = d.color;
+    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>×${state.inventory[id]}`;
+    el.onclick = () => startCard(id);
+    body.appendChild(el);
+  }
+}
+
+function showShop(result) {
+  const body = openOverlay('Shop');
+  body.innerHTML = '';
+  if (result) {
+    const r = document.createElement('div');
+    r.style.width = '100%';
+    r.textContent = 'Gezogen: ' + result.map(id => TILES[id].icon || TILES[id].name).join(' ');
+    body.appendChild(r);
+  }
+  for (const [id, p] of Object.entries(PACKS)) {
+    const row = document.createElement('div');
+    row.className = 'pack';
+    row.innerHTML = `<span><b>${p.name}</b> – ${p.cards} Karten</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = costText(p.cost);
+    btn.disabled = !canAfford(state, p.cost);
+    btn.onclick = () => { const drawn = buyPack(state, id); if (drawn) { save(); showShop(drawn); } };
+    row.appendChild(btn);
+    body.appendChild(row);
+  }
+}
+
+$('btn-cards').onclick = showInventory;
+$('btn-shop').onclick = () => showShop();
 $('btn-place').onclick = () => {
   if (!selected || !selected.unplaced) return;
   if (pending) moveTile(state, selected, pending); else placeTile(selected);

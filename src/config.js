@@ -2,11 +2,20 @@
 // Grafik: optional assets/tiles/<id>.png ablegen, sonst wird Farbe + Emoji genutzt.
 
 export const TICK_MS = 1000;
-// Auf true setzen, damit "Next" wieder Gold kostet.
-export const SPAWN_COSTS_GOLD = false;
-export const START_GOLD = 30;
-export const NEXT_BASE_COST = 10;
-export const NEXT_COST_STEP = 5;
+export const START_GOLD = 0;
+
+// Start-Inventar (Karten pro Tile-Typ).
+export const START_DECK = { gras: 2, wald: 4, feld: 4, holzfaeller: 2, windmuehle: 2, wasser: 1, erde: 1 };
+
+// Höchste Seltenheit, die "Next" zufällig ziehen darf (null = keine Grenze).
+export const NEXT_MAX_RARITY = null;
+export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
+
+// Kartenpacks: Kosten in Ressourcen, Anzahl Karten (Typ nach weight, begrenzt durch maxRarity).
+export const PACKS = {
+  holz: { name: 'Holz-Pack', cost: { wood: 5 }, cards: 5, maxRarity: 'uncommon' },
+  korn: { name: 'Korn-Pack', cost: { grain: 5 }, cards: 5, maxRarity: 'uncommon' },
+};
 
 export const RESOURCES = {
   gold:  { name: 'Gold',  icon: '🪙' },

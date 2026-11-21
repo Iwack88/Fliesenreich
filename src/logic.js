@@ -1,10 +1,10 @@
-import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, NEXT_BASE_COST, NEXT_COST_STEP, SPAWN_COSTS_GOLD } from './config.js';
+import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, START_DECK, NEXT_MAX_RARITY, RARITY_ORDER, PACKS } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export function newState() {
-  const s = { gold: START_GOLD, wood: 0, grain: 0, spawned: 0, nextId: 1, tiles: {} };
+  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, inventory: { ...START_DECK } };
   addTile(s, START_TILE, 0, 0);
   return s;
 }
@@ -17,7 +17,6 @@ export function addTile(s, type, x, y, unplaced = false) {
 }
 
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
-export const nextCost = (s) => !SPAWN_COSTS_GOLD ? 0 : NEXT_BASE_COST + NEXT_COST_STEP * s.spawned;
 
 function freeCellsNextToTiles(s) {
   const cells = new Map();
@@ -30,21 +29,47 @@ function freeCellsNextToTiles(s) {
   return [...cells.values()];
 }
 
-function randomType() {
-  const entries = Object.entries(TILES);
-  let r = Math.random() * entries.reduce((a, [, d]) => a + d.weight, 0);
-  for (const [id, d] of entries) { r -= d.weight; if (r <= 0) return id; }
-  return entries[0][0];
+const rarityOk = (type, max) => !max || RARITY_ORDER.indexOf(TILES[type].rarity) <= RARITY_ORDER.indexOf(max);
+
+function pickWeighted(entries) {
+  let r = Math.random() * entries.reduce((a, [, w]) => a + w, 0);
+  for (const [id, w] of entries) { r -= w; if (r <= 0) return id; }
+  return entries[entries.length - 1][0];
 }
 
-export function spawnTile(s) {
-  const cost = nextCost(s);
-  if (s.gold < cost) return null;
+export const cardCount = (s) => Object.values(s.inventory).reduce((a, n) => a + n, 0);
+
+// Zufällige Karte aus dem Inventar (gewichtet nach Anzahl), begrenzt durch NEXT_MAX_RARITY.
+export function drawRandomType(s) {
+  const entries = Object.entries(s.inventory).filter(([id, n]) => n > 0 && rarityOk(id, NEXT_MAX_RARITY));
+  return entries.length ? pickWeighted(entries) : null;
+}
+
+// Spielt eine Karte: verbraucht sie und legt das Tile an eine freie Seite.
+export function playCard(s, type) {
+  if (hasUnplaced(s) || !(s.inventory[type] > 0)) return null;
   const cells = freeCellsNextToTiles(s);
   const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  s.gold -= cost;
-  s.spawned++;
-  return addTile(s, randomType(), x, y, true);
+  s.inventory[type]--;
+  return addTile(s, type, x, y, true);
+}
+
+export function canAfford(s, cost) {
+  return Object.entries(cost).every(([r, n]) => s[r] >= n);
+}
+
+export function buyPack(s, packId) {
+  const pack = PACKS[packId];
+  if (!canAfford(s, pack.cost)) return null;
+  for (const [r, n] of Object.entries(pack.cost)) s[r] -= n;
+  const pool = Object.entries(TILES).filter(([id]) => rarityOk(id, pack.maxRarity)).map(([id, d]) => [id, d.weight]);
+  const drawn = [];
+  for (let i = 0; i < pack.cards; i++) {
+    const id = pickWeighted(pool);
+    s.inventory[id] = (s.inventory[id] || 0) + 1;
+    drawn.push(id);
+  }
+  return drawn;
 }
 
 function isConnected(tiles) {
@@ -134,15 +159,4 @@ export function tick(s) {
       if (whole > 0) { s[res] += whole; t.acc[res] -= whole; }
     }
   }
-}
-
-export function sellAll(s) {
-  let gold = 0;
-  for (const [res, def] of Object.entries(RESOURCES)) {
-    if (!def.sellValue) continue;
-    gold += s[res] * def.sellValue;
-    s[res] = 0;
-  }
-  s.gold += gold;
-  return gold;
 }
