@@ -1,5 +1,5 @@
 import { TILES, RARITY, TICK_MS } from './config.js';
-import { newState, spawnTile, moveTargets, moveTile, tick, sellAll, nextCost, tileAt, buffCount } from './logic.js';
+import { newState, spawnTile, moveTargets, moveTile, tick, sellAll, nextCost, tileAt, buffCount, hasUnplaced, placeTile } from './logic.js';
 
 const SAVE_KEY = 'fliesenreich-save-v1';
 const TILE = 96;
@@ -112,22 +112,21 @@ function updatePanel() {
   panel.classList.remove('hidden');
   const def = TILES[selected.type];
   const max = RARITY[def.rarity].maxMoves;
-  let info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name}) – Moves: ${selected.movesLeft}/${max}`;
+  let info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
+  if (selected.unplaced) info += ` – Moves: ${selected.movesLeft}/${max}`;
   const buffs = buffCount(state, selected);
   if (def.buffedBy) info += ` – Buffs: ${buffs}`;
   if (pending) info += `<br>Kosten: ${pending.cost} Move → danach ${selected.movesLeft - pending.cost} übrig`;
-  else if (selected.movesLeft > 0 && targets.length) info += '<br>Grünes Feld antippen zum Verschieben';
-  else if (selected.movesLeft > 0) info += '<br>Kein Zielfeld möglich';
-  else info += '<br>Keine Moves mehr';
+  else if (selected.unplaced) info += targets.length ? '<br>Grünes Feld antippen zum Verschieben oder hier Place drücken' : '<br>Kein Zielfeld möglich – Place drücken';
   $('panel-info').innerHTML = info;
-  $('btn-place').disabled = !pending;
+  $('btn-place').style.display = selected.unplaced ? '' : 'none';
 }
 
 function updateHud() {
   for (const r of ['gold', 'wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
   const cost = nextCost(state);
   $('btn-next').textContent = `Next (${cost} 🪙)`;
-  $('btn-next').disabled = state.gold < cost;
+  $('btn-next').disabled = state.gold < cost || hasUnplaced(state);
   $('btn-sell').disabled = state.wood + state.grain < 1;
 }
 
@@ -146,8 +145,8 @@ $('btn-next').onclick = () => {
 };
 $('btn-sell').onclick = () => { toast(`+${sellAll(state)} 🪙`); save(); };
 $('btn-place').onclick = () => {
-  if (!selected || !pending) return;
-  moveTile(state, selected, pending);
+  if (!selected || !selected.unplaced) return;
+  if (pending) moveTile(state, selected, pending); else placeTile(selected);
   save();
   deselect();
 };
@@ -193,7 +192,7 @@ function draw() {
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`+${buffs}`, t.x * TILE + 6, t.y * TILE + 4);
     }
-    if (t.movesLeft > 0) {
+    if (t.unplaced) {
       ctx.fillStyle = '#fff';
       ctx.font = `${TILE * 0.2}px sans-serif`;
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';

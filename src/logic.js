@@ -9,9 +9,9 @@ export function newState() {
   return s;
 }
 
-export function addTile(s, type, x, y) {
+export function addTile(s, type, x, y, unplaced = false) {
   const maxMoves = RARITY[TILES[type].rarity].maxMoves;
-  const t = { id: s.nextId++, type, x, y, movesLeft: maxMoves, acc: {} };
+  const t = { id: s.nextId++, type, x, y, movesLeft: maxMoves, acc: {}, unplaced };
   s.tiles[key(x, y)] = t;
   return t;
 }
@@ -44,7 +44,7 @@ export function spawnTile(s) {
   const [x, y] = cells[Math.floor(Math.random() * cells.length)];
   s.gold -= cost;
   s.spawned++;
-  return addTile(s, randomType(), x, y);
+  return addTile(s, randomType(), x, y, true);
 }
 
 function isConnected(tiles) {
@@ -65,7 +65,7 @@ function isConnected(tiles) {
 // Freie Zielfelder (nur über freie Felder erreichbar), Kosten = Schritte.
 // Das Tile muss am Ziel an ein anderes Tile angrenzen und das Netz darf nicht zerfallen.
 export function moveTargets(s, tile) {
-  if (tile.movesLeft <= 0) return [];
+  if (!tile.unplaced || tile.movesLeft <= 0) return [];
   const others = Object.values(s.tiles).filter(t => t !== tile);
   const dist = new Map([[key(tile.x, tile.y), 0]]);
   const queue = [[tile.x, tile.y]];
@@ -90,8 +90,13 @@ export function moveTile(s, tile, target) {
   delete s.tiles[key(tile.x, tile.y)];
   tile.x = target.x; tile.y = target.y;
   tile.movesLeft -= target.cost;
+  tile.unplaced = false;
   s.tiles[key(tile.x, tile.y)] = tile;
 }
+
+export const hasUnplaced = (s) => Object.values(s.tiles).some(t => t.unplaced);
+
+export function placeTile(tile) { tile.unplaced = false; }
 
 // Anzahl buffender Nachbarn (8 Felder rundherum).
 export function buffCount(s, tile) {

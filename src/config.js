@@ -19,14 +19,14 @@ export const RARITY = {
   rare:     { name: 'Episch',     maxMoves: 1 },
 };
 
-// produces: Grundproduktion pro Tick.
+// produces: Grundproduktion pro Tick (nur Gebäude, Landschafts-Tiles produzieren vorerst nichts).
 // buffedBy: Nachbar-Tile (8 Felder rundherum) -> Bonus pro Nachbar.
 export const TILES = {
   gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 30 },
   erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 15 },
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 15 },
-  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, produces: { wood: 0.1 } },
-  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, produces: { grain: 0.1 } },
+  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20 },
+  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20 },
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  produces: { wood: 0.2 },  buffedBy: { wald: 0.2 } },
   windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  produces: { grain: 0.2 }, buffedBy: { feld: 0.2 } },
 };
