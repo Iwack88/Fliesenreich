@@ -1,5 +1,5 @@
 import { TILES, RARITY, TICK_MS, PACKS, RESOURCES } from './config.js';
-import { newState, spawnTile, moveTargets, moveTile, tick, tileAt, drawRandomType, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
+import { newState, moveTargets, moveTile, tick, tileAt, drawRandomType, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
 
 const SAVE_KEY = 'fliesenreich-save-v2';
 const TILE = 96;
