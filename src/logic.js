@@ -1,4 +1,4 @@
-import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, START_DECK, NEXT_MAX_RARITY, RARITY_ORDER, PACKS } from './config.js';
+import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, START_DECK, NEXT_TYPES, RARITY_ORDER, PACKS } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -9,8 +9,10 @@ export function newState() {
   return s;
 }
 
+export const maxMovesOf = (type) => TILES[type].maxMoves ?? RARITY[TILES[type].rarity].maxMoves;
+
 export function addTile(s, type, x, y, unplaced = false) {
-  const maxMoves = RARITY[TILES[type].rarity].maxMoves;
+  const maxMoves = maxMovesOf(type);
   const t = { id: s.nextId++, type, x, y, movesLeft: maxMoves, acc: {}, unplaced };
   s.tiles[key(x, y)] = t;
   return t;
@@ -39,18 +41,15 @@ function pickWeighted(entries) {
 
 export const cardCount = (s) => Object.values(s.inventory).reduce((a, n) => a + n, 0);
 
-// Zufällige Karte aus dem Inventar (gewichtet nach Anzahl), begrenzt durch NEXT_MAX_RARITY.
-export function drawRandomType(s) {
-  const entries = Object.entries(s.inventory).filter(([id, n]) => n > 0 && rarityOk(id, NEXT_MAX_RARITY));
-  return entries.length ? pickWeighted(entries) : null;
-}
+// Zufälliges Tile für "Next" (unabhängig vom Inventar).
+export const drawNextType = () => pickWeighted(NEXT_TYPES.map(id => [id, TILES[id].weight]));
 
 // Spielt eine Karte: verbraucht sie und legt das Tile an eine freie Seite.
-export function playCard(s, type) {
-  if (hasUnplaced(s) || !(s.inventory[type] > 0)) return null;
+export function playCard(s, type, fromInventory = true) {
+  if (hasUnplaced(s) || (fromInventory && !(s.inventory[type] > 0))) return null;
   const cells = freeCellsNextToTiles(s);
   const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  s.inventory[type]--;
+  if (fromInventory) s.inventory[type]--;
   return addTile(s, type, x, y, true);
 }
 

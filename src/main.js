@@ -1,5 +1,5 @@
 import { TILES, RARITY, TICK_MS, PACKS, RESOURCES } from './config.js';
-import { newState, moveTargets, moveTile, tick, tileAt, drawRandomType, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
+import { newState, moveTargets, moveTile, tick, tileAt, drawNextType, maxMovesOf, playCard, buyPack, canAfford, cardCount, buffCount, hasUnplaced, placeTile } from './logic.js';
 
 const SAVE_KEY = 'fliesenreich-save-v2';
 const TILE = 96;
@@ -111,7 +111,7 @@ function updatePanel() {
   if (!selected) { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   const def = TILES[selected.type];
-  const max = RARITY[def.rarity].maxMoves;
+  const max = maxMovesOf(selected.type);
   let info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
   if (selected.unplaced) info += ` – Moves: ${selected.movesLeft}/${max}`;
   const buffs = buffCount(state, selected);
@@ -124,9 +124,7 @@ function updatePanel() {
 
 function updateHud() {
   for (const r of ['wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
-  const n = cardCount(state);
-  $('btn-next').textContent = `Next (${n})`;
-  $('btn-next').disabled = n < 1 || hasUnplaced(state);
+  $('btn-next').disabled = hasUnplaced(state);
 }
 
 let toastTimer;
@@ -138,8 +136,8 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
 }
 
-function startCard(type) {
-  const t = playCard(state, type);
+function startCard(type, fromInventory = true) {
+  const t = playCard(state, type, fromInventory);
   if (!t) { toast(hasUnplaced(state) ? 'Erst das aktuelle Tile platzieren' : 'Keine Karte'); return; }
   cam.x = (t.x + 0.5) * TILE; cam.y = (t.y + 0.5) * TILE;
   closeOverlay();
@@ -147,8 +145,7 @@ function startCard(type) {
 }
 
 $('btn-next').onclick = () => {
-  const type = drawRandomType(state);
-  if (type) startCard(type);
+  startCard(drawNextType(), false);
 };
 
 function openOverlay(title) {
