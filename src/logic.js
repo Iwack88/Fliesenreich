@@ -1,10 +1,19 @@
-import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS } from './config.js';
+import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, RESOURCES, SHUFFLE_COST } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export function newState() {
-  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, hand: null, inventory: { ...START_DECK } };
+  const s = { gold: START_GOLD, wood: 0, grain: 0, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   addTile(s, START_TILE, 0, 0);
   return s;
 }
@@ -36,17 +45,31 @@ function pickWeighted(entries) {
   return entries[entries.length - 1][0];
 }
 
-export const cardCount = (s) => Object.values(s.inventory).reduce((a, n) => a + n, 0);
+export const cardCount = (s) => s.deck.length;
 
-// Zieht zufällig eine Karte aus dem Inventar (gewichtet nach Anzahl) auf die Hand.
+// Zieht die oberste Karte des Decks auf die Hand.
 export function drawCard(s) {
-  if (s.hand) return null;
-  const entries = Object.entries(s.inventory).filter(([, n]) => n > 0);
-  if (!entries.length) return null;
-  const type = pickWeighted(entries);
-  s.inventory[type]--;
-  s.hand = type;
-  return type;
+  if (s.hand || !s.deck.length) return null;
+  s.hand = s.deck.shift();
+  return s.hand;
+}
+
+export function shuffleDeck(s) {
+  if (s.gold < SHUFFLE_COST || s.deck.length < 2) return false;
+  s.gold -= SHUFFLE_COST;
+  s.deck = shuffled(s.deck);
+  return true;
+}
+
+export function sellAll(s) {
+  let gold = 0;
+  for (const [res, def] of Object.entries(RESOURCES)) {
+    if (!def.sellValue) continue;
+    gold += s[res] * def.sellValue;
+    s[res] = 0;
+  }
+  s.gold += gold;
+  return gold;
 }
 
 // Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.
@@ -69,9 +92,9 @@ export function buyPack(s, packId) {
   const drawn = [];
   for (let i = 0; i < pack.cards; i++) {
     const id = pickWeighted(pool);
-    s.inventory[id] = (s.inventory[id] || 0) + 1;
     drawn.push(id);
   }
+  s.deck.push(...drawn);
   return drawn;
 }
 

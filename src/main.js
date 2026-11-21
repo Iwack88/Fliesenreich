@@ -1,7 +1,7 @@
-import { TILES, RARITY, TICK_MS, PACKS, RESOURCES } from './config.js';
-import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, buffCount } from './logic.js';
+import { TILES, RARITY, TICK_MS, PACKS, RESOURCES, SHUFFLE_COST } from './config.js';
+import { newState, tick, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, sellAll, buffCount } from './logic.js';
 
-const SAVE_KEY = 'fliesenreich-save-v3';
+const SAVE_KEY = 'fliesenreich-save-v4';
 const TILE = 96;
 const BG = '#1e5aa8';
 
@@ -13,7 +13,6 @@ let state = load() || newState();
 let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
-let pending = null;    // gewähltes Zielfeld
 let dpr = 1;
 
 const images = {};
@@ -91,7 +90,12 @@ function onTap(sx, sy) {
   const c = toCell(sx, sy);
   if (state.hand) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
-    if (target) { pending = target; updatePanel(); }
+    if (target) {
+      placeHand(state, target.x, target.y);
+      selected = tileAt(state, target.x, target.y);
+      refreshTargets();
+      save();
+    }
     return;
   }
   selected = tileAt(state, c.x, c.y) || null;
@@ -100,7 +104,6 @@ function onTap(sx, sy) {
 
 function refreshTargets() {
   targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
-  pending = null;
   updatePanel();
 }
 
@@ -112,23 +115,39 @@ function updatePanel() {
   panel.classList.remove('hidden');
   let info;
   if (hand) {
-    info = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>` +
-      (pending ? 'Place drücken zum Platzieren' : 'Grünes Feld antippen, an dem das Tile liegen soll');
+    info = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>Grünes Feld antippen, um das Tile zu platzieren`;
   } else {
     const def = TILES[selected.type];
     info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name})`;
     if (def.buffedBy) info += ` – Buffs: ${buffCount(state, selected)}`;
   }
   $('panel-info').innerHTML = info;
-  $('btn-place').style.display = hand ? '' : 'none';
-  $('btn-place').disabled = !pending;
-  $('btn-cancel').textContent = hand ? 'Auswahl aufheben' : 'Schließen';
+  $('panel-btns').style.display = hand ? 'none' : '';
+}
+
+let queueKey = '';
+function chip(id) {
+  const d = TILES[id];
+  return `<span class="chip" style="background:${d.color}">${d.icon} ${d.name}</span>`;
+}
+function renderQueue() {
+  const key = `${state.hand}|${state.deck[0]}`;
+  if (key === queueKey) return;
+  queueKey = key;
+  let html = '';
+  if (state.hand) html += `Jetzt: ${chip(state.hand)}`;
+  html += state.deck.length ? ` Danach: ${chip(state.deck[0])}` : ' Deck leer';
+  $('queue').innerHTML = html;
 }
 
 function updateHud() {
-  for (const r of ['wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
+  for (const r of ['gold', 'wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
   $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
   $('btn-next').textContent = `Next (${cardCount(state)})`;
+  $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
+  $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
+  $('btn-sell').disabled = state.wood + state.grain < 1;
+  renderQueue();
 }
 
 let toastTimer;
@@ -158,19 +177,18 @@ $('overlay-close').onclick = closeOverlay;
 const costText = (cost) => Object.entries(cost).map(([r, n]) => `${n} ${RESOURCES[r].icon}`).join(' ');
 
 function showInventory() {
-  const body = openOverlay(`Karten (${cardCount(state)})`);
+  const body = openOverlay(`Deck (${cardCount(state)}) – Reihenfolge der Ziehung`);
   body.innerHTML = '';
-  const types = Object.keys(TILES).filter(id => state.inventory[id] > 0);
-  if (!types.length) body.textContent = 'Keine Karten. Kaufe ein Pack im Shop.';
-  for (const id of types) {
+  if (!state.deck.length) body.textContent = 'Keine Karten. Kaufe ein Pack im Shop.';
+  state.deck.forEach((id, i) => {
     const d = TILES[id];
     const el = document.createElement('div');
     el.className = `card ${d.rarity}`;
     el.style.cursor = 'default';
     el.style.background = d.color;
-    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>×${state.inventory[id]}`;
+    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>#${i + 1}`;
     body.appendChild(el);
-  }
+  });
 }
 
 function showShop(result) {
@@ -197,18 +215,11 @@ function showShop(result) {
 
 $('btn-cards').onclick = showInventory;
 $('btn-shop').onclick = () => showShop();
-$('btn-place').onclick = () => {
-  if (!state.hand || !pending) return;
-  const t = placeHand(state, pending.x, pending.y);
-  if (!t) return;
-  selected = t;
-  refreshTargets();
-  save();
+$('btn-cancel').onclick = () => { selected = null; updatePanel(); };
+$('btn-shuffle').onclick = () => {
+  if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);
 };
-$('btn-cancel').onclick = () => {
-  if (state.hand) { pending = null; } else { selected = null; }
-  updatePanel();
-};
+$('btn-sell').onclick = () => { toast(`+${sellAll(state)} 🪙`); save(); };
 
 // ---------- Zeichnen ----------
 function drawTile(t, x, y, alpha = 1) {
@@ -252,14 +263,12 @@ function draw() {
   }
 
   for (const g of targets) {
-    const isPending = pending === g;
-    ctx.fillStyle = isPending ? 'rgba(255,255,255,.35)' : 'rgba(60,220,90,.45)';
+    ctx.fillStyle = 'rgba(60,220,90,.45)';
     ctx.fillRect(g.x * TILE, g.y * TILE, TILE, TILE);
-    ctx.strokeStyle = isPending ? '#fff' : '#3cdc5a';
+    ctx.strokeStyle = '#3cdc5a';
     ctx.lineWidth = 3;
     ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
   }
-  if (pending) drawTile(state.hand, pending.x * TILE, pending.y * TILE, 0.8);
 
   if (selected && !state.hand) {
     ctx.strokeStyle = '#ffeb3b';

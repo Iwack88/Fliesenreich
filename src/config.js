@@ -2,9 +2,10 @@
 // Grafik: optional assets/tiles/<id>.png ablegen, sonst wird Farbe + Emoji genutzt.
 
 export const TICK_MS = 1000;
-export const START_GOLD = 0;
+export const START_GOLD = 10;
+export const SHUFFLE_COST = 5; // Gold pro Shuffle
 
-// Start-Inventar (Karten pro Tile-Typ).
+// Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
 export const START_DECK = { gras: 2, wald: 4, feld: 4, holzfaeller: 2, windmuehle: 2, wasser: 1, erde: 1 };
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
