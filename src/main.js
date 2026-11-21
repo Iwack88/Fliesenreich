@@ -14,6 +14,8 @@ let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
 let dpr = 1;
+const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
+const FLASH_MS = 900;
 
 const images = {};
 for (const id of Object.keys(TILES)) {
@@ -92,7 +94,11 @@ function onTap(sx, sy) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
       const res = placeHand(state, target.x, target.y);
-      if (res && res.gold) toast(`+${res.gold} ${GOLD_ICON}`);
+      if (res && res.gold) {
+        toast(`+${res.gold} ${GOLD_ICON}`);
+        const now = performance.now();
+        for (const p of res.pairs) flashes.push({ x: p.tile.x, y: p.tile.y, value: p.value, start: now });
+      }
       selected = null;
       refreshTargets();
       save();
@@ -326,6 +332,22 @@ function draw() {
     ctx.strokeStyle = '#3cdc5a';
     ctx.lineWidth = 3;
     ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
+  }
+
+  const now = performance.now();
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i], p = (now - f.start) / FLASH_MS;
+    if (p >= 1) { flashes.splice(i, 1); continue; }
+    const pulse = Math.sin(p * Math.PI * 3) ** 2 * (1 - p);
+    ctx.fillStyle = `rgba(255,255,200,${0.85 * pulse})`;
+    ctx.fillRect(f.x * TILE, f.y * TILE, TILE, TILE);
+    ctx.strokeStyle = `rgba(255,235,59,${1 - p})`;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(f.x * TILE + 3, f.y * TILE + 3, TILE - 6, TILE - 6);
+    ctx.fillStyle = `rgba(255,255,255,${1 - p})`;
+    ctx.font = `bold ${TILE * 0.3}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`+${f.value}`, (f.x + 0.5) * TILE, (f.y + 0.5) * TILE - p * TILE * 0.4);
   }
 
   if (selected && !state.hand) {

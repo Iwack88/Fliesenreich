@@ -83,14 +83,16 @@ export function placeHand(s, x, y) {
   const tile = addTile(s, s.hand, x, y);
   s.hand = null;
   let gold = 0;
+  const pairs = [];
   for (const o of partnersOf(s, tile)) {
     const v = pairValue(tile, o);
     gold += v;
+    pairs.push({ tile: o, value: v });
     o.earned = (o.earned || 0) + v;
     tile.earned += v;
   }
   s.gold += gold;
-  return { tile, gold };
+  return { tile, gold, pairs };
 }
 
 export const canAfford = (s, cost) => s.gold >= cost;
