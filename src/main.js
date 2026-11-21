@@ -125,7 +125,7 @@ function updatePanel() {
 function updateHud() {
   for (const r of ['gold', 'wood', 'grain']) $('r-' + r).textContent = Math.floor(state[r]);
   const cost = nextCost(state);
-  $('btn-next').textContent = `Next (${cost} 🪙)`;
+  $('btn-next').textContent = cost ? `Next (${cost} 🪙)` : 'Next';
   $('btn-next').disabled = state.gold < cost || hasUnplaced(state);
   $('btn-sell').disabled = state.wood + state.grain < 1;
 }
@@ -230,3 +230,8 @@ function frame() {
 setInterval(() => { tick(state); save(); }, TICK_MS);
 updatePanel();
 frame();
+
+$('btn-full').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.('landscape')).catch(() => toast('Vollbild nicht verfügbar'));
+};

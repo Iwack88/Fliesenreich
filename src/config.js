@@ -2,6 +2,8 @@
 // Grafik: optional assets/tiles/<id>.png ablegen, sonst wird Farbe + Emoji genutzt.
 
 export const TICK_MS = 1000;
+// Auf true setzen, damit "Next" wieder Gold kostet.
+export const SPAWN_COSTS_GOLD = false;
 export const START_GOLD = 30;
 export const NEXT_BASE_COST = 10;
 export const NEXT_COST_STEP = 5;

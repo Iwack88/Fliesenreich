@@ -1,4 +1,4 @@
-import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, NEXT_BASE_COST, NEXT_COST_STEP } from './config.js';
+import { TILES, RARITY, RESOURCES, START_GOLD, START_TILE, NEXT_BASE_COST, NEXT_COST_STEP, SPAWN_COSTS_GOLD } from './config.js';
 
 const key = (x, y) => `${x},${y}`;
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -17,7 +17,7 @@ export function addTile(s, type, x, y, unplaced = false) {
 }
 
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
-export const nextCost = (s) => NEXT_BASE_COST + NEXT_COST_STEP * s.spawned;
+export const nextCost = (s) => !SPAWN_COSTS_GOLD ? 0 : NEXT_BASE_COST + NEXT_COST_STEP * s.spawned;
 
 function freeCellsNextToTiles(s) {
   const cells = new Map();
