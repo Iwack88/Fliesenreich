@@ -60,7 +60,7 @@ test('free placement only allows unoccupied neighboring cells within the world',
   assert.equal(placeHand(state, 2, 0), null);
 });
 
-test('expansion costs gold once and adds exactly 36 obstacles in new area', () => {
+test('expansion costs gold once and adds 36 obstacles and two camps in new area', () => {
   for (let i = 0; i < 20; i++) {
     const state = newState();
     const original = JSON.stringify(state.tiles);
@@ -74,8 +74,13 @@ test('expansion costs gold once and adds exactly 36 obstacles in new area', () =
     assert.equal(state.size, 16);
     assert.equal(state.hand, 'wald');
     const oldTiles = Object.fromEntries(Object.entries(state.tiles).filter(([, t]) => inBounds(8, t.x, t.y)));
-    assert.deepEqual(oldTiles, JSON.parse(original));
-    assert.equal(Object.keys(state.tiles).length, 52);
+    for (const [pos, tile] of Object.entries(JSON.parse(original))) {
+      const { target: oldTarget, ...before } = tile;
+      const { target: newTarget, ...after } = oldTiles[pos];
+      assert.deepEqual(after, before);
+    }
+    assert.equal(Object.keys(state.tiles).length, 54);
+    assert.equal(Object.values(state.tiles).filter(t => t.type === 'banditen' && !inBounds(8, t.x, t.y)).length, 2);
     assertFreeConnected(state, 8);
     assert.equal(expandWorld(state), false);
     assert.equal(JSON.stringify(JSON.parse(JSON.stringify(state))), JSON.stringify(state));

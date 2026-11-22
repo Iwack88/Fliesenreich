@@ -6,7 +6,7 @@ Bau-/Management-Spiel mit Tiles. Platzhalter-Grafiken: PNGs als `assets/tiles/<i
 
 Das Spielfeld startet mit 8×8 Feldern, einem Workshop, einem benachbarten Wachturm, zwei Banditencamps und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die übrigen drei Felder direkt neben dem Workshop bleiben frei. Grüne Felder sind frei und grenzen seitlich an ein vorhandenes Tile; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
-Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend.
+Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles und zwei Banditencamps ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend.
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint nur, solange eine Karte zum Platzieren gezogen ist.
 
@@ -26,7 +26,7 @@ Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald, Haus, Lagerhalle u
 
 Ein Wachturm schützt ein Quadrat von 7×7 Feldern um sich und vertreibt vorhandene Camps in diesem Bereich beim Platzieren. Der Schutzbereich erscheint beim Antippen des Turms und beim Platzieren einer Karte. Mit **🛡️ Schutz** lassen sich Schildsymbole auf allen geschützten Tiles ein- und ausblenden. Ein neu gestartetes Spiel hat zwei Camps außerhalb dieses Bereichs.
 
-Alle fünf Minuten aktiver Spielzeit versucht jedes vorhandene Camp gleichzeitig, ein zufälliges benachbartes, bereits belegtes und ungeschütztes Tile zu übernehmen; auch diagonale Nachbarn zählen. Das übernommene Tile wird ein neues Camp, das erst beim nächsten Durchgang selbst angreift. Workshop-Aufträge auf zerstörten Tiles gehen verloren. Der gemeinsame Countdown steht oben im Spiel und pausiert, wenn das Spiel geschlossen oder der Tab ausgeblendet ist. Rohstoffproduktion und Workshop-Aufträge laufen weiterhin offline.
+Alle fünf Minuten aktiver Spielzeit versucht jedes vorhandene Camp gleichzeitig, ein zufälliges benachbartes, bereits belegtes und ungeschütztes Tile zu übernehmen; auch diagonale Nachbarn zählen. Ein Pfeil zeigt schon vorher das ausgewählte Ziel. Ist kein Ziel verfügbar, erscheint kein Pfeil; sobald ein mögliches Ziel hinzukommt, wird es ausgewählt. Wenn ein Ziel entfernt oder geschützt wird, wählt das Camp ein neues. Camps greifen nicht gleichzeitig dasselbe Tile an. Das übernommene Tile wird ein neues Camp, das erst beim nächsten Durchgang selbst angreift. Workshop-Aufträge auf zerstörten Tiles gehen verloren. Der gemeinsame Countdown steht oben im Spiel und pausiert, wenn das Spiel geschlossen oder der Tab ausgeblendet ist. Rohstoffproduktion und Workshop-Aufträge laufen weiterhin offline.
 
 Eine gezogene Banditen-Niete erscheint sofort auf einem zufälligen ungeschützten freien Feld und die Kamera springt dorthin. Falls kein solches Feld frei ist, wird ein ungeschütztes Tile übernommen. Gibt es kein geeignetes Feld, wird die Niete ans Deckende gelegt. Wachturm-Packs und Waffen sind noch nicht enthalten.
 

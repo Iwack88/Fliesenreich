@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=11';
+import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=12';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -17,7 +17,8 @@ export function newState() {
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
   addObstacles(s, 0, START_OBSTACLES);
-  addInitialBandits(s);
+  addWorldBandits(s, 0, START_BANDITS);
+  planBandits(s);
   return s;
 }
 
@@ -40,7 +41,7 @@ export function migrateState(s, now = Date.now()) {
     s.deck.push('banditen_niete');
     changed = true;
   }
-  return changed;
+  return planBandits(s) || changed;
 }
 
 export function addTile(s, type, x, y) {
@@ -74,12 +75,11 @@ function connected(cells) {
   return seen.size === cells.size;
 }
 
-function addInitialBandits(s) {
+function addWorldBandits(s, oldSize, count) {
   const cells = new Map();
   for (let x = -s.size / 2; x < s.size / 2; x++) for (let y = -s.size / 2; y < s.size / 2; y++) {
-    if (!tileAt(s, x, y)) cells.set(key(x, y), [x, y]);
+    if ((!oldSize || !inBounds(oldSize, x, y)) && !tileAt(s, x, y)) cells.set(key(x, y), [x, y]);
   }
-  let count = START_BANDITS;
   for (const [x, y] of shuffled([...cells.values()])) {
     if (isProtected(s, x, y)) continue;
     cells.delete(key(x, y));
@@ -115,6 +115,8 @@ export function expandWorld(s) {
   if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
   s.size = EXPANDED_SIZE;
   addObstacles(s, START_SIZE, EXPANSION_OBSTACLES);
+  addWorldBandits(s, START_SIZE, EXPANSION_BANDITS);
+  planBandits(s);
   s.gold -= EXPANSION_COST;
   return true;
 }
@@ -172,6 +174,7 @@ export function placeHand(s, x, y, now = Date.now()) {
   const tile = addTile(s, s.hand, x, y);
   adjustWorkshopJobs(s, affected, now);
   const cleared = tile.type === 'wachturm' ? clearGuardedBandits(s) : 0;
+  planBandits(s);
   s.hand = null;
   return { tile, cleared, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
@@ -221,22 +224,48 @@ export function spawnBandit(s, now = Date.now()) {
   if (!candidates.length) return null;
   const result = replaceWithBandits(s, [candidates[Math.floor(Math.random() * candidates.length)]], now)[0];
   s.hand = null;
+  planBandits(s);
   return result;
 }
 
-export function spreadBandits(s, now = Date.now()) {
-  const camps = shuffled(Object.values(s.tiles).filter(tile => tile.type === 'banditen'));
+export function planBandits(s) {
+  const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');
+  const guards = Object.values(s.tiles).filter(tile => tile.type === 'wachturm');
   const claimed = new Set();
-  const cells = [];
+  let changed = false;
+  const eligible = (camp, x, y) => {
+    const tile = tileAt(s, x, y);
+    return Math.max(Math.abs(x - camp.x), Math.abs(y - camp.y)) === 1 &&
+      tile && tile.type !== 'banditen' && !isProtected(s, x, y, guards);
+  };
   for (const camp of camps) {
-    const candidates = NEIGHBORS.map(([dx, dy]) => tileAt(s, camp.x + dx, camp.y + dy))
-      .filter(tile => tile && tile.type !== 'banditen' && !claimed.has(key(tile.x, tile.y)) && !isProtected(s, tile.x, tile.y));
-    if (!candidates.length) continue;
-    const target = candidates[Math.floor(Math.random() * candidates.length)];
-    claimed.add(key(target.x, target.y));
-    cells.push([target.x, target.y]);
+    const target = camp.target;
+    if (target && eligible(camp, target.x, target.y) && !claimed.has(key(target.x, target.y))) {
+      claimed.add(key(target.x, target.y));
+    } else if (target) {
+      delete camp.target;
+      changed = true;
+    }
   }
-  return replaceWithBandits(s, cells, now);
+  for (const camp of shuffled(camps.filter(tile => !tile.target))) {
+    const candidates = NEIGHBORS.map(([dx, dy]) => [camp.x + dx, camp.y + dy])
+      .filter(([x, y]) => eligible(camp, x, y) && !claimed.has(key(x, y)));
+    if (!candidates.length) continue;
+    const [x, y] = candidates[Math.floor(Math.random() * candidates.length)];
+    camp.target = { x, y };
+    claimed.add(key(x, y));
+    changed = true;
+  }
+  return changed;
+}
+
+export function spreadBandits(s, now = Date.now()) {
+  planBandits(s);
+  const cells = Object.values(s.tiles).filter(tile => tile.type === 'banditen' && tile.target)
+    .map(tile => [tile.target.x, tile.target.y]);
+  const results = replaceWithBandits(s, cells, now);
+  planBandits(s);
+  return results;
 }
 
 export function advanceBandits(s, elapsed, now = Date.now()) {
@@ -274,6 +303,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     const affected = tile.type === 'lagerhalle' ? affectedWorkshopJobs(s, x, y) : [];
     delete s.tiles[key(x, y)];
     adjustWorkshopJobs(s, affected, now);
+    planBandits(s);
     s.hand = null;
     return { kind: 'deleted', tile };
   }
@@ -285,6 +315,7 @@ export function useJoker(s, x, y, now = Date.now()) {
   tile.type = newType;
   adjustWorkshopJobs(s, affected, now);
   const cleared = newType === 'wachturm' ? clearGuardedBandits(s) : 0;
+  planBandits(s);
   s.hand = null;
   return { kind: 'transformed', tile, oldType, cleared, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }

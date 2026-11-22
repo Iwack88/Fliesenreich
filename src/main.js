@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=11';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=13';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=12';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=14';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -242,6 +242,10 @@ function updateTilePopup() {
     html += `<div>📦 Lagerhallen: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
   } else if (selected.type === 'lagerhalle') {
     html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
+  } else if (selected.type === 'banditen') {
+    const target = selected.target && tileAt(state, selected.target.x, selected.target.y);
+    html += target ? `<div>Nächstes Ziel: <b>${TILES[target.type].name} (${target.x}, ${target.y})</b></div>` :
+      '<div>Kein ungeschütztes Ziel in Reichweite.</div>';
   }
   if (def.gives) {
     html += `<div>Bonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek.</div>`;
@@ -679,6 +683,35 @@ function drawShield(tile) {
   ctx.stroke();
 }
 
+function drawBanditArrow(tile) {
+  const dx = tile.target.x - tile.x, dy = tile.target.y - tile.y;
+  const length = Math.hypot(dx, dy), ux = dx / length, uy = dy / length;
+  const cx = (tile.x + 0.5) * TILE, cy = (tile.y + 0.5) * TILE;
+  const x = cx + dx * TILE * 0.47, y = cy + dy * TILE * 0.47;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx + dx * TILE * 0.19, cy + dy * TILE * 0.19);
+  ctx.lineTo(x - ux * 7, y - uy * 7);
+  ctx.strokeStyle = '#251013';
+  ctx.lineWidth = 9;
+  ctx.stroke();
+  ctx.strokeStyle = '#ffdf76';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - ux * 17 - uy * 8, y - uy * 17 + ux * 8);
+  ctx.lineTo(x - ux * 17 + uy * 8, y - uy * 17 - ux * 8);
+  ctx.closePath();
+  ctx.fillStyle = '#ffdf76';
+  ctx.fill();
+  ctx.strokeStyle = '#251013';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = BG;
@@ -781,6 +814,7 @@ function draw() {
     const guards = tiles.filter(tile => tile.type === 'wachturm');
     for (const tile of tiles) if (isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
+  for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
 }
 
 function frame() {

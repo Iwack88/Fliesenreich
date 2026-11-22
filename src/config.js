@@ -18,6 +18,7 @@ export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 5 * 60 * 1000;
 export const START_BANDITS = 2;
+export const EXPANSION_BANDITS = 2;
 export const GUARD_RADIUS = 3;
 
 // Zwei Karten pro Pack sind garantiert keine Grundkarten oder Nieten.

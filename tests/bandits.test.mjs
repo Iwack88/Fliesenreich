@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BANDIT_INTERVAL, START_BANDITS, GUARD_RADIUS, TILES } from '../src/config.js';
-import { addTile, advanceBandits, drawCard, isProtected, migrateState, newState, placeHand, spawnBandit, spreadBandits, startPack, useJoker } from '../src/logic.js';
+import { addTile, advanceBandits, drawCard, isProtected, migrateState, newState, placeHand, planBandits, spawnBandit, spreadBandits, startPack, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
@@ -83,8 +83,54 @@ test('camps cannot claim the same tile twice in a tick', () => {
   addTile(s, 'banditen', 0, 0);
   addTile(s, 'banditen', 2, 0);
   addTile(s, 'wald', 1, 0);
+  planBandits(s);
+  assert.equal(Object.values(s.tiles).filter(t => t.type === 'banditen' && t.target).length, 1);
   assert.equal(spreadBandits(s, 0).length, 1);
   assert.equal(Object.values(s.tiles).filter(t => t.type === 'banditen').length, 3);
+});
+
+test('a camp attacks its announced target even after saving and reloading', (t) => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  addTile(s, 'feld', 1, 0);
+  addTile(s, 'wald', 0, 1);
+  let random = 0;
+  t.mock.method(Math, 'random', () => random);
+  assert.equal(planBandits(s), true);
+  const chosen = { ...camp.target };
+  random = 0.99;
+  assert.equal(planBandits(s), false);
+  const restored = JSON.parse(JSON.stringify(s));
+  assert.equal(spreadBandits(restored, 0)[0].previous.type, s.tiles[`${chosen.x},${chosen.y}`].type);
+  assert.equal(restored.tiles[`${chosen.x},${chosen.y}`].type, 'banditen');
+});
+
+test('a target is assigned when a tile is placed and changed when the target is removed', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  s.hand = 'feld';
+  placeHand(s, 1, 0);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  s.hand = 'joker_loeschen';
+  useJoker(s, 1, 0);
+  assert.equal(camp.target, undefined);
+  s.hand = 'wald';
+  placeHand(s, 0, 1);
+  assert.deepEqual(camp.target, { x: 0, y: 1 });
+});
+
+test('a guard protects an announced target and forces a different target immediately', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  addTile(s, 'feld', 1, 0);
+  addTile(s, 'wald', -1, 0);
+  addTile(s, 'gras', 3, 0);
+  camp.target = { x: 1, y: 0 };
+  s.hand = 'wachturm';
+  placeHand(s, 4, 0);
+  assert.deepEqual(camp.target, { x: -1, y: 0 });
+  assert.equal(spreadBandits(s, 0)[0].previous.type, 'wald');
+  assert.equal(s.tiles['1,0'].type, 'feld');
 });
 
 test('global clock advances only by supplied active time and persists its remainder', () => {
@@ -132,6 +178,7 @@ test('a bandit card takes an unprotected occupied tile if no free cells remain',
   const result = spawnBandit(s, 0);
   assert.equal(result.previous.type, 'haus');
   assert.equal(result.tile.type, 'banditen');
+  assert.ok(result.tile.target);
   assert.equal(s.hand, null);
 });
 
@@ -153,5 +200,16 @@ test('migration adds a guard card and a bandit card without replacing existing t
   assert.equal(migrateState(s), true);
   assert.equal(JSON.stringify(s.tiles), before);
   assert.deepEqual(s.deck, ['wachturm', 'wald', 'banditen_niete']);
+  assert.equal(migrateState(s), false);
+});
+
+test('existing camps get a saved target on loading without resetting progress', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  addTile(s, 'haus', 1, 0);
+  s.banditElapsed = 12345;
+  assert.equal(migrateState(s), true);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  assert.equal(s.banditElapsed, 12345);
   assert.equal(migrateState(s), false);
 });
