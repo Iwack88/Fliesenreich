@@ -6,8 +6,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #res span { margin-right: 10px; font-size: 16px; }
 #res { white-space: nowrap; }
 #r-banditen { color: #ffb8a8; font-variant-numeric: tabular-nums; }
-#next-control { position: relative; display: inline-block; }
-#queue { position: absolute; right: 0; top: calc(100% + 6px); width: 90px; padding: 5px; background: rgba(15,30,25,.92); border-radius: 8px; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; pointer-events: none; }
+#queue { position: absolute; right: 10px; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: center; width: 110px; margin: 0; padding: 7px; background: rgba(15,30,25,.94); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; cursor: pointer; box-shadow: 0 3px 8px #0006; }
+#queue:disabled { background: rgba(15,30,25,.94); color: #e5e5e5; opacity: .78; cursor: default; }
 .queue-label { color: #d7e5d9; }
 #queue .card-art { width: 48px; height: 48px; margin: 4px auto; }
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
@@ -52,6 +52,7 @@ button:disabled { background: #555; color: #999; }
   #hud { min-height: 48px; }
   #toast { top: 58px; }
   #tile-popup { top: 64px; width: 260px; }
+  #queue { right: 10px; }
   #overlay-box { width: min(720px, calc(100vw - 40px)); }
   .row { padding: 9px 10px; }
 }
