@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=12';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=14';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=15';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -234,7 +234,7 @@ function updateTilePopup() {
     workshop: 'Produziert Packs. Benachbarte Lagerhallen beschleunigen die Herstellung.',
     lagerhalle: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
     wachturm: `Schützt einen Bereich von ${GUARD_RADIUS * 2 + 1}×${GUARD_RADIUS * 2 + 1} Feldern und entfernt dort Banditencamps.`,
-    banditen: 'Übernimmt bei jedem Banditen-Timer ein zufälliges ungeschütztes Nachbar-Tile. Joker wirken nicht.',
+    banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   if (selected.type === 'workshop') {
@@ -244,7 +244,7 @@ function updateTilePopup() {
     html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
   } else if (selected.type === 'banditen') {
     const target = selected.target && tileAt(state, selected.target.x, selected.target.y);
-    html += target ? `<div>Nächstes Ziel: <b>${TILES[target.type].name} (${target.x}, ${target.y})</b></div>` :
+    html += selected.target ? `<div>Nächstes Ziel: <b>${target ? TILES[target.type].name : 'Freies Feld'} (${selected.target.x}, ${selected.target.y})</b></div>` :
       '<div>Kein ungeschütztes Ziel in Reichweite.</div>';
   }
   if (def.gives) {
@@ -583,7 +583,7 @@ function syncBandits() {
     else showArchive();
     box.scrollTop = scroll;
   }
-  toast(`Banditen übernehmen ${captured.length} ${captured.length === 1 ? 'Tile' : 'Tiles'}!`);
+  toast(`Banditen breiten sich auf ${captured.length} ${captured.length === 1 ? 'Feld' : 'Felder'} aus!`);
 }
 
 let archiveFilter = 'all';

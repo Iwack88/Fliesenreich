@@ -57,7 +57,7 @@ test('a tile transformed into a guard clears camps in range', (t) => {
   assert.equal(s.tiles['2,0'], undefined);
 });
 
-test('all camps spread once simultaneously, capturing tiles but not guarded or empty cells', () => {
+test('all camps spread once simultaneously without attacking guarded cells', () => {
   const s = emptyWorld();
   addTile(s, 'banditen', 0, 0);
   addTile(s, 'haus', 1, 0);
@@ -67,14 +67,14 @@ test('all camps spread once simultaneously, capturing tiles but not guarded or e
   assert.equal(s.tiles['1,0'].type, 'banditen');
   assert.equal(s.tiles['2,0'].type, 'feld');
   assert.equal(Object.keys(s.tiles).length, 3);
-  assert.equal(spreadBandits(s, 0).length, 1);
+  assert.equal(spreadBandits(s, 0).length, 2);
   assert.equal(s.tiles['2,0'].type, 'banditen');
 
   const guarded = emptyWorld();
   addTile(guarded, 'banditen', -4, 0);
   addTile(guarded, 'workshop', -3, 0);
   addTile(guarded, 'wachturm', 0, 0);
-  assert.deepEqual(spreadBandits(guarded, 0), []);
+  spreadBandits(guarded, 0);
   assert.equal(guarded.tiles['-3,0'].type, 'workshop');
 });
 
@@ -84,9 +84,11 @@ test('camps cannot claim the same tile twice in a tick', () => {
   addTile(s, 'banditen', 2, 0);
   addTile(s, 'wald', 1, 0);
   planBandits(s);
-  assert.equal(Object.values(s.tiles).filter(t => t.type === 'banditen' && t.target).length, 1);
-  assert.equal(spreadBandits(s, 0).length, 1);
-  assert.equal(Object.values(s.tiles).filter(t => t.type === 'banditen').length, 3);
+  const targets = Object.values(s.tiles).filter(t => t.type === 'banditen').map(t => `${t.target.x},${t.target.y}`);
+  assert.equal(new Set(targets).size, 2);
+  assert.ok(targets.includes('1,0'));
+  assert.equal(spreadBandits(s, 0).length, 2);
+  assert.equal(Object.values(s.tiles).filter(t => t.type === 'banditen').length, 4);
 });
 
 test('a camp attacks its announced target even after saving and reloading', (t) => {
@@ -105,7 +107,7 @@ test('a camp attacks its announced target even after saving and reloading', (t) 
   assert.equal(restored.tiles[`${chosen.x},${chosen.y}`].type, 'banditen');
 });
 
-test('a target is assigned when a tile is placed and changed when the target is removed', () => {
+test('a target remains on the same field when its tile is removed and rebuilt', () => {
   const s = emptyWorld();
   const camp = addTile(s, 'banditen', 0, 0);
   s.hand = 'feld';
@@ -113,10 +115,58 @@ test('a target is assigned when a tile is placed and changed when the target is 
   assert.deepEqual(camp.target, { x: 1, y: 0 });
   s.hand = 'joker_loeschen';
   useJoker(s, 1, 0);
-  assert.equal(camp.target, undefined);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
   s.hand = 'wald';
-  placeHand(s, 0, 1);
-  assert.deepEqual(camp.target, { x: 0, y: 1 });
+  placeHand(s, 1, 0);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  assert.equal(spreadBandits(s, 0)[0].previous.type, 'wald');
+});
+
+test('isolated camps target empty in-bounds fields and create camps on the next tick', () => {
+  const s = emptyWorld();
+  s.size = 2;
+  const camp = addTile(s, 'banditen', 0, 0);
+  planBandits(s);
+  const target = { ...camp.target };
+  assert.ok(target.x >= -1 && target.x <= 0 && target.y >= -1 && target.y <= 0);
+  assert.equal(s.tiles[`${target.x},${target.y}`], undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(s)).tiles['0,0'].target, target);
+  const result = spreadBandits(s, 0);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].previous, undefined);
+  assert.equal(s.tiles[`${target.x},${target.y}`].type, 'banditen');
+  assert.equal(Object.keys(s.tiles).length, 2);
+});
+
+test('building on an announced empty target does not change it before the attack', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  camp.target = { x: 1, y: 0 };
+  s.hand = 'haus';
+  placeHand(s, 1, 0);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  const captured = spreadBandits(s, 0);
+  assert.equal(captured[0].previous.type, 'haus');
+  assert.equal(s.tiles['1,0'].type, 'banditen');
+  assert.equal(s.tiles['0,0'].type, 'banditen');
+});
+
+test('new targets prioritize an unprotected occupied neighbor over empty fields', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  addTile(s, 'haus', 1, 1);
+  planBandits(s);
+  assert.deepEqual(camp.target, { x: 1, y: 1 });
+});
+
+test('no target is chosen outside the board or inside guard protection', () => {
+  const s = emptyWorld();
+  s.size = 8;
+  const camp = addTile(s, 'banditen', -4, 0);
+  addTile(s, 'wachturm', -1, 0);
+  planBandits(s);
+  assert.equal(camp.target, undefined);
+  assert.deepEqual(spreadBandits(s, 0), []);
 });
 
 test('a guard protects an announced target and forces a different target immediately', () => {

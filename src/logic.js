@@ -235,8 +235,8 @@ export function planBandits(s) {
   let changed = false;
   const eligible = (camp, x, y) => {
     const tile = tileAt(s, x, y);
-    return Math.max(Math.abs(x - camp.x), Math.abs(y - camp.y)) === 1 &&
-      tile && tile.type !== 'banditen' && !isProtected(s, x, y, guards);
+    return inBounds(s.size, x, y) && Math.max(Math.abs(x - camp.x), Math.abs(y - camp.y)) === 1 &&
+      tile?.type !== 'banditen' && !isProtected(s, x, y, guards);
   };
   for (const camp of camps) {
     const target = camp.target;
@@ -251,7 +251,9 @@ export function planBandits(s) {
     const candidates = NEIGHBORS.map(([dx, dy]) => [camp.x + dx, camp.y + dy])
       .filter(([x, y]) => eligible(camp, x, y) && !claimed.has(key(x, y)));
     if (!candidates.length) continue;
-    const [x, y] = candidates[Math.floor(Math.random() * candidates.length)];
+    const occupied = candidates.filter(([x, y]) => tileAt(s, x, y));
+    const pool = occupied.length ? occupied : candidates;
+    const [x, y] = pool[Math.floor(Math.random() * pool.length)];
     camp.target = { x, y };
     claimed.add(key(x, y));
     changed = true;
