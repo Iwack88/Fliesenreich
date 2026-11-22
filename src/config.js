@@ -5,7 +5,6 @@ export const START_GOLD = 20;
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 
 // Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
-// World-Tiles/Nieten erscheinen beim Ziehen direkt zufällig auf dem Spielfeld.
 export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
@@ -19,22 +18,31 @@ export const PACKS = {
 export const GOLD_ICON = '🪙';
 
 export const RARITY = {
-  common:   { name: 'Gewöhnlich', maxMoves: 3 },
-  uncommon: { name: 'Selten', maxMoves: 2 },
-  rare:     { name: 'Episch', maxMoves: 1 },
+  common:   { name: 'Gewöhnlich' },
+  uncommon: { name: 'Selten' },
+  rare:     { name: 'Episch' },
 };
+
+export const SOCKETS = {
+  landschaft: { name: 'Landschaft', color: '#137a33', symbol: 'L' },
+  industrie: { name: 'Industrie', color: '#ad4b04', symbol: 'I' },
+  zukunft: { name: 'Später', color: '#59616c', symbol: '–' },
+};
+
+// Oben, rechts, unten, links. Die vierte Seite ist für spätere Typen reserviert.
+export const DEFAULT_SOCKETS = ['landschaft', 'industrie', 'landschaft', 'zukunft'];
 
 // gives: Gold-Bonus pro Nachbar-Typ (8 Felder rundherum). Wird einmal ausgezahlt, sobald das Paar entsteht
 // (egal welches Tile zuerst lag). Gleiche Typen zählen als ein Paar (Feld an Feld = einmal +1);
 // bei verschiedenen Typen werden die gives beider Seiten addiert.
 export const TILES = {
-  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 40, world: true },
-  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 25, world: true },
-  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 20, world: true },
-  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, gives: { wald: 1 } },
-  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, gives: { feld: 1 } },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  maxMoves: 6, gives: { wald: 2 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  maxMoves: 6, gives: { feld: 2 } },
+  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 40, category: 'landschaft' },
+  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 25, category: 'landschaft' },
+  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 20, category: 'landschaft' },
+  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, category: 'landschaft', gives: { wald: 1 } },
+  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, category: 'landschaft', gives: { feld: 1 } },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8, category: 'industrie', gives: { wald: 2 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8, category: 'industrie', gives: { feld: 2 } },
 };
 
 export const START_TILE = 'gras';

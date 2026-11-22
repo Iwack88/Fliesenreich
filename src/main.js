@@ -1,5 +1,5 @@
-import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST } from './config.js';
-import { newState, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js';
+import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, SOCKETS, DEFAULT_SOCKETS } from './config.js?v=3';
+import { newState, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=3';
 
 const SAVE_KEY = 'fliesenreich-save-v7';
 const TILE = 96;
@@ -125,6 +125,7 @@ function onTap(sx, sy) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
       const res = placeHand(state, target.x, target.y);
+      if (!res) { toast('Dieser Sockel passt nicht'); return; }
       if (res && res.gold) {
         toast(`+${res.gold} ${GOLD_ICON}`);
         const now = performance.now();
@@ -133,7 +134,7 @@ function onTap(sx, sy) {
       selected = res?.tile || null;
       refreshTargets();
       save();
-    }
+    } else toast('Wähle ein grünes Feld mit passendem Sockel');
     return;
   }
   selected = tileAt(state, c.x, c.y) || null;
@@ -142,7 +143,7 @@ function onTap(sx, sy) {
 }
 
 function refreshTargets() {
-  targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
+  targets = state.hand ? placeCells(state, state.hand).map(([x, y]) => ({ x, y })) : [];
   updatePanel();
 }
 
@@ -155,7 +156,8 @@ function updatePanel() {
   const hand = state.hand && TILES[state.hand];
   if (hand) {
     panel.classList.remove('hidden');
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>Grünes Feld antippen, um das Tile zu platzieren`;
+    const category = SOCKETS[hand.category];
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> · ${category.name} (${category.symbol})<br>${targets.length ? 'Grünes Feld antippen zum Platzieren' : 'Kein passender Sockel frei'}`;
   } else {
     panel.classList.add('hidden');
   }
@@ -170,6 +172,10 @@ function updateTilePopup() {
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
+  html += `<div>Typ: ${SOCKETS[def.category].name} (${SOCKETS[def.category].symbol})</div>`;
+  const directions = ['oben', 'rechts', 'unten', 'links'];
+  const sockets = def.sockets ?? DEFAULT_SOCKETS;
+  html += `<div class="dim">Sockel: ${sockets.map((id, i) => `${directions[i]} ${SOCKETS[id].name}`).join(', ')}</div>`;
   html += `<div>Bisher eingebracht: <b>${selected.earned || 0} ${GOLD_ICON}</b></div>`;
   if (def.gives) {
     html += `<div>Gold-Bonus je Nachbar: <b>${givesText(def)}</b></div>`;
@@ -217,17 +223,8 @@ function toast(msg) {
 }
 
 $('btn-next').onclick = () => {
-  const result = drawCard(state);
-  if (!result) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
-  if (result.kind === 'world') {
-    if (result.tile) {
-      cam.x = (result.tile.x + 0.5) * TILE;
-      cam.y = (result.tile.y + 0.5) * TILE;
-      toast(`${TILES[result.type].icon || ''} ${TILES[result.type].name} gespawnt`);
-    }
-  } else {
-    selected = null;
-  }
+  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
+  selected = null;
   refreshTargets();
   save();
 };
@@ -345,6 +342,22 @@ function drawTile(t, x, y, alpha = 1) {
   ctx.strokeStyle = 'rgba(0,0,0,.35)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, TILE, TILE);
+  const sockets = def.sockets ?? DEFAULT_SOCKETS;
+  const positions = [[TILE / 2, 8], [TILE - 8, TILE / 2], [TILE / 2, TILE - 8], [8, TILE / 2]];
+  sockets.forEach((id, i) => {
+    const [dx, dy] = positions[i];
+    const socket = SOCKETS[id];
+    ctx.fillStyle = socket.color;
+    ctx.fillRect(x + dx - 10, y + dy - 7, 20, 14);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + dx - 10, y + dy - 7, 20, 14);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(socket.symbol, x + dx, y + dy);
+  });
   ctx.globalAlpha = 1;
 }
 
@@ -373,11 +386,6 @@ function draw() {
     ctx.strokeStyle = '#3cdc5a';
     ctx.lineWidth = 3;
     ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${TILE * 0.32}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(g.cost, (g.x + 0.5) * TILE, (g.y + 0.5) * TILE);
   }
 
 

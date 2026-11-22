@@ -1,7 +1,7 @@
-import { TILES, RARITY, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js';
+import { TILES, DEFAULT_SOCKETS, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js?v=3';
 
 const key = (x, y) => `${x},${y}`;
-const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
 function shuffled(arr) {
   const a = [...arr];
@@ -26,67 +26,14 @@ export function addTile(s, type, x, y) {
 
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
 
-export function maxMovesOf(type) {
-  const def = TILES[type];
-  return def.maxMoves ?? RARITY[def.rarity].maxMoves;
-}
-
-// Eine gezogene Karte spawnt zufällig an einer freien Seite eines bestehenden Tiles.
-export function spawnHandTile(s) {
-  if (!s.hand) return null;
-  const cells = [];
-  for (const t of Object.values(s.tiles)) {
-    for (const [dx, dy] of DIRS4) {
-      const x = t.x + dx, y = t.y + dy;
-      if (!s.tiles[key(x, y)]) cells.push([x, y]);
-    }
-  }
-  if (!cells.length) return null;
-  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  const tile = addTile(s, s.hand, x, y);
-  tile.unplaced = true;
-  tile.movesLeft = maxMovesOf(tile.type);
-  s.hand = null;
-  return tile;
-}
-
-// Alle erreichbaren leeren Felder, deren Entfernung <= Moves bleibt.
-// Das Netz muss an mindestens einem bestehenden Tile liegen.
-export function moveTargets(s, tile) {
-  if (!tile.unplaced || tile.movesLeft <= 0) return [];
-  const dist = new Map([[key(tile.x, tile.y), 0]]);
-  const queue = [[tile.x, tile.y]];
-  const result = [];
-  while (queue.length) {
-    const [x, y] = queue.shift();
-    const d = dist.get(key(x, y));
-    if (d >= tile.movesLeft) continue;
-    for (const [dx, dy] of DIRS4) {
-      const nx = x + dx, ny = y + dy, k = key(nx, ny);
-      if (dist.has(k) || s.tiles[k] && s.tiles[k] !== tile) continue;
-      dist.set(k, d + 1);
-      queue.push([nx, ny]);
-      const adjacent = DIRS4.some(([ax, ay]) => tileAt(s, nx + ax, ny + ay) && tileAt(s, nx + ax, ny + ay) !== tile);
-      if (adjacent) result.push({ x: nx, y: ny, cost: d + 1 });
-    }
-  }
-  return result;
-}
-
-export function moveTile(s, tile, target) {
-  delete s.tiles[key(tile.x, tile.y)];
-  tile.x = target.x;
-  tile.y = target.y;
-  tile.movesLeft -= target.cost;
-  s.tiles[key(tile.x, tile.y)] = tile;
-}
-
-export function placeCells(s) {
+export function placeCells(s, type) {
+  if (!TILES[type]) return [];
   const cells = new Map();
   for (const t of Object.values(s.tiles)) {
-    for (const [dx, dy] of DIRS4) {
+    const sockets = TILES[t.type].sockets ?? DEFAULT_SOCKETS;
+    for (const [i, [dx, dy]] of DIRS4.entries()) {
       const x = t.x + dx, y = t.y + dy;
-      if (!s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
+      if (sockets[i] === TILES[type].category && !s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
     }
   }
   return [...cells.values()];
@@ -102,30 +49,10 @@ function pickWeighted(entries) {
 
 export const cardCount = (s) => s.deck.length;
 
-// Zieht die oberste Karte.
-// World-Tiles werden sofort zufällig platziert. Sinn-Karten gehen auf die Hand.
 export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;
-  const type = s.deck.shift();
-  if (TILES[type].world) {
-    const tile = spawnWorldTile(s, type);
-    return { kind: 'world', type, tile };
-  }
-  s.hand = type;
-  return { kind: 'card', type };
-}
-
-export function spawnWorldTile(s, type) {
-  const cells = [];
-  for (const t of Object.values(s.tiles)) {
-    for (const [dx, dy] of DIRS4) {
-      const x = t.x + dx, y = t.y + dy;
-      if (!s.tiles[key(x, y)]) cells.push([x, y]);
-    }
-  }
-  if (!cells.length) return null;
-  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  return addTile(s, type, x, y);
+  s.hand = s.deck.shift();
+  return s.hand;
 }
 
 export function shuffleDeck(s) {
@@ -135,10 +62,9 @@ export function shuffleDeck(s) {
   return true;
 }
 
-// Sinn-Karten werden frei auf ein leeres Nachbarfeld gesetzt.
 export function placeHand(s, x, y) {
   if (!s.hand) return null;
-  const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
+  const valid = placeCells(s, s.hand).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const tile = addTile(s, s.hand, x, y);
   s.hand = null;
@@ -155,7 +81,6 @@ export function placeHand(s, x, y) {
   return { tile, gold, pairs };
 }
 
-// Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
 
 // Gold-Wert eines Nachbar-Paares.
@@ -168,24 +93,6 @@ export function pairValue(a, b) {
 // Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Gold-Paar bildet.
 export function partnersOf(s, tile) {
   return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o && pairValue(tile, o) > 0);
-}
-
-// Platzierung bestätigt das bewegte Tile und zahlt einmalig Gold für neue Paare.
-export function placeTile(s, tile) {
-  if (!tile.unplaced) return null;
-  tile.unplaced = false;
-  delete tile.movesLeft;
-  let gold = 0;
-  const pairs = [];
-  for (const o of partnersOf(s, tile)) {
-    const v = pairValue(tile, o);
-    gold += v;
-    pairs.push({ tile: o, value: v });
-    o.earned = (o.earned || 0) + v;
-    tile.earned += v;
-  }
-  s.gold += gold;
-  return { tile, gold, pairs };
 }
 
 export const canAfford = (s, cost) => s.gold >= cost;
