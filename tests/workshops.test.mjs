@@ -19,6 +19,23 @@ test('tile yield includes its own production buffs, not bonuses it grants other 
   assert.deepEqual(productionRates(s), { holz: 5, korn: 3, gold: 0 });
 });
 
+test('HumanCity is crafted with resources, gains warehouse speed and opens from inventory', (t) => {
+  const s = newState();
+  s.productionAt = 1000;
+  const workshop = s.tiles['0,0'];
+  addTile(s, 'lagerhalle', 1, 1);
+  assert.equal(startPack(s, workshop, 'humancity', 1000), true);
+  assert.deepEqual(s.resources, { holz: 0, korn: 2 });
+  assert.equal(workshop.job.duration, 72000);
+  updateProduction(s, 73000);
+  assert.equal(s.packs.humancity, 1);
+  t.mock.method(Math, 'random', () => 0.999);
+  const cards = openPack(s, 'humancity');
+  assert.equal(cards.length, 5);
+  assert.ok(cards.includes('wachturm'));
+  assert.equal(s.packs.humancity, 0);
+});
+
 test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
   const s = newState();
   s.tiles = {};

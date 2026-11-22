@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=12';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=16';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=13';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=17';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -297,6 +297,8 @@ function updateHud() {
   $('btn-cards').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
   $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
+  const sale = shopStatus(state);
+  $('btn-shop').textContent = sale.open ? `Shop SALE ${formatTime(sale.remaining)}` : `Shop ${formatTime(sale.remaining)}`;
   renderQueue();
 }
 
@@ -483,9 +485,37 @@ function showInventory() {
   });
 }
 
+let shopViewKey = '';
 function showShop() {
-  const body = openOverlay('Shop');
+  const body = openOverlay('Shop', 'shop');
   body.innerHTML = '';
+  const sale = shopStatus(state);
+  shopViewKey = `${state.shop.round}|${sale.open}`;
+  const status = document.createElement('div');
+  status.id = 'shop-sale-status';
+  status.className = 'workshop';
+  body.appendChild(status);
+  if (sale.open) {
+    const round = state.shop.round;
+    for (const offer of state.shop.offers) {
+      const card = CARDS[offer.card];
+      const row = document.createElement('div');
+      row.className = 'pack';
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : ''}</span>`;
+      const button = document.createElement('button');
+      button.dataset.shopCard = offer.card;
+      button.onclick = () => {
+        syncBandits();
+        syncProduction();
+        if (!buyShopCard(state, offer.card, round)) { toast('Kauf nicht möglich: Sale beendet, ausverkauft oder zu wenig Gold'); updateShopView(); return; }
+        save();
+        showShop();
+        toast(`${card.name} gekauft – im Inventar am Deckende`);
+      };
+      row.appendChild(button);
+      body.appendChild(row);
+    }
+  }
   if (state.size === START_SIZE) {
     const row = document.createElement('div');
     row.className = 'pack';
@@ -503,7 +533,32 @@ function showShop() {
     row.appendChild(btn);
     body.appendChild(row);
   }
-  if (state.size !== START_SIZE) body.textContent = 'Das Spielfeld ist bereits erweitert.';
+  if (state.size !== START_SIZE) {
+    const notice = document.createElement('p');
+    notice.textContent = 'Das Spielfeld ist bereits erweitert.';
+    body.appendChild(notice);
+  }
+  updateShopView();
+}
+
+function updateShopView() {
+  if (overlayView !== 'shop') return;
+  const sale = shopStatus(state);
+  if (shopViewKey !== `${state.shop.round}|${sale.open}`) {
+    const scroll = $('overlay-box').scrollTop;
+    showShop();
+    $('overlay-box').scrollTop = scroll;
+    return;
+  }
+  $('shop-sale-status').textContent = sale.open
+    ? `SALE: ${SHOP_DISCOUNT * 100} % Rabatt · noch ${formatTime(sale.remaining)}. Jede Karte einmal verfügbar.`
+    : `Karten-Shop geschlossen · nächster Sale in ${formatTime(sale.remaining)} aktiver Spielzeit. Alle 5 Minuten, eine Minute lang, vier zufällige Karten inklusive Joker und Nieten.`;
+  for (const offer of state.shop.offers) {
+    const button = document.querySelector(`[data-shop-card="${offer.card}"]`);
+    if (!button) continue;
+    button.textContent = offer.bought ? 'Ausverkauft' : `Kaufen · ${offer.price} ${GOLD_ICON}`;
+    button.disabled = !sale.open || offer.bought || state.gold < offer.price;
+  }
 }
 
 function formatTime(ms) {
@@ -638,6 +693,8 @@ function syncBandits() {
   if (!elapsed) return;
   if (state.banditElapsed + elapsed >= BANDIT_INTERVAL) syncProduction();
   const captured = advanceBandits(state, elapsed);
+  advanceShop(state, elapsed);
+  updateShopView();
   save();
   if (!captured.length) return;
   if (selected && tileAt(state, selected.x, selected.y) !== selected) selected = null;
@@ -696,7 +753,7 @@ $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncProduction(); showWorkshops(); };
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
-$('btn-shop').onclick = () => showShop();
+$('btn-shop').onclick = () => { syncBandits(); syncProduction(); showShop(); };
 $('btn-shields').onclick = () => {
   showShields = !showShields;
   $('btn-shields').setAttribute('aria-pressed', String(showShields));
@@ -903,6 +960,7 @@ setInterval(() => {
   syncBandits();
   syncProduction();
   updateWarehouse();
+  updateShopView();
   for (const indicator of document.querySelectorAll('.job-status')) updateJobIndicator(indicator);
 }, 1000);
 document.addEventListener('visibilitychange', () => {

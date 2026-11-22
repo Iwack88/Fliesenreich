@@ -20,7 +20,7 @@ test('displayed probabilities include the guarantee and sum to 100%', () => {
   }
 });
 
-test('both packs always contain at least two non-filler cards even with worst-case randomness', (t) => {
+test('all packs always contain at least two non-filler cards even with worst-case randomness', (t) => {
   t.mock.method(Math, 'random', () => 0);
   for (const id of Object.keys(PACKS)) {
     const state = { packs: { [id]: 1 }, deck: ['wasser'] };
@@ -43,4 +43,12 @@ test('a missing pack does not change the deck', () => {
   const state = { packs: {}, deck: ['wald'] };
   assert.equal(openPack(state, 'natur'), null);
   assert.deepEqual(state, { packs: {}, deck: ['wald'] });
+});
+
+test('HumanCity offers houses, taverns and guards with guarantee-adjusted chances', () => {
+  const chances = Object.fromEntries(packChances(PACKS.humancity));
+  assert.ok(Math.abs(chances.wachturm - 11.2) < 1e-10);
+  assert.ok(Math.abs(chances.haus - 42) < 1e-10);
+  assert.ok(Math.abs(chances.taverne - 16.8) < 1e-10);
+  assert.equal(chances.banditen_niete, 3);
 });

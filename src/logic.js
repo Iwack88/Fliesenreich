@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=12';
+import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=13';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -14,6 +14,7 @@ function shuffled(arr) {
 
 export function newState() {
   const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  s.shop = { elapsed: 0, round: 0, offers: [] };
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
   addObstacles(s, 0, START_OBSTACLES);
@@ -24,6 +25,10 @@ export function newState() {
 
 export function migrateState(s, now = Date.now()) {
   let changed = false;
+  if (!s.shop) {
+    s.shop = { elapsed: 0, round: 0, offers: [] };
+    changed = true;
+  }
   if (!s.resources) {
     s.resources = { ...START_RESOURCES };
     s.productionAt = now;
@@ -152,6 +157,35 @@ export function packChances(pack) {
 }
 
 export const cardCount = (s) => s.deck.length;
+
+export function shopStatus(s) {
+  const open = s.shop.round > 0 && s.shop.elapsed < SHOP_DURATION;
+  return { open, remaining: (open ? SHOP_DURATION : SHOP_INTERVAL) - s.shop.elapsed };
+}
+
+export function advanceShop(s, elapsedMs) {
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) throw new Error('Ungültige aktive Shop-Zeit');
+  const elapsed = s.shop.elapsed + elapsedMs;
+  const rounds = Math.floor(elapsed / SHOP_INTERVAL);
+  s.shop.elapsed = elapsed % SHOP_INTERVAL;
+  if (rounds) {
+    s.shop.round += rounds;
+    s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
+      .slice(0, SHOP_OFFER_COUNT).map(card => ({
+        card, price: Math.round(SHOP_PRICES[CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
+      }));
+  }
+}
+
+export function buyShopCard(s, card, round) {
+  if (!shopStatus(s).open || s.shop.round !== round) return false;
+  const offer = s.shop.offers.find(offer => offer.card === card);
+  if (!offer || offer.bought || s.gold < offer.price) return false;
+  s.gold -= offer.price;
+  s.deck.push(card);
+  offer.bought = true;
+  return true;
+}
 
 export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;

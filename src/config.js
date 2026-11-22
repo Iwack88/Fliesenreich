@@ -20,6 +20,11 @@ export const BANDIT_INTERVAL = 5 * 60 * 1000;
 export const START_BANDITS = 2;
 export const EXPANSION_BANDITS = 2;
 export const GUARD_RADIUS = 3;
+export const SHOP_INTERVAL = 5 * 60 * 1000;
+export const SHOP_DURATION = 60 * 1000;
+export const SHOP_OFFER_COUNT = 4;
+export const SHOP_DISCOUNT = 0.25;
+export const SHOP_PRICES = { common: 80, uncommon: 200, rare: 400 };
 
 // Zwei Karten pro Pack sind garantiert keine Grundkarten oder Nieten.
 export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser', 'banditen_niete'];
@@ -34,6 +39,10 @@ export const PACKS = {
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 6, korn: 5 }, duration: 60000, cards: 5,
     weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, banditen_niete: 2 },
+  },
+  humancity: {
+    name: 'HumanCity-Pack', cost: { holz: 8, korn: 6 }, duration: 90000, cards: 5,
+    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8 },
   },
 };
 
