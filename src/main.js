@@ -380,6 +380,59 @@ $('btn-new-game').onclick = () => {
 
 const costText = (cost) => `${cost} ${GOLD_ICON}`;
 
+const WAREHOUSE_RESOURCES = [
+  { id: 'gold', name: 'Gold', icon: '🪙' },
+  { id: 'holz', name: 'Holz', icon: '🪵' },
+  { id: 'korn', name: 'Korn', icon: '🌾' },
+];
+let warehouseResource = null;
+
+function showWarehouse() {
+  warehouseResource = null;
+  const body = openOverlay('Warehouse', 'warehouse');
+  body.innerHTML = '';
+  for (const resource of WAREHOUSE_RESOURCES) {
+    const button = document.createElement('button');
+    button.className = 'row resource-option';
+    button.dataset.resource = resource.id;
+    button.setAttribute('aria-pressed', 'false');
+    button.onclick = () => {
+      warehouseResource = resource;
+      syncBandits();
+      syncProduction();
+      updateWarehouse();
+    };
+    body.appendChild(button);
+  }
+  const detail = document.createElement('div');
+  detail.id = 'warehouse-detail';
+  detail.className = 'workshop';
+  body.appendChild(detail);
+  updateWarehouse();
+}
+
+function updateWarehouse() {
+  if (overlayView !== 'warehouse') return;
+  for (const resource of WAREHOUSE_RESOURCES) {
+    const stock = resource.id === 'gold' ? state.gold : state.resources[resource.id];
+    const button = document.querySelector(`[data-resource="${resource.id}"]`);
+    button.textContent = `${resource.icon} ${resource.name} · Bestand: ${fmt(stock)}${resource.id === 'gold' ? '' : ` / ${RESOURCE_CAP}`}`;
+    button.setAttribute('aria-pressed', String(warehouseResource?.id === resource.id));
+  }
+  const detail = $('warehouse-detail');
+  if (!warehouseResource) {
+    detail.textContent = 'Tippe eine Ressource an, um ihren Ertrag pro Tick zu sehen.';
+    return;
+  }
+  const { id, name, icon } = warehouseResource;
+  const rate = productionRates(state)[id];
+  detail.innerHTML = `<b>${icon} ${name}: +${fmt(rate)} pro Tick</b><div class="pack-chances">Ein Tick dauert ${PRODUCTION_INTERVAL / 1000} Sekunden. Gesamtertrag aller Tiles inklusive Nachbarschaftsboni; Goldpaare zählen nur einmal.</div>`;
+  if (id !== 'gold') {
+    const stored = Math.min(rate, Math.max(0, RESOURCE_CAP - state.resources[id]));
+    detail.innerHTML += `<div class="pack-chances">Bei aktuellem Lagerstand passen beim nächsten Tick ${fmt(stored)} ${name} ins Lager. Lagerlimit: ${RESOURCE_CAP}; Überschuss verfällt.</div>`;
+  }
+}
+
 function showInventory() {
   const body = openOverlay(`Inventar & Deck (${cardCount(state)} Karten)`, 'inventory');
   body.innerHTML = '';
@@ -642,6 +695,7 @@ function showArchive() {
 $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncProduction(); showWorkshops(); };
+$('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
 $('btn-shop').onclick = () => showShop();
 $('btn-shields').onclick = () => {
   showShields = !showShields;
@@ -830,7 +884,7 @@ function draw() {
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
   if (selected && !state.hand) {
     const related = new Set([selected, ...displayPartners(selected)]);
-    ctx.fillStyle = 'rgba(150,150,150,.4)';
+    ctx.fillStyle = 'rgba(85,85,85,.82)';
     for (const tile of tiles) {
       if (!related.has(tile)) ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
     }
@@ -848,6 +902,7 @@ frame();
 setInterval(() => {
   syncBandits();
   syncProduction();
+  updateWarehouse();
   for (const indicator of document.querySelectorAll('.job-status')) updateJobIndicator(indicator);
 }, 1000);
 document.addEventListener('visibilitychange', () => {
