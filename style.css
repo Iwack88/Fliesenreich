@@ -12,7 +12,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #queue .card-art { width: 48px; height: 48px; margin: 4px auto; }
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
 #hud { flex-wrap: wrap; gap: 4px; }
+#actions { display: flex; align-items: center; }
+#primary-actions, #tool-actions { display: contents; }
 #hud button { padding: 6px 10px; margin-left: 4px; }
+#actions .action-icon { display: none; }
+#btn-shuffle .action-icon { display: inline; }
 #hud .hud-resource { padding: 4px; margin: 0 2px 0 0; background: transparent; font-size: 16px; }
 #hud .hud-resource:focus-visible { outline: 2px solid #a8e1ff; }
 #btn-shields[aria-pressed="true"], #btn-grid[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
@@ -44,6 +48,30 @@ button:disabled { background: #555; color: #999; }
   #hud button { font-size: 13px; padding: 5px 6px; margin-left: 2px; }
   #hud .hud-resource { font-size: 14px; padding: 4px; margin: 0; }
   #res span { font-size: 14px; margin-right: 5px; }
+}
+@media (max-width: 899px) {
+  #hud { min-height: 0; height: auto; justify-content: center; padding: 4px 6px; background: rgba(15, 28, 29, .82); border-bottom: 1px solid rgba(236, 222, 187, .35); }
+  #res { display: flex; align-items: center; justify-content: center; gap: 2px; }
+  #res .hud-resource { padding: 3px 4px; margin: 0; border-radius: 6px; font-size: 13px; }
+  #res span { margin: 0 2px; font-size: 12px; }
+  #actions { display: contents; }
+  #primary-actions { position: fixed; top: 50%; left: 6px; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px; transform: translateY(-50%); border: 1px solid rgba(236, 222, 187, .4); border-radius: 11px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; }
+  #primary-actions button { display: flex; width: 58px; min-height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; margin: 0; padding: 3px 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: rgba(78, 111, 77, .88); }
+  #primary-actions .action-icon { display: block; font-size: 19px; line-height: 1; }
+  #primary-actions .action-label { display: block; max-width: 54px; overflow: hidden; font-size: 10px; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+  #tool-actions { position: fixed; bottom: 62px; left: 78px; z-index: 3; display: flex; gap: 3px; padding: 4px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 10px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; }
+  #tool-actions button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; margin: 0; padding: 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: rgba(78, 111, 77, .88); }
+  #tool-actions .action-icon { display: block; font-size: 18px; line-height: 1; }
+  #tool-actions .action-label { display: none; }
+  #crafting-toggle { right: auto; left: calc(100% + 80px); transform: translateY(-50%); }
+  #crafting-panel:not(.closed) #crafting-toggle { right: -40px; left: auto; }
+  #queue { top: calc(100% + 5px); right: 6px; width: 92px; padding: 5px; font-size: 10px; }
+  #queue .card-art { width: 38px; height: 38px; margin: 3px auto; }
+  #panel { padding: 6px 8px; font-size: 13px; }
+  #panel.has-ready-packs { padding-left: 78px; }
+  #panel.has-idle-workshop { padding-right: 78px; }
+  #panel-info { max-width: calc(100vw - 130px); }
+  #panel-info .preview-buffs { display: block; margin-top: 3px; font-size: 11px; }
 }
 @media (min-width: 900px) {
   button { transition: filter .12s, transform .12s; }

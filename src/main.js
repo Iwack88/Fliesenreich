@@ -22,6 +22,7 @@ let cam = initialCamera();
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
 let placementPreview = null;
+let placementBuffCache = null;
 let dpr = 1;
 const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
@@ -198,6 +199,7 @@ function onTap(sx, sy) {
     if (target) {
       if (!placementPreview || placementPreview.x !== target.x || placementPreview.y !== target.y) {
         placementPreview = target;
+        placementBuffCache = null;
         selected = null;
         updatePanel();
         return;
@@ -207,6 +209,7 @@ function onTap(sx, sy) {
       if (res.cleared) toast(`${res.cleared} Banditencamps vertrieben`);
       flashPairs(res.pairs);
       placementPreview = null;
+      placementBuffCache = null;
       selected = res?.tile || null;
       refreshTargets();
       save();
@@ -223,6 +226,7 @@ function refreshTargets() {
   if (!TILES[state.hand] || (placementPreview && !targets.some(t => t.x === placementPreview.x && t.y === placementPreview.y))) {
     placementPreview = null;
   }
+  placementBuffCache = null;
   updatePanel();
 }
 
@@ -260,6 +264,48 @@ function previewPartners() {
   });
 }
 
+function previewBuffs() {
+  if (!placementPreview || !TILES[state.hand]) return [];
+  if (placementBuffCache) return placementBuffCache;
+  const candidate = { ...placementPreview, type: state.hand };
+  const simulated = { ...state, tiles: { ...state.tiles, [`${candidate.x},${candidate.y}`]: candidate } };
+  const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
+  const buffs = [];
+  const formatBonus = (before, after) => Object.keys(resources)
+    .filter(resource => after[resource] > before[resource])
+    .map(resource => `+${fmt(after[resource] - before[resource])} ${resources[resource]}/Tick`)
+    .join(', ');
+
+  for (const tile of Object.values(state.tiles)) {
+    const change = formatBonus(tileProduction(state, tile).bonus, tileProduction(simulated, tile).bonus);
+    if (change) buffs.push({ tile, text: change });
+  }
+  const ownBonus = formatBonus({ holz: 0, korn: 0, gold: 0 }, tileProduction(simulated, candidate).bonus);
+  if (ownBonus) buffs.push({ tile: candidate, text: ownBonus, candidate: true });
+
+  if (candidate.type === 'werkzeugschmiede') {
+    for (const tile of Object.values(state.tiles).filter(tile => tile.type === 'workshop')) {
+      const speed = Math.max(0, Math.min(3, forgeCount(simulated, tile)) - Math.min(3, forgeCount(state, tile))) * 20;
+      if (speed) buffs.push({ tile, text: `Herstellung −${speed}%` });
+    }
+  } else if (candidate.type === 'workshop') {
+    const speed = Math.min(3, forgeCount(simulated, candidate)) * 20;
+    if (speed) buffs.push({ tile: candidate, text: `Herstellung −${speed}%`, candidate: true });
+  }
+  placementBuffCache = buffs;
+  return placementBuffCache;
+}
+
+function previewBuffText() {
+  if (state.hand === 'wachturm') return `Schützt ${previewPartners().length} Tiles im Wirkungsbereich.`;
+  const buffs = previewBuffs();
+  if (!buffs.length) return 'Keine Produktions- oder Workshop-Buffs an dieser Position.';
+  const shown = buffs.slice(0, 3).map(({ tile, text, candidate }) =>
+    `${candidate ? 'Neues Tile' : TILES[tile.type].name}: ${text}`);
+  if (buffs.length > shown.length) shown.push(`und ${buffs.length - shown.length} weitere`);
+  return `<span class="preview-buffs"><b>Gebuffte Tiles:</b> ${shown.join(' · ')}</span>`;
+}
+
 function updatePanel() {
   const panel = $('panel');
   const hand = state.hand && CARDS[state.hand];
@@ -271,7 +317,7 @@ function updatePanel() {
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
       state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
-      placementPreview ? `Vorschau: ${previewPartners().length} beeinflusste Tiles · erneut antippen zum Platzieren; anderes grünes Feld verschiebt sie` :
+      placementPreview ? `Vorschau: ${previewPartners().length} relevante Tiles · erneut antippen zum Platzieren; anderes grünes Feld verschiebt sie<br>${previewBuffText()}` :
       targets.length ? 'Grünes Feld antippen für Vorschau; erneut antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
@@ -372,15 +418,17 @@ function updateHud() {
   $('r-korn').textContent = `${state.resources.korn}/${caps.korn}`;
   $('r-banditen').textContent = formatTime(BANDIT_INTERVAL - state.banditElapsed);
   const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
-  $('btn-cards').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
+  $('btn-cards-label').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
+  $('btn-cards').setAttribute('aria-label', readyPacks ? `Inventar, ${readyPacks} fertige Packs` : 'Inventar');
   $('ready-packs').hidden = !readyPacks;
   $('ready-packs-count').textContent = readyPacks;
   $('ready-packs').setAttribute('aria-label', `${readyPacks} fertige Packs öffnen`);
   $('panel').classList.toggle('has-ready-packs', readyPacks > 0);
-  $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
+  $('btn-shuffle-label').textContent = `${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
   const sale = shopStatus(state);
-  $('btn-shop').textContent = sale.open ? `Shop SALE ${formatTime(sale.remaining)}` : `Shop ${formatTime(sale.remaining)}`;
+  $('btn-shop-label').textContent = sale.open ? `Shop SALE ${formatTime(sale.remaining)}` : `Shop ${formatTime(sale.remaining)}`;
+  $('btn-shop').setAttribute('aria-label', sale.open ? `Shop, Sale endet in ${formatTime(sale.remaining)}` : `Shop, Sale in ${formatTime(sale.remaining)}`);
   const idleWorkshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && !tile.job).length;
   $('idle-workshop').hidden = !idleWorkshops;
   $('idle-workshop-count').textContent = idleWorkshops;
@@ -444,6 +492,7 @@ $('btn-return-card').onclick = () => {
   state.deck.push(state.hand);
   state.hand = null;
   placementPreview = null;
+  placementBuffCache = null;
   refreshTargets();
   save();
   toast('Joker ans Deckende gelegt');
@@ -475,6 +524,7 @@ $('btn-new-game').onclick = () => {
     cam = initialCamera();
     selected = null;
     placementPreview = null;
+    placementBuffCache = null;
     flashes.length = 0;
     closeOverlay();
     refreshTargets();
@@ -1160,7 +1210,8 @@ function draw() {
     }
   }
 
-  const visibleGuards = TILES[state.hand] ? tiles.filter(t => t.type === 'wachturm') :
+  const visibleGuards = TILES[state.hand] ?
+    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [{ ...placementPreview, type: 'wachturm' }] : [])] :
     selected?.type === 'wachturm' && !state.hand ? [selected] : [];
   for (const guard of visibleGuards) {
     const minX = Math.max(-half, guard.x - GUARD_RADIUS);
@@ -1215,6 +1266,26 @@ function draw() {
       ctx.strokeStyle = '#ffb52e';
       ctx.lineWidth = 5;
       ctx.strokeRect(tile.x * TILE + 4, tile.y * TILE + 4, TILE - 8, TILE - 12);
+    }
+    for (const buff of previewBuffs()) {
+      const bx = buff.tile.x * TILE, by = buff.tile.y * TILE;
+      ctx.fillStyle = 'rgba(71,210,105,.24)';
+      ctx.fillRect(bx + 2, by + 2, TILE - 4, TILE - 12);
+      ctx.strokeStyle = '#6cff91';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(bx + 4, by + 4, TILE - 8, TILE - 12);
+      ctx.beginPath();
+      ctx.arc(bx + 16, by + 16, 11, 0, Math.PI * 2);
+      ctx.fillStyle = '#1c5635';
+      ctx.fill();
+      ctx.strokeStyle = '#e5ffe9';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#e5ffe9';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('↑', bx + 16, by + 16);
     }
   }
 
