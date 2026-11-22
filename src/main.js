@@ -4,11 +4,12 @@ import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJok
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
 const BG = '#1e5aa8';
-const BOARD_COLOR = '#355b38';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const $ = (id) => document.getElementById(id);
+const backgroundImage = new Image();
+backgroundImage.src = 'assets/game-background.jpg';
 
 const loadedState = load();
 let state = loadedState || newState();
@@ -994,14 +995,23 @@ function drawGrid(half) {
 
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, innerWidth, innerHeight);
+  if (backgroundImage.complete && backgroundImage.naturalWidth) {
+    const scale = Math.max(innerWidth / backgroundImage.naturalWidth, innerHeight / backgroundImage.naturalHeight);
+    const width = backgroundImage.naturalWidth * scale;
+    const height = backgroundImage.naturalHeight * scale;
+    ctx.drawImage(backgroundImage, (innerWidth - width) / 2, (innerHeight - height) / 2, width, height);
+    ctx.fillStyle = 'rgba(0, 20, 28, .12)';
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+  } else {
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+  }
   ctx.translate(innerWidth / 2, innerHeight / 2);
   ctx.scale(cam.zoom, cam.zoom);
   ctx.translate(-cam.x, -cam.y);
 
   const half = state.size / 2;
-  ctx.fillStyle = BOARD_COLOR;
+  ctx.fillStyle = 'rgba(37, 91, 47, .12)';
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
   if (TILES[state.hand]) {
     drawGrid(half);
