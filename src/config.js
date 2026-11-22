@@ -18,9 +18,9 @@ export const PACKS = {
 export const GOLD_ICON = '🪙';
 
 export const RARITY = {
-  common:   { name: 'Gewöhnlich' },
-  uncommon: { name: 'Selten' },
-  rare:     { name: 'Episch' },
+  common:   { name: 'Gewöhnlich', maxMoves: 3 },
+  uncommon: { name: 'Selten', maxMoves: 2 },
+  rare:     { name: 'Episch', maxMoves: 1 },
 };
 
 // gives: Gold-Bonus pro Nachbar-Typ (8 Felder rundherum). Wird einmal ausgezahlt, sobald das Paar entsteht
@@ -32,8 +32,8 @@ export const TILES = {
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 15 },
   wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, gives: { wald: 1 } },
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, gives: { feld: 1 } },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  gives: { wald: 2 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  gives: { feld: 2 } },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  maxMoves: 6, gives: { wald: 2 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8,  maxMoves: 6, gives: { feld: 2 } },
 };
 
 export const START_TILE = 'gras';
