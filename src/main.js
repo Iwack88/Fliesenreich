@@ -1,5 +1,5 @@
-import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=8';
-import { newState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=8';
+import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=9';
+import { newState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=9';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;

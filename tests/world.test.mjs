@@ -62,6 +62,7 @@ test('expansion costs gold once and adds exactly 36 obstacles in new area', () =
   for (let i = 0; i < 20; i++) {
     const state = newState();
     const original = JSON.stringify(state.tiles);
+    state.gold = 29;
     assert.equal(expandWorld(state), false);
     assert.equal(JSON.stringify(state.tiles), original);
     state.gold = 30;

@@ -10,6 +10,8 @@ Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; da
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint nur, solange eine Karte zum Platzieren gezogen ist.
 
+Neue Spiele starten zum Testen mit 100 Gold und 12 Karten. Bestehende Spielstände bleiben unverändert.
+
 ## Kartenpacks
 
 Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald und Haus. Das teurere Entdecker-Pack enthält zusätzlich selten Windmühlen, Holzfäller, Tavernen und Joker. Jedes Pack enthält fünf Karten, darunter mindestens zwei, die nicht Gras, Erde oder Wasser sind (Joker zählen dazu). Die gezogenen Karten werden gemischt und hinten ans Deck angehängt. Die im Shop angegebenen Chancen gelten für eine zufällige Karte aus dem Pack, nicht für das gesamte Pack; aufgrund der Garantie sind die Karten nicht unabhängig. Die Gewichte und Preise stehen in `src/config.js`.

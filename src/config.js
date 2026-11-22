@@ -1,7 +1,7 @@
 // Alle Spielwerte an einer Stelle. Neue Tiles hier ergänzen.
 // Grafik: optional assets/tiles/<id>.png ablegen, sonst wird Farbe + Emoji genutzt.
 
-export const START_GOLD = 20;
+export const START_GOLD = 100;
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;
@@ -11,7 +11,7 @@ export const EXPANSION_COST = 30;
 export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
-export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
+export const START_DECK = { gras: 2, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
 // Zwei Karten pro Pack sind garantiert keine dieser Grundkarten.
 export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser'];

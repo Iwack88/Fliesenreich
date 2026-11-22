@@ -5,6 +5,8 @@ import { addTile, drawCard, newState, placeHand, useJoker } from '../src/logic.j
 
 test('new games have one of each joker and drawing preserves them', () => {
   const state = newState();
+  assert.equal(state.gold, 100);
+  assert.equal(state.deck.length, 12);
   for (const id of ['joker_loeschen', 'joker_verwandeln']) {
     assert.equal(START_DECK[id], 1);
     assert.equal(state.deck.filter(card => card === id).length, 1);
