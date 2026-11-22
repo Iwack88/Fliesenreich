@@ -24,12 +24,12 @@ export const RARITY = {
 };
 
 export const SOCKETS = {
-  landschaft: { name: 'Landschaft', color: '#137a33', symbol: 'L' },
-  industrie: { name: 'Industrie', color: '#ad4b04', symbol: 'I' },
-  zukunft: { name: 'Später', color: '#59616c', symbol: '–' },
+  landschaft: { name: 'Landschaft', color: '#137a33' },
+  industrie: { name: 'Industrie', color: '#ad4b04' },
+  zukunft: { name: 'Später', color: '#59616c' },
 };
 
-// Oben, rechts, unten, links. Die vierte Seite ist für spätere Typen reserviert.
+// Sockel pro Tile; ihre Seiten werden beim Platzieren zufällig verteilt.
 export const DEFAULT_SOCKETS = ['landschaft', 'industrie', 'landschaft', 'zukunft'];
 
 // gives: Gold-Bonus pro Nachbar-Typ (8 Felder rundherum). Wird einmal ausgezahlt, sobald das Paar entsteht

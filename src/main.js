@@ -1,5 +1,5 @@
-import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, SOCKETS, DEFAULT_SOCKETS } from './config.js?v=3';
-import { newState, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=3';
+import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, SOCKETS } from './config.js?v=4';
+import { newState, migrateSockets, tileAt, drawCard, returnBlockedCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=4';
 
 const SAVE_KEY = 'fliesenreich-save-v7';
 const TILE = 96;
@@ -9,7 +9,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const $ = (id) => document.getElementById(id);
 
-let state = load() || newState();
+const loadedState = load();
+let state = loadedState || newState();
 let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
@@ -29,6 +30,7 @@ function load() {
   try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; }
 }
 function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+if (!loadedState || migrateSockets(state)) save();
 
 function resize() {
   dpr = window.devicePixelRatio || 1;
@@ -157,7 +159,9 @@ function updatePanel() {
   if (hand) {
     panel.classList.remove('hidden');
     const category = SOCKETS[hand.category];
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> · ${category.name} (${category.symbol})<br>${targets.length ? 'Grünes Feld antippen zum Platzieren' : 'Kein passender Sockel frei'}`;
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> · ${category.name}<br>${targets.length ? 'Grünes Feld antippen zum Platzieren' : 'Kein passender Sockel frei'}`;
+    $('btn-return-card').hidden = targets.length > 0;
+    if (!targets.length && !state.deck.length) $('panel-info').innerHTML += '<br>Deck leer: Im Shop gibt es neue Karten.';
   } else {
     panel.classList.add('hidden');
   }
@@ -172,9 +176,9 @@ function updateTilePopup() {
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
-  html += `<div>Typ: ${SOCKETS[def.category].name} (${SOCKETS[def.category].symbol})</div>`;
+  html += `<div>Typ: ${SOCKETS[def.category].name}</div>`;
   const directions = ['oben', 'rechts', 'unten', 'links'];
-  const sockets = def.sockets ?? DEFAULT_SOCKETS;
+  const sockets = selected.sockets;
   html += `<div class="dim">Sockel: ${sockets.map((id, i) => `${directions[i]} ${SOCKETS[id].name}`).join(', ')}</div>`;
   html += `<div>Bisher eingebracht: <b>${selected.earned || 0} ${GOLD_ICON}</b></div>`;
   if (def.gives) {
@@ -227,6 +231,13 @@ $('btn-next').onclick = () => {
   selected = null;
   refreshTargets();
   save();
+};
+
+$('btn-return-card').onclick = () => {
+  if (!returnBlockedCard(state)) return;
+  refreshTargets();
+  save();
+  toast('Karte ans Deckende gelegt');
 };
 
 function openOverlay(title) {
@@ -324,11 +335,11 @@ $('btn-shuffle').onclick = () => {
 };
 
 // ---------- Zeichnen ----------
-function drawTile(t, x, y, alpha = 1) {
-  const def = TILES[t];
+function drawTile(tile, x, y, alpha = 1) {
+  const def = TILES[tile.type];
   ctx.globalAlpha = alpha;
-  if (images[t]) {
-    ctx.drawImage(images[t], x, y, TILE, TILE);
+  if (images[tile.type]) {
+    ctx.drawImage(images[tile.type], x, y, TILE, TILE);
   } else {
     ctx.fillStyle = def.color;
     ctx.fillRect(x, y, TILE, TILE);
@@ -342,21 +353,12 @@ function drawTile(t, x, y, alpha = 1) {
   ctx.strokeStyle = 'rgba(0,0,0,.35)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, TILE, TILE);
-  const sockets = def.sockets ?? DEFAULT_SOCKETS;
-  const positions = [[TILE / 2, 8], [TILE - 8, TILE / 2], [TILE / 2, TILE - 8], [8, TILE / 2]];
-  sockets.forEach((id, i) => {
-    const [dx, dy] = positions[i];
-    const socket = SOCKETS[id];
-    ctx.fillStyle = socket.color;
-    ctx.fillRect(x + dx - 10, y + dy - 7, 20, 14);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + dx - 10, y + dy - 7, 20, 14);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(socket.symbol, x + dx, y + dy);
+  const thickness = 6;
+  const strips = [[0, 0, TILE, thickness], [TILE - thickness, 0, thickness, TILE], [0, TILE - thickness, TILE, thickness], [0, 0, thickness, TILE]];
+  tile.sockets.forEach((id, i) => {
+    const [dx, dy, width, height] = strips[i];
+    ctx.fillStyle = SOCKETS[id].color;
+    ctx.fillRect(x + dx, y + dy, width, height);
   });
   ctx.globalAlpha = 1;
 }
@@ -370,7 +372,7 @@ function draw() {
   ctx.translate(-cam.x, -cam.y);
 
   for (const t of Object.values(state.tiles)) {
-    drawTile(t.type, t.x * TILE, t.y * TILE);
+    drawTile(t, t.x * TILE, t.y * TILE);
     const partners = partnersOf(state, t).length;
     if (partners) {
       ctx.fillStyle = '#ffd54f';

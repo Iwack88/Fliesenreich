@@ -1,4 +1,4 @@
-import { TILES, DEFAULT_SOCKETS, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js?v=3';
+import { TILES, DEFAULT_SOCKETS, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js?v=4';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -19,9 +19,20 @@ export function newState() {
 }
 
 export function addTile(s, type, x, y) {
-  const t = { id: s.nextId++, type, x, y, earned: 0 };
+  const t = { id: s.nextId++, type, x, y, earned: 0, sockets: shuffled(TILES[type].sockets ?? DEFAULT_SOCKETS) };
   s.tiles[key(x, y)] = t;
   return t;
+}
+
+export function migrateSockets(s) {
+  let changed = false;
+  for (const tile of Object.values(s.tiles)) {
+    if (!tile.sockets) {
+      tile.sockets = shuffled(TILES[tile.type].sockets ?? DEFAULT_SOCKETS);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
@@ -30,7 +41,7 @@ export function placeCells(s, type) {
   if (!TILES[type]) return [];
   const cells = new Map();
   for (const t of Object.values(s.tiles)) {
-    const sockets = TILES[t.type].sockets ?? DEFAULT_SOCKETS;
+    const sockets = t.sockets;
     for (const [i, [dx, dy]] of DIRS4.entries()) {
       const x = t.x + dx, y = t.y + dy;
       if (sockets[i] === TILES[type].category && !s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
@@ -53,6 +64,13 @@ export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;
   s.hand = s.deck.shift();
   return s.hand;
+}
+
+export function returnBlockedCard(s) {
+  if (!s.hand || placeCells(s, s.hand).length) return false;
+  s.deck.push(s.hand);
+  s.hand = null;
+  return true;
 }
 
 export function shuffleDeck(s) {
