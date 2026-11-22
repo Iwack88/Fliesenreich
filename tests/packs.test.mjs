@@ -8,8 +8,11 @@ test('displayed probabilities include the guarantee and sum to 100%', () => {
   const explorer = Object.fromEntries(packChances(PACKS.basis));
   assert.ok(Math.abs(nature.gras - 18) < 1e-10);
   assert.ok(Math.abs(nature.haus - 15.6) < 1e-10);
-  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 100 + 2 * 2 / 24) / 5) < 1e-10);
+  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 100 + 2 * 2 / 26) / 5) < 1e-10);
   assert.equal(explorer.windmuehle, explorer.taverne);
+  assert.ok(explorer.joker_loeschen > 0);
+  assert.equal(explorer.joker_loeschen, explorer.joker_verwandeln);
+  assert.equal(nature.joker_loeschen, undefined);
   for (const pack of Object.values(PACKS)) {
     assert.ok(Math.abs(packChances(pack).reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
   }

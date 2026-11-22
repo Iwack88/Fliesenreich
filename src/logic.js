@@ -1,4 +1,4 @@
-import { TILES, START_GOLD, START_TILE, START_DECK, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=7';
+import { TILES, CARDS, START_GOLD, START_TILE, START_DECK, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=8';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -100,7 +100,7 @@ export function packChances(pack) {
   const entries = Object.entries(pack.weights);
   const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
   const specialTotal = entries.filter(([id]) => !PACK_FILLER_TYPES.includes(id)).reduce((sum, [, weight]) => sum + weight, 0);
-  if (!total || !specialTotal || pack.cards < PACK_MIN_SPECIAL || entries.some(([id, weight]) => !TILES[id] || !Number.isFinite(weight) || weight <= 0)) {
+  if (!total || !specialTotal || pack.cards < PACK_MIN_SPECIAL || entries.some(([id, weight]) => !CARDS[id] || !Number.isFinite(weight) || weight <= 0)) {
     throw new Error(`Ungültige Kartengewichte für ${pack.name}`);
   }
   return entries.map(([id, weight]) => [id, 100 * (
@@ -125,7 +125,7 @@ export function shuffleDeck(s) {
 }
 
 export function placeHand(s, x, y) {
-  if (!s.hand) return null;
+  if (!TILES[s.hand]) return null;
   const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const tile = addTile(s, s.hand, x, y);
@@ -155,6 +155,37 @@ export function pairValue(a, b) {
 // Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Gold-Paar bildet.
 export function partnersOf(s, tile) {
   return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o && pairValue(tile, o) > 0);
+}
+
+export function useJoker(s, x, y) {
+  const tile = tileAt(s, x, y);
+  if (!tile) return null;
+  if (s.hand === 'joker_loeschen') {
+    if (Object.keys(s.tiles).length <= 1) return null;
+    delete s.tiles[key(x, y)];
+    s.hand = null;
+    return { kind: 'deleted', tile };
+  }
+  if (s.hand !== 'joker_verwandeln') return null;
+  const types = Object.keys(TILES).filter(type => type !== tile.type);
+  const newType = types[Math.floor(Math.random() * types.length)];
+  const oldType = tile.type;
+  const neighbors = NEIGHBORS.map(([dx, dy]) => tileAt(s, x + dx, y + dy)).filter(Boolean);
+  const before = neighbors.map(neighbor => pairValue(tile, neighbor));
+  tile.type = newType;
+  const pairs = [];
+  let gold = 0;
+  neighbors.forEach((neighbor, i) => {
+    const value = Math.max(0, pairValue(tile, neighbor) - before[i]);
+    if (!value) return;
+    gold += value;
+    pairs.push({ tile: neighbor, value });
+    neighbor.earned = (neighbor.earned || 0) + value;
+    tile.earned = (tile.earned || 0) + value;
+  });
+  s.gold += gold;
+  s.hand = null;
+  return { kind: 'transformed', tile, oldType, gold, pairs };
 }
 
 export const canAfford = (s, cost) => s.gold >= cost;

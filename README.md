@@ -12,6 +12,10 @@ Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand 
 
 ## Kartenpacks
 
-Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald und Haus. Das teurere Entdecker-Pack enthält zusätzlich selten Windmühlen, Holzfäller und Tavernen. Jedes Pack enthält fünf Karten, darunter mindestens zwei, die nicht Gras, Erde oder Wasser sind. Die gezogenen Karten werden gemischt und hinten ans Deck angehängt. Die im Shop angegebenen Chancen gelten für eine zufällige Karte aus dem Pack, nicht für das gesamte Pack; aufgrund der Garantie sind die Karten nicht unabhängig. Die Gewichte und Preise stehen in `src/config.js`.
+Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald und Haus. Das teurere Entdecker-Pack enthält zusätzlich selten Windmühlen, Holzfäller, Tavernen und Joker. Jedes Pack enthält fünf Karten, darunter mindestens zwei, die nicht Gras, Erde oder Wasser sind (Joker zählen dazu). Die gezogenen Karten werden gemischt und hinten ans Deck angehängt. Die im Shop angegebenen Chancen gelten für eine zufällige Karte aus dem Pack, nicht für das gesamte Pack; aufgrund der Garantie sind die Karten nicht unabhängig. Die Gewichte und Preise stehen in `src/config.js`.
 
 Häuser geben einmalig 1 Gold pro benachbartem Haus; eine Taverne und ein Haus geben einmalig 2 Gold pro Paar. Wie bei den übrigen Boni zählen auch diagonale Nachbarn.
+
+## Joker
+
+Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Eine gezogene Jokerkarte wird durch Antippen eines vorhandenen Tiles verbraucht. Löschen entfernt das Tile ohne Rückzahlung; das letzte Tile bleibt erhalten und der Joker kann dann ans Deckende gelegt werden. Verwandeln wählt zufällig einen anderen Typ aus allen Tile-Typen. Nur neu hinzukommende Bonuswerte werden dabei ausgezahlt, bestehendes Gold bleibt erhalten.

@@ -1,5 +1,5 @@
-import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=7';
-import { newState, tileAt, drawCard, placeHand, placeCells, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=7';
+import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=8';
+import { newState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=8';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -128,6 +128,22 @@ function setZoom(z) { cam.zoom = Math.min(2.5, Math.max(0.4, z)); }
 
 function onTap(sx, sy) {
   const c = toCell(sx, sy);
+  if (JOKERS[state.hand]) {
+    const result = useJoker(state, c.x, c.y);
+    if (!result) {
+      toast(Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
+        ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
+      return;
+    }
+    selected = result.kind === 'transformed' ? result.tile : null;
+    if (result.kind === 'transformed') {
+      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.gold ? ` · +${result.gold} ${GOLD_ICON}` : ''}`);
+      flashPairs(result.pairs);
+    } else toast(`${TILES[result.tile.type].name} gelöscht`);
+    refreshTargets();
+    save();
+    return;
+  }
   if (state.hand) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
@@ -135,8 +151,7 @@ function onTap(sx, sy) {
       if (!res) { toast('Dieses Feld ist nicht frei'); return; }
       if (res && res.gold) {
         toast(`+${res.gold} ${GOLD_ICON}`);
-        const now = performance.now();
-        for (const p of res.pairs) flashes.push({ x: p.tile.x, y: p.tile.y, value: p.value, start: now });
+        flashPairs(res.pairs);
       }
       selected = res?.tile || null;
       refreshTargets();
@@ -150,8 +165,13 @@ function onTap(sx, sy) {
 }
 
 function refreshTargets() {
-  targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
+  targets = TILES[state.hand] ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
   updatePanel();
+}
+
+function flashPairs(pairs) {
+  const now = performance.now();
+  for (const p of pairs) flashes.push({ x: p.tile.x, y: p.tile.y, value: p.value, start: now });
 }
 
 // ---------- UI ----------
@@ -160,10 +180,15 @@ const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${T
 
 function updatePanel() {
   const panel = $('panel');
-  const hand = state.hand && TILES[state.hand];
+  const hand = state.hand && CARDS[state.hand];
   if (hand) {
     panel.classList.remove('hidden');
-    const message = targets.length ? 'Grünes Feld antippen zum Platzieren' :
+    const blockedDelete = state.hand === 'joker_loeschen' && Object.keys(state.tiles).length <= 1;
+    $('btn-return-card').hidden = !blockedDelete;
+    const message = blockedDelete ? 'Das letzte Tile kann nicht gelöscht werden.' :
+      state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
+      state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
+      targets.length ? 'Grünes Feld antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}`;
   } else {
@@ -174,7 +199,7 @@ function updatePanel() {
 
 function updateTilePopup() {
   const el = $('tile-popup');
-  if (!selected) { el.classList.add('hidden'); return; }
+  if (!selected || state.hand) { el.classList.add('hidden'); return; }
   const def = TILES[selected.type];
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
@@ -194,7 +219,7 @@ function updateTilePopup() {
 
 let queueKey = '';
 function chip(id) {
-  const d = TILES[id];
+  const d = CARDS[id];
   return `<span class="chip" style="background:${d.color}">${d.icon} ${d.name}</span>`;
 }
 function renderQueue() {
@@ -230,6 +255,15 @@ $('btn-next').onclick = () => {
   selected = null;
   refreshTargets();
   save();
+};
+
+$('btn-return-card').onclick = () => {
+  if (state.hand !== 'joker_loeschen' || Object.keys(state.tiles).length > 1) return;
+  state.deck.push(state.hand);
+  state.hand = null;
+  refreshTargets();
+  save();
+  toast('Joker ans Deckende gelegt');
 };
 
 function openOverlay(title) {
@@ -269,7 +303,7 @@ function showInventory() {
   body.innerHTML = '';
   if (!state.deck.length) body.textContent = 'Keine Karten. Kaufe ein Pack im Shop.';
   state.deck.forEach((id, i) => {
-    const d = TILES[id];
+    const d = CARDS[id];
     const el = document.createElement('div');
     el.className = `card ${d.rarity}`;
     el.style.cursor = 'default';
@@ -285,7 +319,7 @@ function showShop(result) {
   if (result) {
     const r = document.createElement('div');
     r.style.width = '100%';
-    r.textContent = 'Gezogen: ' + result.map(id => TILES[id].icon || TILES[id].name).join(' ');
+    r.textContent = 'Gezogen: ' + result.map(id => `${CARDS[id].icon} ${CARDS[id].name}`.trim()).join(' · ');
     body.appendChild(r);
   }
   if (state.size === START_SIZE) {
@@ -310,7 +344,7 @@ function showShop(result) {
     row.className = 'pack';
     const info = document.createElement('div');
     const chances = packChances(p).map(([type, chance]) =>
-      `${TILES[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
+      `${CARDS[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
     info.innerHTML = `<b>${p.name}</b> – ${p.cards} Karten<div class="pack-chances">Mindestens ${PACK_MIN_SPECIAL} Karten außer Gras, Erde und Wasser.<br>Chance je zufälliger Karte: ${chances}</div>`;
     row.appendChild(info);
     const btn = document.createElement('button');
@@ -402,7 +436,7 @@ function draw() {
   const half = state.size / 2;
   ctx.fillStyle = BOARD_COLOR;
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
-  if (state.hand) {
+  if (TILES[state.hand]) {
     ctx.strokeStyle = 'rgba(255,255,255,.25)';
     ctx.lineWidth = 1;
     for (let i = -half; i <= half; i++) {
@@ -418,7 +452,8 @@ function draw() {
     ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
   }
 
-  for (const t of Object.values(state.tiles)) {
+  const tiles = Object.values(state.tiles);
+  for (const t of tiles) {
     drawTile(t, t.x * TILE, t.y * TILE);
     const partners = partnersOf(state, t).length;
     if (partners) {
@@ -426,6 +461,11 @@ function draw() {
       ctx.font = `bold ${TILE * 0.22}px sans-serif`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
+    }
+    if (JOKERS[state.hand] && (state.hand !== 'joker_loeschen' || tiles.length > 1)) {
+      ctx.strokeStyle = '#d39cff';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
 

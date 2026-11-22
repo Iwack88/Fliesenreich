@@ -10,8 +10,8 @@ export const EXPANSION_OBSTACLES = 36;
 export const EXPANSION_COST = 30;
 export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 
-// Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
-export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
+// Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
+export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
 // Zwei Karten pro Pack sind garantiert keine dieser Grundkarten.
 export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser'];
@@ -25,7 +25,7 @@ export const PACKS = {
   },
   basis: {
     name: 'Entdecker-Pack', cost: 15, cards: 5,
-    weights: { gras: 28, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2 },
+    weights: { gras: 26, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1 },
   },
 };
 
@@ -51,5 +51,12 @@ export const TILES = {
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
 };
+
+export const JOKERS = {
+  joker_loeschen: { name: 'Lösch-Joker', icon: '🗑️', color: '#b88bdb', rarity: 'rare' },
+  joker_verwandeln: { name: 'Verwandlungs-Joker', icon: '✨', color: '#b88bdb', rarity: 'rare' },
+};
+
+export const CARDS = { ...TILES, ...JOKERS };
 
 export const START_TILE = 'gras';
