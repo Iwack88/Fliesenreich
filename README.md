@@ -1,6 +1,6 @@
 # Fliesenreich
 
-Bau-/Management-Spiel mit Tiles. Die Inselgrafik `assets/game-background.jpg` bildet den Bildschirmhintergrund. Platzhalter-Grafiken: PNGs als `assets/tiles/<id>.png` ablegen (z. B. `wald.png`), sonst Farbe + Emoji.
+Bau-/Management-Spiel mit Tiles. Die Inselgrafik `assets/game-background.jpg` bildet den Bildschirmhintergrund. Die zweidimensionalen Tiles erhalten durch Schattierung und die Illustrationen aus `assets/card-art.svg` einen leichten Tiefeneffekt. Eigene PNGs als `assets/tiles/<id>.png` ablegen (z. B. `wald.png`), um einzelne Tiles zu ersetzen.
 
 ## Spielfeld
 
