@@ -102,11 +102,30 @@ function pickWeighted(entries) {
 
 export const cardCount = (s) => s.deck.length;
 
-// Zieht die oberste Karte des Decks auf die Hand.
+// Zieht die oberste Karte.
+// World-Tiles werden sofort zufällig platziert. Sinn-Karten gehen auf die Hand.
 export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;
-  s.hand = s.deck.shift();
-  return s.hand;
+  const type = s.deck.shift();
+  if (TILES[type].world) {
+    const tile = spawnWorldTile(s, type);
+    return { kind: 'world', type, tile };
+  }
+  s.hand = type;
+  return { kind: 'card', type };
+}
+
+export function spawnWorldTile(s, type) {
+  const cells = [];
+  for (const t of Object.values(s.tiles)) {
+    for (const [dx, dy] of DIRS4) {
+      const x = t.x + dx, y = t.y + dy;
+      if (!s.tiles[key(x, y)]) cells.push([x, y]);
+    }
+  }
+  if (!cells.length) return null;
+  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
+  return addTile(s, type, x, y);
 }
 
 export function shuffleDeck(s) {
@@ -114,6 +133,26 @@ export function shuffleDeck(s) {
   s.gold -= SHUFFLE_COST;
   s.deck = shuffled(s.deck);
   return true;
+}
+
+// Sinn-Karten werden frei auf ein leeres Nachbarfeld gesetzt.
+export function placeHand(s, x, y) {
+  if (!s.hand) return null;
+  const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
+  if (!valid) return null;
+  const tile = addTile(s, s.hand, x, y);
+  s.hand = null;
+  let gold = 0;
+  const pairs = [];
+  for (const o of partnersOf(s, tile)) {
+    const v = pairValue(tile, o);
+    gold += v;
+    pairs.push({ tile: o, value: v });
+    o.earned = (o.earned || 0) + v;
+    tile.earned += v;
+  }
+  s.gold += gold;
+  return { tile, gold, pairs };
 }
 
 // Legt die Handkarte frei auf ein freies Feld neben einem bestehenden Tile.

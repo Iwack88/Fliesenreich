@@ -5,7 +5,8 @@ export const START_GOLD = 20;
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 
 // Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
-export const START_DECK = { gras: 2, wald: 4, feld: 4, holzfaeller: 2, windmuehle: 2, wasser: 1, erde: 1 };
+// World-Tiles/Nieten erscheinen beim Ziehen direkt zufällig auf dem Spielfeld.
+export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
 
@@ -27,9 +28,9 @@ export const RARITY = {
 // (egal welches Tile zuerst lag). Gleiche Typen zählen als ein Paar (Feld an Feld = einmal +1);
 // bei verschiedenen Typen werden die gives beider Seiten addiert.
 export const TILES = {
-  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 30 },
-  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 15 },
-  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 15 },
+  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 40, world: true },
+  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 25, world: true },
+  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 20, world: true },
   wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, gives: { wald: 1 } },
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, gives: { feld: 1 } },
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8,  maxMoves: 6, gives: { wald: 2 } },

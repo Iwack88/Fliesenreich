@@ -1,7 +1,7 @@
 import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST } from './config.js';
-import { newState, tileAt, drawCard, spawnHandTile, moveTargets, moveTile, placeTile, buyPack, canAfford, cardCount, shuffleDeck, partnersOf, maxMovesOf } from './logic.js';
+import { newState, tileAt, drawCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js';
 
-const SAVE_KEY = 'fliesenreich-save-v6';
+const SAVE_KEY = 'fliesenreich-save-v7';
 const TILE = 96;
 const BG = '#1e5aa8';
 
@@ -13,7 +13,6 @@ let state = load() || newState();
 let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
-let pending = null;
 let dpr = 1;
 const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
@@ -122,21 +121,28 @@ function setZoom(z) { cam.zoom = Math.min(2.5, Math.max(0.4, z)); }
 
 function onTap(sx, sy) {
   const c = toCell(sx, sy);
-  const target = targets.find(t => t.x === c.x && t.y === c.y);
-  if (selected?.unplaced && target) {
-    pending = target;
-    updatePanel();
+  if (state.hand) {
+    const target = targets.find(t => t.x === c.x && t.y === c.y);
+    if (target) {
+      const res = placeHand(state, target.x, target.y);
+      if (res && res.gold) {
+        toast(`+${res.gold} ${GOLD_ICON}`);
+        const now = performance.now();
+        for (const p of res.pairs) flashes.push({ x: p.tile.x, y: p.tile.y, value: p.value, start: now });
+      }
+      selected = res?.tile || null;
+      refreshTargets();
+      save();
+    }
     return;
   }
   selected = tileAt(state, c.x, c.y) || null;
-  pending = null;
   refreshTargets();
   updatePanel();
 }
 
 function refreshTargets() {
-  targets = selected?.unplaced ? moveTargets(state, selected) : [];
-  if (!selected?.unplaced) pending = null;
+  targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
   updatePanel();
 }
 
@@ -146,15 +152,10 @@ const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${T
 
 function updatePanel() {
   const panel = $('panel');
-  if (selected?.unplaced) {
+  const hand = state.hand && TILES[state.hand];
+  if (hand) {
     panel.classList.remove('hidden');
-    const def = TILES[selected.type];
-    let info = `<b>${def.icon} ${def.name}</b> (${RARITY[def.rarity].name}) – Moves ${selected.movesLeft}/${maxMovesOf(selected.type)}`;
-    if (pending) info += `<br>Kosten: ${pending.cost} Move`;
-    else if (targets.length) info += '<br>Grünes Feld antippen zum Verschieben';
-    else info += '<br>Kein Verschieben möglich';
-    $('panel-info').innerHTML = info;
-    $('btn-place').disabled = false;
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> (${RARITY[hand.rarity].name})<br>Grünes Feld antippen, um das Tile zu platzieren`;
   } else {
     panel.classList.add('hidden');
   }
@@ -164,7 +165,7 @@ function updatePanel() {
 // Tile-Daten als Popup: Seltenheit, Produktion (Basis + Buffs), buffende Nachbarn.
 function updateTilePopup() {
   const el = $('tile-popup');
-  if (!selected || selected.unplaced) { el.classList.add('hidden'); return; }
+  if (!selected) { el.classList.add('hidden'); return; }
   const def = TILES[selected.type];
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
@@ -216,28 +217,17 @@ function toast(msg) {
 }
 
 $('btn-next').onclick = () => {
-  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
-  const tile = spawnHandTile(state);
-  if (!tile) { toast('Keine freie Seite'); return; }
-  selected = tile;
-  pending = null;
-  refreshTargets();
-  cam.x = (tile.x + 0.5) * TILE;
-  cam.y = (tile.y + 0.5) * TILE;
-  save();
-};
-
-$('btn-place').onclick = () => {
-  if (!selected?.unplaced) return;
-  if (pending) moveTile(state, selected, pending);
-  const res = placeTile(state, selected);
-  if (res?.gold) {
-    toast(`+${res.gold} ${GOLD_ICON}`);
-    const now = performance.now();
-    for (const p of res.pairs) flashes.push({ x: p.tile.x, y: p.tile.y, value: p.value, start: now });
+  const result = drawCard(state);
+  if (!result) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
+  if (result.kind === 'world') {
+    if (result.tile) {
+      cam.x = (result.tile.x + 0.5) * TILE;
+      cam.y = (result.tile.y + 0.5) * TILE;
+      toast(`${TILES[result.type].icon || ''} ${TILES[result.type].name} gespawnt`);
+    }
+  } else {
+    selected = null;
   }
-  selected = null;
-  pending = null;
   refreshTargets();
   save();
 };
@@ -368,13 +358,6 @@ function draw() {
 
   for (const t of Object.values(state.tiles)) {
     drawTile(t.type, t.x * TILE, t.y * TILE);
-    if (t.unplaced) {
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${TILE * 0.2}px sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(`↔${t.movesLeft}`, (t.x + 1) * TILE - 6, (t.y + 1) * TILE - 4);
-    }
     const partners = partnersOf(state, t).length;
     if (partners) {
       ctx.fillStyle = '#ffd54f';
@@ -385,9 +368,9 @@ function draw() {
   }
 
   for (const g of targets) {
-    ctx.fillStyle = pending?.x === g.x && pending?.y === g.y ? 'rgba(255,255,255,.35)' : 'rgba(60,220,90,.45)';
+    ctx.fillStyle = 'rgba(60,220,90,.45)';
     ctx.fillRect(g.x * TILE, g.y * TILE, TILE, TILE);
-    ctx.strokeStyle = pending?.x === g.x && pending?.y === g.y ? '#fff' : '#3cdc5a';
+    ctx.strokeStyle = '#3cdc5a';
     ctx.lineWidth = 3;
     ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
     ctx.fillStyle = '#fff';
@@ -397,12 +380,6 @@ function draw() {
     ctx.fillText(g.cost, (g.x + 0.5) * TILE, (g.y + 0.5) * TILE);
   }
 
-  if (selected?.unplaced) {
-    ctx.strokeStyle = '#ffeb3b';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(selected.x * TILE, selected.y * TILE, TILE, TILE);
-  }
-  if (pending) drawTile(selected.type, pending.x * TILE, pending.y * TILE, 0.75);
 
   const now = performance.now();
   for (let i = flashes.length - 1; i >= 0; i--) {
