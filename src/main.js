@@ -288,13 +288,18 @@ function chip(id) {
   const d = CARDS[id];
   return `<span class="chip" style="background:${d.color}">${d.icon} ${d.name}</span>`;
 }
+function cardArt(id) {
+  const card = CARDS[id];
+  const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=1#${id}"></use></svg></span>`;
+}
 function renderQueue() {
   const key = state.deck[0] || 'empty';
   if (key === queueKey) return;
   queueKey = key;
   const card = CARDS[state.deck[0]];
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes</span><span class="queue-icon" style="background:${card.color}" aria-hidden="true">${card.icon}</span><b>${card.name}</b>${state.deck[0] === 'joker_banditenzeit' ? '<div>Wirkt sofort</div>' : ''}`
+    ? `<span class="queue-label">Als Nächstes</span>${cardArt(state.deck[0])}<b>${card.name}</b>${state.deck[0] === 'joker_banditenzeit' ? '<div>Wirkt sofort</div>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -513,9 +518,7 @@ function showInventory() {
     const d = CARDS[id];
     const el = document.createElement('div');
     el.className = `card ${d.rarity}`;
-    el.style.cursor = 'default';
-    el.style.background = d.color;
-    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>#${i + 1}${id === 'joker_banditenzeit' ? '<br>Wirkt sofort' : ''}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[d.rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : ''}`;
     body.appendChild(el);
   });
 }

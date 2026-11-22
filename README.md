@@ -10,7 +10,7 @@ Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; da
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Platzieren; mit **▦ Grid** lässt es sich auch außerhalb des Baumodus ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
 
-Unter **Next** zeigt ein Symbol mit Namen die nächste Karte im Deck. Die aktuell gezogene Karte steht weiterhin im Platzierungsmenü unten; bei leerem Deck zeigt die Vorschau „Deck leer“.
+Unter **Next** zeigt eine illustrierte Vorschau mit Namen die nächste Karte im Deck. Das Inventar zeigt die Karten in Ziehreihenfolge mit eigenen Illustrationen und Seltenheit; die Kartengrafiken liegen in `assets/card-art.svg`. Die aktuell gezogene Karte steht weiterhin im Platzierungsmenü unten; bei leerem Deck zeigt die Vorschau „Deck leer“.
 
 Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter ein Holzlager. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 

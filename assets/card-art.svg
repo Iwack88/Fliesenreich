@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="leaf" x2="0.8" y2="1"><stop stop-color="#b7c87a"/><stop offset="1" stop-color="#55733f"/></linearGradient>
+    <linearGradient id="wood" x2="1" y2="1"><stop stop-color="#d0a873"/><stop offset="1" stop-color="#8c5c3a"/></linearGradient>
+    <linearGradient id="water" x2="0" y2="1"><stop stop-color="#a8d7d0"/><stop offset="1" stop-color="#528f9e"/></linearGradient>
+    <linearGradient id="stone" x2="1" y2="1"><stop stop-color="#e0d1ad"/><stop offset="1" stop-color="#9d8d77"/></linearGradient>
+    <g id="tree" stroke="#435538" stroke-width="2.5" stroke-linejoin="round">
+      <path d="M45 60h11l3 22H42z" fill="#79573d"/>
+      <path d="M50 12c-8 9-12 17-11 20-8 6-10 13-7 17-8 8-7 17 2 20 9 4 25 4 34 0 9-4 9-12 1-20 3-5 0-12-8-17 1-5-3-13-11-20z" fill="url(#leaf)"/>
+      <path d="M40 43c5 3 12 4 19 2M36 58c8 4 21 5 29 1" fill="none" stroke="#728e50"/>
+    </g>
+    <g id="building" stroke="#745437" stroke-width="2.5" stroke-linejoin="round">
+      <path d="M20 46 50 23 80 46v34H20z" fill="url(#stone)"/>
+      <path d="m15 46 35-30 35 30-7 5-28-23-28 23z" fill="#9e684e"/>
+      <path d="M44 80V57h15v23" fill="#896444"/>
+      <path d="M27 54h9v10h-9zm37 0h9v10h-9z" fill="#a9c5b9"/>
+    </g>
+    <g id="tool" stroke="#65503d" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="m28 77 36-45 8 6-35 45c-5 5-12-1-9-6z" fill="#aa8050"/>
+      <path d="M53 28c10-9 22-11 30-3l-9 14-9-5-7 6-8-7z" fill="#aab5ac"/>
+    </g>
+    <g id="shield" stroke="#555547" stroke-width="3" stroke-linejoin="round">
+      <path d="M50 15 75 24v24c0 18-10 27-25 35-15-8-25-17-25-35V24z" fill="#789d92"/>
+      <path d="M50 23v50M35 44h30" fill="none" stroke="#e4d7b5" stroke-width="5"/>
+    </g>
+  </defs>
+  <symbol id="gras" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="79" rx="37" ry="9" fill="#697b50" opacity=".25"/>
+    <path d="M18 72c2-20 14-31 31-31s30 11 33 31c-14 9-50 9-64 0z" fill="url(#leaf)" stroke="#667b49" stroke-width="2"/>
+    <path d="m34 62-4-10m4 10 5-8m12 6-2-15m2 15 6-10m10 15 4-9" fill="none" stroke="#d3d995" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="26" cy="70" r="2" fill="#e1cf9c"/><circle cx="63" cy="69" r="2" fill="#e1cf9c"/>
+  </symbol>
+  <symbol id="erde" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="79" rx="36" ry="8" fill="#765e48" opacity=".2"/>
+    <path d="M16 66c8-11 20-17 34-17 17 0 28 6 34 17l-5 11H21z" fill="url(#wood)" stroke="#806044" stroke-width="2.5"/>
+    <path d="m29 64 6-3m11 10 7-3m13-8 6 2" stroke="#e2bb86" stroke-width="3" stroke-linecap="round"/>
+    <path d="m48 48 4-10m-3 7-7-5m9 2 6-5" fill="none" stroke="#81935a" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="wasser" viewBox="0 0 100 100">
+    <ellipse cx="50" cy="72" rx="37" ry="15" fill="url(#water)" stroke="#609798" stroke-width="3"/>
+    <path d="M28 71c7-5 14-5 21 0s14 5 22 0M36 79c6-3 12-3 18 0" fill="none" stroke="#deeee0" stroke-width="3" stroke-linecap="round"/>
+    <path d="M50 17c-5 9-12 17-12 25a12 12 0 0 0 24 0c0-8-7-16-12-25z" fill="#acd9d1" stroke="#699f9e" stroke-width="2.5"/>
+    <path d="M44 42c0 3 1 5 4 6" fill="none" stroke="#eff5dc" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="wald" viewBox="0 0 100 100">
+    <use href="#tree" transform="translate(-13 16) scale(.72)"/>
+    <use href="#tree" transform="translate(22 3) scale(.91)"/>
+  </symbol>
+  <symbol id="feld" viewBox="0 0 100 100">
+    <path d="m13 70 15-24h44l15 24-12 10H25z" fill="#ad8656" stroke="#7f6545" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="m27 70 8-14m5 17 7-17m6 17 3-17m9 17-1-17m13 14-6-14" stroke="#e5c779" stroke-width="4" stroke-linecap="round"/>
+    <path d="m34 56-3-5m3 5 4-6m9 6-2-7m2 7 4-6m5 6-2-7m2 7 4-6m4 6-2-6m2 6 4-6" fill="none" stroke="#e8d491" stroke-width="2.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="haus" viewBox="0 0 100 100"><use href="#building"/><path d="M67 28V18h8v17" fill="#ae8d6c" stroke="#745437" stroke-width="2.5"/></symbol>
+  <symbol id="taverne" viewBox="0 0 100 100">
+    <use href="#building"/><path d="M17 53h18v19H17z" fill="#dfc99e" stroke="#745437" stroke-width="2.5"/>
+    <path d="M22 58h8v8h-8z" fill="#a97045"/><path d="M20 60h12M21 57v10m9-10v10" stroke="#ead5ad" stroke-width="1.5"/>
+    <path d="M35 43h8" stroke="#745437" stroke-width="3"/>
+  </symbol>
+  <symbol id="holzfaeller" viewBox="0 0 100 100">
+    <use href="#tree" transform="translate(-3 10) scale(.7)"/>
+    <path d="M55 70h28v10H55z" fill="#a97a4e" stroke="#725438" stroke-width="2.5"/>
+    <ellipse cx="69" cy="70" rx="14" ry="5" fill="#d0ae7c" stroke="#725438" stroke-width="2.5"/>
+    <path d="m56 62 18-28" stroke="#8c6241" stroke-width="5" stroke-linecap="round"/>
+    <path d="m67 31 12 1 4 10-10 1z" fill="#aeb6a6" stroke="#667267" stroke-width="2"/>
+  </symbol>
+  <symbol id="windmuehle" viewBox="0 0 100 100">
+    <path d="m37 80 4-43h18l5 43z" fill="url(#stone)" stroke="#766952" stroke-width="2.5"/>
+    <path d="m37 38 13-14 13 14z" fill="#9d6c52" stroke="#766952" stroke-width="2.5"/>
+    <path d="M45 80V65h10v15" fill="#886346" stroke="#766952" stroke-width="2"/>
+    <g fill="#e4d7b6" stroke="#82765e" stroke-width="2" stroke-linejoin="round">
+      <path d="M48 44 31 19l7-4 15 27zm5 3 26-15 4 7-28 13zm-1 6 17 25-7 4-15-27zm-5-3L21 65l-4-7 28-13z"/>
+    </g><circle cx="50" cy="49" r="5" fill="#a77a4f" stroke="#766952" stroke-width="2"/>
+  </symbol>
+  <symbol id="workshop" viewBox="0 0 100 100">
+    <use href="#building"/><path d="m33 65 21-24" stroke="#75543c" stroke-width="5" stroke-linecap="round"/>
+    <path d="m49 39 10-3 5 7-8 6z" fill="#aab5ac" stroke="#6b7369" stroke-width="2"/>
+    <path d="m57 66-17-19" stroke="#75543c" stroke-width="5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="lagerhalle" viewBox="0 0 100 100">
+    <use href="#building"/><path d="M21 70h19v9H21zm2-9h19v9H23z" fill="#98704c" stroke="#745437" stroke-width="2"/>
+    <path d="M23 63h17m-19 9h17" stroke="#dbc099" stroke-width="2"/>
+  </symbol>
+  <symbol id="kornlager" viewBox="0 0 100 100">
+    <use href="#building"/><path d="M21 61c4-5 11-5 15 0l3 15-4 4H23l-4-4z" fill="#d5b879" stroke="#745437" stroke-width="2"/>
+    <path d="M28 75V64m0 6-4-3m4 0 4-3" fill="none" stroke="#9d7e46" stroke-width="2"/>
+  </symbol>
+  <symbol id="goldlager" viewBox="0 0 100 100">
+    <use href="#building"/><circle cx="30" cy="70" r="10" fill="#d4ae5e" stroke="#846a42" stroke-width="2.5"/>
+    <path d="M30 64v12m-3-9c2-3 7-1 6 1-1 3-6 1-6 4 0 2 5 3 7 0" fill="none" stroke="#9b783d" stroke-width="2"/>
+  </symbol>
+  <symbol id="werkzeugschmiede" viewBox="0 0 100 100">
+    <use href="#tool"/><path d="M22 72h42l-4 9H29z" fill="#7e8580" stroke="#60665d" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M32 81h25" stroke="#60665d" stroke-width="4" stroke-linecap="round"/>
+    <path d="m77 53 2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z" fill="#e4c57c"/>
+  </symbol>
+  <symbol id="wachturm" viewBox="0 0 100 100">
+    <path d="m35 79 4-42h22l4 42z" fill="url(#wood)" stroke="#75553c" stroke-width="2.5"/>
+    <path d="M35 43h30v-9H35zM31 34l19-17 19 17z" fill="#987058" stroke="#75553c" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M46 51h8v11h-8zM36 72h28" fill="#6e5844" stroke="#75553c" stroke-width="2"/>
+    <path d="M50 17V9m0 0h14l-4 5H50" fill="#b78a69" stroke="#75553c" stroke-width="2" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="banditen" viewBox="0 0 100 100">
+    <path d="M20 77 43 40l23 37z" fill="#a67e64" stroke="#614d42" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M36 77 43 61l7 16z" fill="#594a40"/><path d="M65 80V20" stroke="#614d42" stroke-width="4" stroke-linecap="round"/>
+    <path d="M65 22c9-4 15 5 22 0v19c-7 5-13-4-22 0z" fill="#685a57" stroke="#614d42" stroke-width="2"/>
+    <path d="m75 29 4 5m0-5-4 5" stroke="#e9dcc2" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="banditen_niete" viewBox="0 0 100 100"><use href="#banditen"/></symbol>
+  <symbol id="joker_schutz" viewBox="0 0 100 100"><use href="#shield"/></symbol>
+  <symbol id="joker_loeschen" viewBox="0 0 100 100">
+    <path d="M29 34h42l-4 45H33z" fill="#b8b2a1" stroke="#69685f" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M25 30h50M42 29v-7h16v7M43 44v25m14-25v25" fill="none" stroke="#69685f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m76 17 2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z" fill="#d2bd85"/>
+  </symbol>
+  <symbol id="joker_verwandeln" viewBox="0 0 100 100">
+    <path d="M33 36a23 23 0 0 1 38 7m-4-11 4 11 10-5M67 64a23 23 0 0 1-38-7m4 11-4-11-10 5" fill="none" stroke="#82738a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m50 29 4 13 13 4-13 4-4 13-4-13-13-4 13-4z" fill="#e2c986" stroke="#a99265" stroke-width="2" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="joker_banditenzeit" viewBox="0 0 100 100">
+    <path d="M30 20h40M30 80h40" stroke="#796b5e" stroke-width="5" stroke-linecap="round"/>
+    <path d="M34 22c0 16 6 22 16 28-10 6-16 12-16 28h32c0-16-6-22-16-28 10-6 16-12 16-28z" fill="#d4e4d8" stroke="#796b5e" stroke-width="2.5"/>
+    <path d="M39 31c1 10 6 14 11 17 5-3 10-7 11-17zM40 73c2-8 6-12 10-15 4 3 8 7 10 15z" fill="#d4b273"/>
+  </symbol>
+</svg>

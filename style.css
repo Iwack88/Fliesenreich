@@ -9,7 +9,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #next-control { position: relative; display: inline-block; }
 #queue { position: absolute; right: 0; top: calc(100% + 6px); width: 90px; padding: 5px; background: rgba(15,30,25,.92); border-radius: 8px; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; pointer-events: none; }
 .queue-label { color: #d7e5d9; }
-.queue-icon { display: flex; width: 36px; height: 36px; margin: 4px auto; border-radius: 5px; align-items: center; justify-content: center; font-size: 24px; }
+#queue .card-art { width: 48px; height: 48px; margin: 4px auto; }
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
 #hud { flex-wrap: wrap; gap: 4px; }
 #hud button { padding: 6px 10px; margin-left: 4px; }
@@ -53,7 +53,6 @@ button:disabled { background: #555; color: #999; }
   #toast { top: 58px; }
   #tile-popup { top: 64px; width: 260px; }
   #overlay-box { width: min(720px, calc(100vw - 40px)); }
-  .card { width: 104px; padding: 10px 6px; }
   .row { padding: 9px 10px; }
 }
 #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 5; }
@@ -61,10 +60,19 @@ button:disabled { background: #555; color: #999; }
 #overlay-box { background: #22352a; border-radius: 12px; padding: 12px; width: min(90vw, 640px); max-height: 85vh; overflow-y: auto; }
 #overlay-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 #overlay-body { display: flex; flex-wrap: wrap; gap: 8px; }
-.card { width: 92px; padding: 8px 4px; border-radius: 8px; text-align: center; color: #000; font-size: 13px; cursor: pointer; border: 3px solid transparent; }
-.card.uncommon { border-color: #4aa3ff; }
-.card.rare { border-color: #c15bff; }
-.card .ic { font-size: 28px; min-height: 34px; }
+.card { position: relative; display: flex; flex-direction: column; align-items: center; width: 108px; padding: 6px 6px 8px; border: 2px solid #94754e; border-radius: 8px; background: linear-gradient(145deg, #f3e5c4, #c8b18b); box-shadow: inset 0 0 0 2px #f7ebd1, 0 3px 5px #0005; color: #382d23; text-align: center; font-size: 12px; line-height: 1.15; overflow-wrap: anywhere; }
+.card.uncommon { border-color: #718b86; background: linear-gradient(145deg, #e1ece0, #9fb6aa); box-shadow: inset 0 0 0 2px #ecf1dc, 0 3px 5px #0005; }
+.card.rare { border-color: #8a708d; background: linear-gradient(145deg, #eee3e7, #bba8bb); box-shadow: inset 0 0 0 2px #f3e8e4, 0 3px 5px #0005; }
+.card-art { display: block; flex-shrink: 0; width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid #806f56; border-radius: 5px; background: linear-gradient(#cfddc2 0%, #e8dfb9 64%, #b4ba8a 65%, #859869); }
+.card-art.industrie, .card-art.siedlung { background: linear-gradient(#d7dfd0 0%, #e6d9bb 64%, #c1b18d 65%, #9c9b78); }
+.card-art.verteidigung { background: linear-gradient(#c6d6d3 0%, #ddd9c3 64%, #afb6a0 65%, #8a9b82); }
+.card-art.gefahr { background: linear-gradient(#d6c3b4 0%, #cdbfa9 64%, #ae9b7f 65%, #877f68); }
+.card-art.joker { background: radial-gradient(circle at 50% 40%, #eee4d9, #b4a9b2); }
+.card-art svg { display: block; width: 100%; height: 100%; }
+.card-number { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 2px 4px; border-radius: 3px; background: #f6ecd7df; color: #4b3b2b; font-size: 10px; font-weight: 700; }
+.card-name { margin-top: 6px; }
+.card-rarity { margin-top: auto; padding-top: 5px; color: #5b5147; font-size: 10px; }
+.card-effect { margin-top: 3px; font-size: 10px; font-weight: 700; }
 .pack { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,.25); border-radius: 8px; }
 .pack-chances { font-size: 13px; line-height: 1.5; color: #d7e5d9; margin-top: 4px; }
 .pack button { flex-shrink: 0; }
