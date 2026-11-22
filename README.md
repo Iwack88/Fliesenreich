@@ -24,7 +24,7 @@ Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald, Haus, Lagerhalle u
 
 ## Banditen und Wachtürme
 
-Ein Wachturm schützt ein Quadrat von 7×7 Feldern um sich und vertreibt vorhandene Camps in diesem Bereich beim Platzieren. Der Schutzbereich erscheint beim Antippen des Turms und beim Platzieren einer Karte. Ein neu gestartetes Spiel hat zwei Camps außerhalb dieses Bereichs.
+Ein Wachturm schützt ein Quadrat von 7×7 Feldern um sich und vertreibt vorhandene Camps in diesem Bereich beim Platzieren. Der Schutzbereich erscheint beim Antippen des Turms und beim Platzieren einer Karte. Mit **🛡️ Schutz** lassen sich Schildsymbole auf allen geschützten Tiles ein- und ausblenden. Ein neu gestartetes Spiel hat zwei Camps außerhalb dieses Bereichs.
 
 Alle fünf Minuten aktiver Spielzeit versucht jedes vorhandene Camp gleichzeitig, ein zufälliges benachbartes, bereits belegtes und ungeschütztes Tile zu übernehmen; auch diagonale Nachbarn zählen. Das übernommene Tile wird ein neues Camp, das erst beim nächsten Durchgang selbst angreift. Workshop-Aufträge auf zerstörten Tiles gehen verloren. Der gemeinsame Countdown steht oben im Spiel und pausiert, wenn das Spiel geschlossen oder der Tab ausgeblendet ist. Rohstoffproduktion und Workshop-Aufträge laufen weiterhin offline.
 

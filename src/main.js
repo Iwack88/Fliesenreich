@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=11';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=12';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=13';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -25,6 +25,7 @@ const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
 let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
+let showShields = false;
 
 const images = {};
 for (const id of Object.keys(TILES)) {
@@ -625,6 +626,10 @@ $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncProduction(); showWorkshops(); };
 $('btn-shop').onclick = () => showShop();
+$('btn-shields').onclick = () => {
+  showShields = !showShields;
+  $('btn-shields').setAttribute('aria-pressed', String(showShields));
+};
 $('btn-shuffle').onclick = () => {
   if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);
 };
@@ -649,6 +654,29 @@ function drawTile(tile, x, y, alpha = 1) {
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, TILE, TILE);
   ctx.globalAlpha = 1;
+}
+
+function drawShield(tile) {
+  const x = tile.x * TILE + TILE - 32, y = tile.y * TILE + 4;
+  ctx.beginPath();
+  ctx.moveTo(x + 14, y);
+  ctx.lineTo(x + 27, y + 5);
+  ctx.lineTo(x + 26, y + 17);
+  ctx.quadraticCurveTo(x + 24, y + 24, x + 14, y + 30);
+  ctx.quadraticCurveTo(x + 4, y + 24, x + 2, y + 17);
+  ctx.lineTo(x + 1, y + 5);
+  ctx.closePath();
+  ctx.fillStyle = '#20659d';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + 14, y + 7);
+  ctx.lineTo(x + 14, y + 21);
+  ctx.moveTo(x + 8, y + 14);
+  ctx.lineTo(x + 20, y + 14);
+  ctx.stroke();
 }
 
 function draw() {
@@ -747,6 +775,11 @@ function draw() {
     ctx.strokeStyle = '#ffeb3b';
     ctx.lineWidth = 4;
     ctx.strokeRect(selected.x * TILE, selected.y * TILE, TILE, TILE);
+  }
+
+  if (showShields) {
+    const guards = tiles.filter(tile => tile.type === 'wachturm');
+    for (const tile of tiles) if (isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
 }
 

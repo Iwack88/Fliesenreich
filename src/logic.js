@@ -178,8 +178,8 @@ export function placeHand(s, x, y, now = Date.now()) {
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
 
-export function isProtected(s, x, y) {
-  return Object.values(s.tiles).some(t => t.type === 'wachturm' &&
+export function isProtected(s, x, y, tiles = Object.values(s.tiles)) {
+  return tiles.some(t => t.type === 'wachturm' &&
     Math.abs(t.x - x) <= GUARD_RADIUS && Math.abs(t.y - y) <= GUARD_RADIUS);
 }
 

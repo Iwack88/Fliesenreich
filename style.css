@@ -10,6 +10,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
 #hud { flex-wrap: wrap; gap: 4px; }
 #hud button { padding: 6px 10px; margin-left: 4px; }
+#btn-shields[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
 button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; background: #3d8b4f; color: #fff; margin-left: 8px; }
 button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
