@@ -1,7 +1,33 @@
-import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=17';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=18';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+export const baseRarity = type => CARDS[type].rarity;
+export const tileRarity = tile => tile.rarity || baseRarity(tile.type);
+export const tileStrength = tile => RARITY[tileRarity(tile)].strength;
+export const guardRadius = tile => GUARD_RADIUS + tileStrength(tile) - 1;
+
+export function rollRarity(type) {
+  const base = baseRarity(type);
+  if (!TILES[type] || type === 'banditen') return base;
+  const entries = Object.entries(RARITY);
+  const minimum = entries.findIndex(([id]) => id === base);
+  const eligible = entries.slice(minimum);
+  return pickWeighted(eligible.map(([id, rarity]) => [id, rarity.weight]));
+}
+
+function ensureDeckRarities(s) {
+  if (!Array.isArray(s.deckRarities) || s.deckRarities.length !== s.deck.length) {
+    s.deckRarities = s.deck.map(baseRarity);
+  }
+}
+
+function addCards(s, cards) {
+  ensureDeckRarities(s);
+  s.deck.push(...cards);
+  s.deckRarities.push(...cards.map(rollRarity));
+}
 
 function shuffled(arr) {
   const a = [...arr];
@@ -14,6 +40,7 @@ function shuffled(arr) {
 
 export function newState() {
   const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  s.deckRarities = s.deck.map(rollRarity);
   s.shop = { elapsed: 0, round: 0, offers: [] };
   s.protectedFields = {};
   addTile(s, START_TILE, 0, 0);
@@ -51,11 +78,19 @@ export function migrateState(s, now = Date.now()) {
     s.deck.push('banditen_niete');
     changed = true;
   }
+  if (!Array.isArray(s.deckRarities) || s.deckRarities.length !== s.deck.length) {
+    s.deckRarities = s.deck.map(baseRarity);
+    changed = true;
+  }
+  if (s.hand && !s.handRarity) {
+    s.handRarity = baseRarity(s.hand);
+    changed = true;
+  }
   return planBandits(s) || changed;
 }
 
-export function addTile(s, type, x, y) {
-  const t = { id: s.nextId++, type, x, y, earned: 0 };
+export function addTile(s, type, x, y, rarity = baseRarity(type)) {
+  const t = { id: s.nextId++, type, x, y, rarity, earned: 0 };
   s.tiles[key(x, y)] = t;
   return t;
 }
@@ -177,7 +212,7 @@ export function advanceShop(s, elapsedMs) {
     s.shop.round += rounds;
     s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
       .slice(0, SHOP_OFFER_COUNT).map(card => ({
-        card, price: Math.round(SHOP_PRICES[CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
+        card, price: Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
       }));
   }
 }
@@ -187,23 +222,38 @@ export function buyShopCard(s, card, round) {
   const offer = s.shop.offers.find(offer => offer.card === card);
   if (!offer || offer.bought || s.gold < offer.price) return false;
   s.gold -= offer.price;
-  s.deck.push(card);
+  addCards(s, [card]);
   offer.bought = true;
   return true;
 }
 
 export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;
+  ensureDeckRarities(s);
   const card = s.deck.shift();
-  if (card === 'joker_banditenzeit') s.banditElapsed = 0;
-  else s.hand = card;
+  const rarity = s.deckRarities.shift();
+  if (card === 'joker_banditenzeit') { s.banditElapsed = 0; s.handRarity = null; }
+  else { s.hand = card; s.handRarity = rarity; }
   return card;
+}
+
+export function returnHand(s) {
+  if (!s.hand) return false;
+  ensureDeckRarities(s);
+  s.deck.push(s.hand);
+  s.deckRarities.push(s.handRarity || baseRarity(s.hand));
+  s.hand = null;
+  s.handRarity = null;
+  return true;
 }
 
 export function shuffleDeck(s) {
   if (s.gold < SHUFFLE_COST || s.deck.length < 2) return false;
   s.gold -= SHUFFLE_COST;
-  s.deck = shuffled(s.deck);
+  ensureDeckRarities(s);
+  const cards = shuffled(s.deck.map((type, i) => ({ type, rarity: s.deckRarities[i] })));
+  s.deck = cards.map(card => card.type);
+  s.deckRarities = cards.map(card => card.rarity);
   return true;
 }
 
@@ -212,11 +262,12 @@ export function placeHand(s, x, y, now = Date.now()) {
   const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const affected = s.hand === 'werkzeugschmiede' ? affectedWorkshopJobs(s, x, y) : [];
-  const tile = addTile(s, s.hand, x, y);
+  const tile = addTile(s, s.hand, x, y, s.handRarity || baseRarity(s.hand));
   adjustWorkshopJobs(s, affected, now);
   const cleared = tile.type === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
+  s.handRarity = null;
   return { tile, cleared, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -224,7 +275,7 @@ const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filte
 
 export function isProtected(s, x, y, tiles = Object.values(s.tiles)) {
   return !!s.protectedFields?.[key(x, y)] || tiles.some(t => t.type === 'wachturm' &&
-    Math.abs(t.x - x) <= GUARD_RADIUS && Math.abs(t.y - y) <= GUARD_RADIUS);
+    Math.abs(t.x - x) <= guardRadius(t) && Math.abs(t.y - y) <= guardRadius(t));
 }
 
 function clearGuardedBandits(s) {
@@ -270,6 +321,7 @@ export function spawnBandit(s, now = Date.now()) {
   if (!candidates.length) return null;
   const result = replaceWithBandits(s, [candidates[Math.floor(Math.random() * candidates.length)]], now)[0];
   s.hand = null;
+  s.handRarity = null;
   planBandits(s);
   return result;
 }
@@ -333,8 +385,8 @@ export function advanceBandits(s, elapsed, now = Date.now()) {
 // Stärke eines Nachbar-Paares.
 export function pairValue(a, b) {
   const ga = TILES[a.type].gives?.[b.type] || 0;
-  if (a.type === b.type) return ga;
-  return ga + (TILES[b.type].gives?.[a.type] || 0);
+  const value = a.type === b.type ? ga : ga + (TILES[b.type].gives?.[a.type] || 0);
+  return value * Math.max(tileStrength(a), tileStrength(b));
 }
 
 // Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Paar bildet.
@@ -351,6 +403,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     s.protectedFields[key(x, y)] = true;
     planBandits(s);
     s.hand = null;
+    s.handRarity = null;
     return { kind: 'protected', tile, x, y };
   }
   if (!tile || tile.type === 'banditen') return null;
@@ -364,6 +417,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     const losses = trimStorage(s, lostStorage ? [lostStorage] : []);
     planBandits(s);
     s.hand = null;
+    s.handRarity = null;
     return { kind: 'deleted', tile, losses };
   }
   if (s.hand !== 'joker_verwandeln') return null;
@@ -377,6 +431,7 @@ export function useJoker(s, x, y, now = Date.now()) {
   const cleared = newType === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
+  s.handRarity = null;
   return { kind: 'transformed', tile, oldType, cleared, losses, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -385,8 +440,8 @@ export const canAfford = (s, cost) => s.gold >= cost;
 export function tileProduction(s, tile) {
   const base = { holz: 0, korn: 0, gold: 0 };
   const bonus = { holz: 0, korn: 0, gold: 0 };
-  if (tile.type === 'wald' || tile.type === 'holzfaeller') base.holz = 1;
-  if (tile.type === 'feld' || tile.type === 'windmuehle') base.korn = 1;
+  if (tile.type === 'wald' || tile.type === 'holzfaeller') base.holz = tileStrength(tile);
+  if (tile.type === 'feld' || tile.type === 'windmuehle') base.korn = tileStrength(tile);
   for (const other of partnersOf(s, tile)) {
     const value = pairValue(tile, other);
     if (tile.type === 'holzfaeller') bonus.holz += value;
@@ -412,7 +467,7 @@ export function storageCapacity(s) {
   const caps = { ...BASE_CAPACITY };
   for (const tile of Object.values(s.tiles)) {
     const resource = TILES[tile.type].storage;
-    if (resource) caps[resource] += STORAGE_BONUS;
+    if (resource) caps[resource] += STORAGE_BONUS * tileStrength(tile);
   }
   return caps;
 }
@@ -459,7 +514,12 @@ export function forgeCount(s, tile) {
   return NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)).filter(t => t?.type === 'werkzeugschmiede').length;
 }
 
-const workshopFactor = (s, tile) => Math.max(0.4, 1 - forgeCount(s, tile) * 0.2);
+export function forgeBonus(s, tile) {
+  return Math.min(60, NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
+    .filter(t => t?.type === 'werkzeugschmiede').reduce((sum, forge) => sum + tileStrength(forge) * 20, 0));
+}
+
+const workshopFactor = (s, tile) => (1 - forgeBonus(s, tile) / 100) * (1 - (tileStrength(tile) - 1) * 0.1);
 
 export function workshopDuration(s, tile, packId) {
   const baseDuration = packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
@@ -519,7 +579,7 @@ export function openPack(s, packId) {
   if (packId === 'starthilfe') {
     s.packs[packId]--;
     const cards = shuffled(['wald', 'feld', 'gras', 'erde', 'wasser']);
-    s.deck.push(...cards);
+    addCards(s, cards);
     return cards;
   }
   const pack = PACKS[packId];
@@ -534,6 +594,6 @@ export function openPack(s, packId) {
     drawn.push(id);
   }
   const cards = shuffled(drawn);
-  s.deck.push(...cards);
+  addCards(s, cards);
   return cards;
 }

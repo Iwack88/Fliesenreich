@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=17';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, forgeCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=22';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=18';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=23';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -271,10 +271,10 @@ function displayPartners(tile) {
 
 function previewPartners() {
   if (!placementPreview || !TILES[state.hand]) return [];
-  const candidate = { ...placementPreview, type: state.hand };
+  const candidate = { ...placementPreview, type: state.hand, rarity: state.handRarity };
   return Object.values(state.tiles).filter(tile => {
     const dx = Math.abs(tile.x - candidate.x), dy = Math.abs(tile.y - candidate.y);
-    if (candidate.type === 'wachturm' && dx <= GUARD_RADIUS && dy <= GUARD_RADIUS) return true;
+    if (candidate.type === 'wachturm' && dx <= guardRadius(candidate) && dy <= guardRadius(candidate)) return true;
     if (dx > 1 || dy > 1) return false;
     if ((candidate.type === 'workshop' && tile.type === 'werkzeugschmiede') ||
         (candidate.type === 'werkzeugschmiede' && tile.type === 'workshop')) return true;
@@ -285,7 +285,7 @@ function previewPartners() {
 function previewBuffs() {
   if (!placementPreview || !TILES[state.hand]) return [];
   if (placementBuffCache) return placementBuffCache;
-  const candidate = { ...placementPreview, type: state.hand };
+  const candidate = { ...placementPreview, type: state.hand, rarity: state.handRarity };
   const simulated = { ...state, tiles: { ...state.tiles, [`${candidate.x},${candidate.y}`]: candidate } };
   const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
   const buffs = [];
@@ -303,11 +303,11 @@ function previewBuffs() {
 
   if (candidate.type === 'werkzeugschmiede') {
     for (const tile of Object.values(state.tiles).filter(tile => tile.type === 'workshop')) {
-      const speed = Math.max(0, Math.min(3, forgeCount(simulated, tile)) - Math.min(3, forgeCount(state, tile))) * 20;
+      const speed = forgeBonus(simulated, tile) - forgeBonus(state, tile);
       if (speed) buffs.push({ tile, text: `Herstellung −${speed}%` });
     }
   } else if (candidate.type === 'workshop') {
-    const speed = Math.min(3, forgeCount(simulated, candidate)) * 20;
+    const speed = forgeBonus(simulated, candidate);
     if (speed) buffs.push({ tile: candidate, text: `Herstellung −${speed}%`, candidate: true });
   }
   placementBuffCache = buffs;
@@ -339,7 +339,7 @@ function updatePanel() {
       targets.length ? 'Grünes Feld antippen für Vorschau; erneut antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}${guardHint}`;
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}${TILES[state.hand] ? ` · ${RARITY[state.handRarity || baseRarity(state.hand)].name}` : ''}</b><br>${message}${guardHint}`;
   } else {
     panel.classList.add('hidden');
   }
@@ -352,21 +352,21 @@ function updateTilePopup() {
   const def = TILES[selected.type];
   const partners = displayPartners(selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
-  html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
+  html += `<div class="dim">${RARITY[tileRarity(selected)].name} · Position ${selected.x}, ${selected.y}</div>`;
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
-    wald: 'Produziert 1 Holz pro 10 Sekunden.',
-    holzfaeller: 'Produziert 1 Holz; +1 pro benachbartem Wald.',
-    feld: 'Produziert 1 Korn pro 10 Sekunden.',
-    windmuehle: 'Produziert 1 Korn; +1 pro benachbartem Feld.',
+    wald: 'Produziert Holz pro 10 Sekunden.',
+    holzfaeller: 'Produziert Holz; benachbarte Wälder erhöhen den Ertrag.',
+    feld: 'Produziert Korn pro 10 Sekunden.',
+    windmuehle: 'Produziert Korn; benachbarte Felder erhöhen den Ertrag.',
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
-    taverne: 'Ein benachbartes Haus gibt 2 Gold pro 10 Sekunden.',
+    taverne: 'Erzeugt Gold mit benachbarten Häusern.',
     workshop: 'Produziert Packs. Benachbarte Werkzeugschmieden beschleunigen die Herstellung.',
-    lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS}.`,
-    kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS}.`,
-    goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS}.`,
-    werkzeugschmiede: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
-    wachturm: `Schützt einen Bereich von ${GUARD_RADIUS * 2 + 1}×${GUARD_RADIUS * 2 + 1} Feldern und entfernt dort Banditencamps.`,
+    lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
+    kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
+    goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
+    werkzeugschmiede: `Beschleunigt benachbarte Workshops um ${tileStrength(selected) * 20} %, insgesamt bis zu 60 %.`,
+    wachturm: `Schützt einen Bereich von ${guardRadius(selected) * 2 + 1}×${guardRadius(selected) * 2 + 1} Feldern und entfernt dort Banditencamps.`,
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
@@ -382,7 +382,7 @@ function updateTilePopup() {
   }
   if (selected.type === 'workshop') {
     const count = forgeCount(state, selected);
-    html += `<div>⚒️ Werkzeugschmieden: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
+    html += `<div>⚒️ Werkzeugschmieden: ${count} · Schmiedebonus −${forgeBonus(state, selected)} % · Seltenheitsbonus −${(tileStrength(selected) - 1) * 10} %</div>`;
     for (const [id, pack] of Object.entries(PACKS)) {
       html += `<div>${pack.name}: <b>1 Pack / ${formatTime(workshopDuration(state, selected, id))}</b></div>`;
     }
@@ -396,7 +396,7 @@ function updateTilePopup() {
       '<div>Kein ungeschütztes Ziel in Reichweite.</div>';
   }
   if (def.gives) {
-    html += `<div>Bonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek.</div>`;
+    html += `<div>Basisbonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek. · höhere Seltenheit verstärkt das Paar.</div>`;
   }
   html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
   el.innerHTML = html;
@@ -418,14 +418,14 @@ function cardArt(id) {
   return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=1#${id}"></use></svg></span>`;
 }
 function renderQueue() {
-  const key = `${state.deck[0] || 'empty'}:${state.deck.length}`;
+  const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
   $('queue').disabled = !!state.hand || !state.deck.length;
   if (key === queueKey) return;
   queueKey = key;
   const card = CARDS[state.deck[0]];
-  $('queue').setAttribute('aria-label', card ? `${card.name} ziehen` : 'Deck leer');
+  $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[state.deck[0]] ? `, ${RARITY[state.deckRarities[0]].name}` : ''} ziehen` : 'Deck leer');
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${state.deck[0] === 'joker_banditenzeit' ? '<span>Wirkt sofort</span>' : ''}`
+    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${state.deck[0] === 'joker_banditenzeit' ? '<span>Wirkt sofort</span>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -490,8 +490,7 @@ function drawNextCard() {
       cam.y = (selected.y + 0.5) * TILE;
       toast(`${result.previous ? `Banditen übernehmen ${TILES[result.previous.type].name}!` : 'Ein Banditencamp ist erschienen!'}${lossText(result.losses)}`);
     } else {
-      state.deck.push(state.hand);
-      state.hand = null;
+      returnHand(state);
       selected = null;
       toast('Kein ungeschütztes Feld – Niete ans Deckende gelegt');
     }
@@ -507,8 +506,7 @@ $('queue').onclick = drawNextCard;
 
 $('btn-return-card').onclick = () => {
   if (!JOKERS[state.hand]) return;
-  state.deck.push(state.hand);
-  state.hand = null;
+  returnHand(state);
   placementPreview = null;
   placementBuffCache = null;
   refreshTargets();
@@ -640,6 +638,10 @@ function showInventory() {
   deckTitle.className = 'section-title';
   deckTitle.textContent = 'Deck – Reihenfolge der Ziehung';
   body.appendChild(deckTitle);
+  const rarityInfo = document.createElement('div');
+  rarityInfo.className = 'pack-chances';
+  rarityInfo.textContent = 'Tile-Seltenheit: Common weiß 70 % · Uncommon grün 20 % · Rare blau 8 % · Epic lila 2 %. Höhere Stufen verstärken die Wirkung.';
+  body.appendChild(rarityInfo);
   if (!state.deck.length) {
     const empty = document.createElement('div');
     empty.textContent = 'Keine Karten im Deck.';
@@ -647,9 +649,10 @@ function showInventory() {
   }
   state.deck.forEach((id, i) => {
     const d = CARDS[id];
+    const rarity = state.deckRarities[i];
     const el = document.createElement('div');
-    el.className = `card ${d.rarity}`;
-    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[d.rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : ''}`;
+    el.className = `card ${rarity}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : ''}`;
     body.appendChild(el);
   });
 }
@@ -670,7 +673,7 @@ function showShop() {
       const card = CARDS[offer.card];
       const row = document.createElement('div');
       row.className = 'pack';
-      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : ''}</span>`;
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : ''}</span>`;
       const button = document.createElement('button');
       button.dataset.shopCard = offer.card;
       button.onclick = () => {
@@ -852,7 +855,7 @@ function showWorkshops() {
       const forges = forgeCount(state, tile);
       const bonus = document.createElement('div');
       bonus.className = 'pack-chances';
-      bonus.textContent = `⚒️ ${forges} Werkzeugschmieden · Herstellungszeit −${Math.min(60, forges * 20)} %`;
+      bonus.textContent = `⚒️ ${forges} Werkzeugschmieden · Schmiedebonus −${forgeBonus(state, tile)} % · Seltenheitsbonus −${(tileStrength(tile) - 1) * 10} %`;
       section.appendChild(bonus);
     }
     if (tile.job) {
@@ -1102,6 +1105,18 @@ function drawTile(tile, x, y, alpha = 1) {
       ctx.fillText(def.icon, x + TILE / 2, y + TILE / 2);
     }
   }
+  if (tile.type !== 'banditen') {
+    ctx.beginPath();
+    ctx.moveTo(x + TILE - 24, y + TILE - 9);
+    ctx.lineTo(x + TILE - 4, y + TILE - 29);
+    ctx.lineTo(x + TILE - 4, y + TILE - 9);
+    ctx.closePath();
+    ctx.fillStyle = RARITY[tileRarity(tile)].color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(25,35,25,.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1229,13 +1244,14 @@ function draw() {
   }
 
   const visibleGuards = TILES[state.hand] ?
-    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [{ ...placementPreview, type: 'wachturm' }] : [])] :
+    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [{ ...placementPreview, type: 'wachturm', rarity: state.handRarity }] : [])] :
     selected?.type === 'wachturm' && !state.hand ? [selected] : [];
   for (const guard of visibleGuards) {
-    const minX = Math.max(-half, guard.x - GUARD_RADIUS);
-    const minY = Math.max(-half, guard.y - GUARD_RADIUS);
-    const maxX = Math.min(half - 1, guard.x + GUARD_RADIUS);
-    const maxY = Math.min(half - 1, guard.y + GUARD_RADIUS);
+    const radius = guardRadius(guard);
+    const minX = Math.max(-half, guard.x - radius);
+    const minY = Math.max(-half, guard.y - radius);
+    const maxX = Math.min(half - 1, guard.x + radius);
+    const maxY = Math.min(half - 1, guard.y + radius);
     ctx.fillStyle = 'rgba(80, 175, 255, .18)';
     ctx.fillRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
     ctx.strokeStyle = '#63c7ff';
@@ -1270,7 +1286,7 @@ function draw() {
 
   if (placementPreview && TILES[state.hand]) {
     const x = placementPreview.x * TILE, y = placementPreview.y * TILE;
-    drawTile({ type: state.hand }, x, y, 0.88);
+    drawTile({ type: state.hand, rarity: state.handRarity }, x, y, 0.88);
     ctx.strokeStyle = '#172d20';
     ctx.lineWidth = 8;
     ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 12);

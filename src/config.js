@@ -54,9 +54,10 @@ export const PACKS = {
 export const GOLD_ICON = '🪙';
 
 export const RARITY = {
-  common:   { name: 'Gewöhnlich' },
-  uncommon: { name: 'Selten' },
-  rare:     { name: 'Episch' },
+  common:   { name: 'Common', color: '#f5f2e9', weight: 70, strength: 1 },
+  uncommon: { name: 'Uncommon', color: '#52b765', weight: 20, strength: 2 },
+  rare:     { name: 'Rare', color: '#4b8ce8', weight: 8, strength: 3 },
+  epic:     { name: 'Epic', color: '#a962dc', weight: 2, strength: 4 },
 };
 
 // gives beschreibt die Stärke benachbarter Paare (auch diagonal).
@@ -66,16 +67,16 @@ export const TILES = {
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   category: 'landschaft' },
   wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   category: 'landschaft' },
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft' },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', category: 'industrie', gives: { wald: 1 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', category: 'industrie', gives: { feld: 1 } },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { wald: 1 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { feld: 1 } },
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
-  taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
+  taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'common', shopTier: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
-  lagerhalle:   { name: 'Holzlager',   color: '#9b8c76', icon: '🪵', rarity: 'uncommon', category: 'industrie', storage: 'holz' },
-  kornlager:    { name: 'Kornlager',   color: '#bda95c', icon: '🌾', rarity: 'uncommon', category: 'industrie', storage: 'korn' },
-  goldlager:    { name: 'Goldlager',   color: '#c69b39', icon: '🪙', rarity: 'uncommon', category: 'industrie', storage: 'gold' },
-  werkzeugschmiede: { name: 'Werkzeugschmiede', color: '#896960', icon: '⚒️', rarity: 'uncommon', category: 'industrie' },
-  wachturm:     { name: 'Wachturm',    color: '#a4b7c8', icon: '🗼', rarity: 'uncommon', category: 'verteidigung' },
+  lagerhalle:   { name: 'Holzlager',   color: '#9b8c76', icon: '🪵', rarity: 'common', shopTier: 'uncommon', category: 'industrie', storage: 'holz' },
+  kornlager:    { name: 'Kornlager',   color: '#bda95c', icon: '🌾', rarity: 'common', shopTier: 'uncommon', category: 'industrie', storage: 'korn' },
+  goldlager:    { name: 'Goldlager',   color: '#c69b39', icon: '🪙', rarity: 'common', shopTier: 'uncommon', category: 'industrie', storage: 'gold' },
+  werkzeugschmiede: { name: 'Werkzeugschmiede', color: '#896960', icon: '⚒️', rarity: 'common', shopTier: 'uncommon', category: 'industrie' },
+  wachturm:     { name: 'Wachturm',    color: '#a4b7c8', icon: '🗼', rarity: 'common', shopTier: 'uncommon', category: 'verteidigung' },
   banditen:     { name: 'Banditencamp', color: '#713d44', icon: '🏴', rarity: 'common', category: 'gefahr' },
 };
 

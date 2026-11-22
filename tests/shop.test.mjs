@@ -28,7 +28,7 @@ test('buying charges the discounted price once and preserves the hand and saved 
   s.hand = 'wald';
   advanceShop(s, SHOP_INTERVAL);
   const { card, price } = s.shop.offers[0];
-  assert.equal(price, Math.round(SHOP_PRICES[CARDS[card].rarity] * (1 - SHOP_DISCOUNT)));
+  assert.equal(price, Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)));
   const before = [...s.deck];
   assert.equal(buyShopCard(s, 'banditen', s.shop.round), false);
   s.gold = price - 1;
