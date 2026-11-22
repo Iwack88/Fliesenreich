@@ -1,5 +1,5 @@
-import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST } from './config.js?v=6';
-import { newState, tileAt, drawCard, placeHand, placeCells, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=6';
+import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=7';
+import { newState, tileAt, drawCard, placeHand, placeCells, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=7';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -311,7 +311,7 @@ function showShop(result) {
     const info = document.createElement('div');
     const chances = packChances(p).map(([type, chance]) =>
       `${TILES[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
-    info.innerHTML = `<b>${p.name}</b> – ${p.cards} Karten<div class="pack-chances">Chance je Karte: ${chances}</div>`;
+    info.innerHTML = `<b>${p.name}</b> – ${p.cards} Karten<div class="pack-chances">Mindestens ${PACK_MIN_SPECIAL} Karten außer Gras, Erde und Wasser.<br>Chance je zufälliger Karte: ${chances}</div>`;
     row.appendChild(info);
     const btn = document.createElement('button');
     btn.textContent = costText(p.cost);

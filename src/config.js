@@ -13,15 +13,19 @@ export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 // Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
 export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
 
-// Gewichte werden für jede Karte unabhängig in eine Wahrscheinlichkeit umgerechnet.
+// Zwei Karten pro Pack sind garantiert keine dieser Grundkarten.
+export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser'];
+export const PACK_MIN_SPECIAL = 2;
+
+// Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: 8, cards: 5,
-    weights: { gras: 30, erde: 25, wasser: 25, feld: 10, wald: 10 },
+    weights: { gras: 30, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6 },
   },
   basis: {
     name: 'Entdecker-Pack', cost: 15, cards: 5,
-    weights: { gras: 28, erde: 24, wasser: 24, feld: 10, wald: 10, windmuehle: 2, holzfaeller: 2 },
+    weights: { gras: 28, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2 },
   },
 };
 
@@ -44,6 +48,8 @@ export const TILES = {
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft', gives: { feld: 1 } },
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', category: 'industrie', gives: { wald: 2 } },
   windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', category: 'industrie', gives: { feld: 2 } },
+  haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
+  taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
 };
 
 export const START_TILE = 'gras';

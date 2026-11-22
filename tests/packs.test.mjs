@@ -1,26 +1,37 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PACKS } from '../src/config.js';
+import { PACKS, PACK_FILLER_TYPES } from '../src/config.js';
 import { buyPack, packChances } from '../src/logic.js';
 
-test('packs expose the specified chances per card', () => {
-  assert.deepEqual(Object.fromEntries(packChances(PACKS.natur)),
-    { gras: 30, erde: 25, wasser: 25, feld: 10, wald: 10 });
-  assert.deepEqual(Object.fromEntries(packChances(PACKS.basis)),
-    { gras: 28, erde: 24, wasser: 24, feld: 10, wald: 10, windmuehle: 2, holzfaeller: 2 });
-  assert.ok(PACKS.basis.cost > PACKS.natur.cost);
+test('displayed probabilities include the guarantee and sum to 100%', () => {
+  const nature = Object.fromEntries(packChances(PACKS.natur));
+  const explorer = Object.fromEntries(packChances(PACKS.basis));
+  assert.ok(Math.abs(nature.gras - 18) < 1e-10);
+  assert.ok(Math.abs(nature.haus - 15.6) < 1e-10);
+  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 100 + 2 * 2 / 24) / 5) < 1e-10);
+  assert.equal(explorer.windmuehle, explorer.taverne);
+  for (const pack of Object.values(PACKS)) {
+    assert.ok(Math.abs(packChances(pack).reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
+  }
 });
 
-test('each pack uses its own weights for independent draws and appends the cards', (t) => {
-  const state = { gold: 50, deck: ['feld'] };
-  const values = [0.01, 0.31, 0.56, 0.81, 0.91, 0.01, 0.29, 0.53, 0.97, 0.99];
-  t.mock.method(Math, 'random', () => values.shift());
-  assert.deepEqual(buyPack(state, 'natur'), ['gras', 'erde', 'wasser', 'feld', 'wald']);
-  assert.equal(state.gold, 42);
-  assert.deepEqual(buyPack(state, 'basis'), ['gras', 'erde', 'wasser', 'windmuehle', 'holzfaeller']);
-  assert.equal(state.gold, 27);
-  assert.deepEqual(state.deck.slice(0, 2), ['feld', 'gras']);
-  assert.equal(state.deck.length, 11);
+test('both packs always contain at least two non-filler cards even with worst-case randomness', (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  for (const id of Object.keys(PACKS)) {
+    const state = { gold: 50, deck: ['wasser'] };
+    const cards = buyPack(state, id);
+    assert.equal(cards.length, 5);
+    assert.equal(cards.filter(card => !PACK_FILLER_TYPES.includes(card)).length, 2);
+    assert.deepEqual(state.deck, ['wasser', ...cards]);
+    assert.equal(state.gold, 50 - PACKS[id].cost);
+  }
+});
+
+test('the guaranteed cards are shuffled with the rest of the pack', (t) => {
+  t.mock.method(Math, 'random', () => 0);
+  const cards = buyPack({ gold: 50, deck: [] }, 'natur');
+  assert.ok(PACK_FILLER_TYPES.includes(cards[1]));
+  assert.ok(!PACK_FILLER_TYPES.includes(cards[4]));
 });
 
 test('an unaffordable pack does not spend gold or change the deck', () => {

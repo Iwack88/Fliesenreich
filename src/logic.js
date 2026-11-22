@@ -1,4 +1,4 @@
-import { TILES, START_GOLD, START_TILE, START_DECK, PACKS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=6';
+import { TILES, START_GOLD, START_TILE, START_DECK, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=7';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -99,10 +99,14 @@ function pickWeighted(entries) {
 export function packChances(pack) {
   const entries = Object.entries(pack.weights);
   const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  if (!total || entries.some(([id, weight]) => !TILES[id] || !Number.isFinite(weight) || weight <= 0)) {
+  const specialTotal = entries.filter(([id]) => !PACK_FILLER_TYPES.includes(id)).reduce((sum, [, weight]) => sum + weight, 0);
+  if (!total || !specialTotal || pack.cards < PACK_MIN_SPECIAL || entries.some(([id, weight]) => !TILES[id] || !Number.isFinite(weight) || weight <= 0)) {
     throw new Error(`Ungültige Kartengewichte für ${pack.name}`);
   }
-  return entries.map(([id, weight]) => [id, weight * 100 / total]);
+  return entries.map(([id, weight]) => [id, 100 * (
+    (pack.cards - PACK_MIN_SPECIAL) * weight / total +
+    (PACK_FILLER_TYPES.includes(id) ? 0 : PACK_MIN_SPECIAL * weight / specialTotal)
+  ) / pack.cards]);
 }
 
 export const cardCount = (s) => s.deck.length;
@@ -159,13 +163,16 @@ export function buyPack(s, packId) {
   const pack = PACKS[packId];
   if (!pack) throw new Error(`Unbekanntes Pack: ${packId}`);
   if (!canAfford(s, pack.cost)) return null;
-  const pool = packChances(pack);
+  packChances(pack);
+  const pool = Object.entries(pack.weights);
+  const specialPool = pool.filter(([id]) => !PACK_FILLER_TYPES.includes(id));
   s.gold -= pack.cost;
   const drawn = [];
   for (let i = 0; i < pack.cards; i++) {
-    const id = pickWeighted(pool);
+    const id = pickWeighted(i < PACK_MIN_SPECIAL ? specialPool : pool);
     drawn.push(id);
   }
-  s.deck.push(...drawn);
-  return drawn;
+  const cards = shuffled(drawn);
+  s.deck.push(...cards);
+  return cards;
 }
