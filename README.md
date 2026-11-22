@@ -2,8 +2,8 @@
 
 Bau-/Management-Spiel mit Tiles. Platzhalter-Grafiken: PNGs als `assets/tiles/<id>.png` ablegen (z. B. `wald.png`), sonst Farbe + Emoji.
 
-## Sockel-Prototyp
+## Spielfeld
 
-Jede Karte wird selbst platziert. Grüne Felder liegen an mindestens einem freien Sockel, der zum Typ der Karte passt. Aktuell hat jedes Tile zwei Landschafts-Sockel, einen Industrie-Sockel und einen reservierten Sockel, deren Seiten zufällig bestimmt und im Spielstand gespeichert werden. Die übrigen angrenzenden Seiten müssen nicht passen. Boni zählen weiterhin für alle passenden Nachbarn einschließlich diagonaler Felder und werden einmal beim Platzieren ausgezahlt. Kann eine Karte nicht platziert werden, lässt sie sich ans Deckende legen.
+Das Spielfeld startet mit 8×8 Feldern, einem Start-Tile und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die vier Felder direkt neben dem Start-Tile bleiben frei. Grüne Felder sind frei und grenzen seitlich an ein vorhandenes Tile; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen weiterhin für passende Nachbarn einschließlich diagonaler Felder und werden einmal beim Platzieren ausgezahlt.
 
-Die Kategorien und Sockel stehen in `src/config.js`. Ein Tile-Typ kann mit `sockets` die Zusammensetzung der zufällig verteilten Standard-Sockel überschreiben.
+Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend. Zahlen und Kosten stehen in `src/config.js`. Für den Prototyp beginnt ein neuer Spielstand; der alte bleibt im Browser gespeichert.

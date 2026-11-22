@@ -1,7 +1,7 @@
-import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, SOCKETS } from './config.js?v=4';
-import { newState, migrateSockets, tileAt, drawCard, returnBlockedCard, placeHand, placeCells, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=4';
+import { TILES, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST } from './config.js?v=5';
+import { newState, tileAt, drawCard, placeHand, placeCells, expandWorld, buyPack, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=5';
 
-const SAVE_KEY = 'fliesenreich-save-v7';
+const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
 const BG = '#1e5aa8';
 
@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 
 const loadedState = load();
 let state = loadedState || newState();
-let cam = { x: TILE / 2, y: TILE / 2, zoom: 1 };
+let cam = { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
 let dpr = 1;
@@ -30,7 +30,7 @@ function load() {
   try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; }
 }
 function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
-if (!loadedState || migrateSockets(state)) save();
+if (!loadedState) save();
 
 function resize() {
   dpr = window.devicePixelRatio || 1;
@@ -127,7 +127,7 @@ function onTap(sx, sy) {
     const target = targets.find(t => t.x === c.x && t.y === c.y);
     if (target) {
       const res = placeHand(state, target.x, target.y);
-      if (!res) { toast('Dieser Sockel passt nicht'); return; }
+      if (!res) { toast('Dieses Feld ist nicht frei'); return; }
       if (res && res.gold) {
         toast(`+${res.gold} ${GOLD_ICON}`);
         const now = performance.now();
@@ -136,7 +136,7 @@ function onTap(sx, sy) {
       selected = res?.tile || null;
       refreshTargets();
       save();
-    } else toast('Wähle ein grünes Feld mit passendem Sockel');
+    } else toast('Wähle ein grünes Feld');
     return;
   }
   selected = tileAt(state, c.x, c.y) || null;
@@ -145,7 +145,7 @@ function onTap(sx, sy) {
 }
 
 function refreshTargets() {
-  targets = state.hand ? placeCells(state, state.hand).map(([x, y]) => ({ x, y })) : [];
+  targets = state.hand ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
   updatePanel();
 }
 
@@ -158,17 +158,15 @@ function updatePanel() {
   const hand = state.hand && TILES[state.hand];
   if (hand) {
     panel.classList.remove('hidden');
-    const category = SOCKETS[hand.category];
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b> · ${category.name}<br>${targets.length ? 'Grünes Feld antippen zum Platzieren' : 'Kein passender Sockel frei'}`;
-    $('btn-return-card').hidden = targets.length > 0;
-    if (!targets.length && !state.deck.length) $('panel-info').innerHTML += '<br>Deck leer: Im Shop gibt es neue Karten.';
+    const message = targets.length ? 'Grünes Feld antippen zum Platzieren' :
+      state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}`;
   } else {
     panel.classList.add('hidden');
   }
   updateTilePopup();
 }
 
-// Tile-Daten als Popup: Seltenheit, Produktion (Basis + Buffs), buffende Nachbarn.
 function updateTilePopup() {
   const el = $('tile-popup');
   if (!selected) { el.classList.add('hidden'); return; }
@@ -176,10 +174,6 @@ function updateTilePopup() {
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
-  html += `<div>Typ: ${SOCKETS[def.category].name}</div>`;
-  const directions = ['oben', 'rechts', 'unten', 'links'];
-  const sockets = selected.sockets;
-  html += `<div class="dim">Sockel: ${sockets.map((id, i) => `${directions[i]} ${SOCKETS[id].name}`).join(', ')}</div>`;
   html += `<div>Bisher eingebracht: <b>${selected.earned || 0} ${GOLD_ICON}</b></div>`;
   if (def.gives) {
     html += `<div>Gold-Bonus je Nachbar: <b>${givesText(def)}</b></div>`;
@@ -233,13 +227,6 @@ $('btn-next').onclick = () => {
   save();
 };
 
-$('btn-return-card').onclick = () => {
-  if (!returnBlockedCard(state)) return;
-  refreshTargets();
-  save();
-  toast('Karte ans Deckende gelegt');
-};
-
 function openOverlay(title) {
   $('overlay-title').textContent = title;
   $('overlay').classList.remove('hidden');
@@ -273,6 +260,23 @@ function showShop(result) {
     r.style.width = '100%';
     r.textContent = 'Gezogen: ' + result.map(id => TILES[id].icon || TILES[id].name).join(' ');
     body.appendChild(r);
+  }
+  if (state.size === START_SIZE) {
+    const row = document.createElement('div');
+    row.className = 'pack';
+    row.innerHTML = `<span><b>Spielfeld erweitern</b> – ${EXPANDED_SIZE}×${EXPANDED_SIZE}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = costText(EXPANSION_COST);
+    btn.disabled = state.gold < EXPANSION_COST;
+    btn.onclick = () => {
+      if (!expandWorld(state)) { toast('Erweiterung nicht möglich'); return; }
+      refreshTargets();
+      save();
+      showShop();
+      toast('Spielfeld erweitert');
+    };
+    row.appendChild(btn);
+    body.appendChild(row);
   }
   for (const [id, p] of Object.entries(PACKS)) {
     const row = document.createElement('div');
@@ -353,13 +357,6 @@ function drawTile(tile, x, y, alpha = 1) {
   ctx.strokeStyle = 'rgba(0,0,0,.35)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, TILE, TILE);
-  const thickness = 6;
-  const strips = [[0, 0, TILE, thickness], [TILE - thickness, 0, thickness, TILE], [0, TILE - thickness, TILE, thickness], [0, 0, thickness, TILE]];
-  tile.sockets.forEach((id, i) => {
-    const [dx, dy, width, height] = strips[i];
-    ctx.fillStyle = SOCKETS[id].color;
-    ctx.fillRect(x + dx, y + dy, width, height);
-  });
   ctx.globalAlpha = 1;
 }
 
@@ -370,6 +367,23 @@ function draw() {
   ctx.translate(innerWidth / 2, innerHeight / 2);
   ctx.scale(cam.zoom, cam.zoom);
   ctx.translate(-cam.x, -cam.y);
+
+  const half = state.size / 2;
+  ctx.fillStyle = 'rgba(255,255,255,.09)';
+  ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
+  ctx.strokeStyle = 'rgba(255,255,255,.25)';
+  ctx.lineWidth = 1;
+  for (let i = -half; i <= half; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * TILE, -half * TILE);
+    ctx.lineTo(i * TILE, half * TILE);
+    ctx.moveTo(-half * TILE, i * TILE);
+    ctx.lineTo(half * TILE, i * TILE);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
 
   for (const t of Object.values(state.tiles)) {
     drawTile(t, t.x * TILE, t.y * TILE);

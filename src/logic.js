@@ -1,4 +1,4 @@
-import { TILES, DEFAULT_SOCKETS, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST } from './config.js?v=4';
+import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=5';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -13,38 +13,78 @@ function shuffled(arr) {
 }
 
 export function newState() {
-  const s = { gold: START_GOLD, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  const s = { gold: START_GOLD, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   addTile(s, START_TILE, 0, 0);
+  addObstacles(s, 0, START_OBSTACLES);
   return s;
 }
 
 export function addTile(s, type, x, y) {
-  const t = { id: s.nextId++, type, x, y, earned: 0, sockets: shuffled(TILES[type].sockets ?? DEFAULT_SOCKETS) };
+  const t = { id: s.nextId++, type, x, y, earned: 0 };
   s.tiles[key(x, y)] = t;
   return t;
 }
 
-export function migrateSockets(s) {
-  let changed = false;
-  for (const tile of Object.values(s.tiles)) {
-    if (!tile.sockets) {
-      tile.sockets = shuffled(TILES[tile.type].sockets ?? DEFAULT_SOCKETS);
-      changed = true;
-    }
-  }
-  return changed;
-}
-
 export const tileAt = (s, x, y) => s.tiles[key(x, y)];
 
-export function placeCells(s, type) {
-  if (!TILES[type]) return [];
+export function inBounds(size, x, y) {
+  const half = size / 2;
+  return x >= -half && x < half && y >= -half && y < half;
+}
+
+function connected(cells) {
+  if (!cells.size) return true;
+  const seen = new Set();
+  const queue = [cells.values().next().value];
+  seen.add(key(...queue[0]));
+  for (let i = 0; i < queue.length; i++) {
+    const [x, y] = queue[i];
+    for (const [dx, dy] of DIRS4) {
+      const k = key(x + dx, y + dy);
+      if (cells.has(k) && !seen.has(k)) {
+        seen.add(k);
+        queue.push(cells.get(k));
+      }
+    }
+  }
+  return seen.size === cells.size;
+}
+
+function addObstacles(s, oldSize, count) {
+  const cells = new Map();
+  for (let x = -s.size / 2; x < s.size / 2; x++) {
+    for (let y = -s.size / 2; y < s.size / 2; y++) {
+      if ((!oldSize || !inBounds(oldSize, x, y)) && !tileAt(s, x, y)) cells.set(key(x, y), [x, y]);
+    }
+  }
+  for (const [x, y] of shuffled([...cells.values()])) {
+    if (!count) break;
+    if (!oldSize && Math.abs(x) + Math.abs(y) <= 1) continue;
+    cells.delete(key(x, y));
+    if (!connected(cells)) {
+      cells.set(key(x, y), [x, y]);
+      continue;
+    }
+    addTile(s, OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)], x, y);
+    count--;
+  }
+  if (count) throw new Error('Nicht genügend freie Felder für die Weltgenerierung');
+}
+
+export function expandWorld(s) {
+  if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
+  s.size = EXPANDED_SIZE;
+  addObstacles(s, START_SIZE, EXPANSION_OBSTACLES);
+  s.gold -= EXPANSION_COST;
+  return true;
+}
+
+export function placeCells(s) {
   const cells = new Map();
   for (const t of Object.values(s.tiles)) {
-    const sockets = t.sockets;
-    for (const [i, [dx, dy]] of DIRS4.entries()) {
+    for (const [dx, dy] of DIRS4) {
       const x = t.x + dx, y = t.y + dy;
-      if (sockets[i] === TILES[type].category && !s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
+      if (inBounds(s.size, x, y) && !s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
     }
   }
   return [...cells.values()];
@@ -66,13 +106,6 @@ export function drawCard(s) {
   return s.hand;
 }
 
-export function returnBlockedCard(s) {
-  if (!s.hand || placeCells(s, s.hand).length) return false;
-  s.deck.push(s.hand);
-  s.hand = null;
-  return true;
-}
-
 export function shuffleDeck(s) {
   if (s.gold < SHUFFLE_COST || s.deck.length < 2) return false;
   s.gold -= SHUFFLE_COST;
@@ -82,7 +115,7 @@ export function shuffleDeck(s) {
 
 export function placeHand(s, x, y) {
   if (!s.hand) return null;
-  const valid = placeCells(s, s.hand).some(c => c[0] === x && c[1] === y);
+  const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const tile = addTile(s, s.hand, x, y);
   s.hand = null;

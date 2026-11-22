@@ -3,6 +3,12 @@
 
 export const START_GOLD = 20;
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
+export const START_SIZE = 8;
+export const EXPANDED_SIZE = 16;
+export const START_OBSTACLES = 12;
+export const EXPANSION_OBSTACLES = 36;
+export const EXPANSION_COST = 30;
+export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 
 // Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
 export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
@@ -22,15 +28,6 @@ export const RARITY = {
   uncommon: { name: 'Selten' },
   rare:     { name: 'Episch' },
 };
-
-export const SOCKETS = {
-  landschaft: { name: 'Landschaft', color: '#137a33' },
-  industrie: { name: 'Industrie', color: '#ad4b04' },
-  zukunft: { name: 'Später', color: '#59616c' },
-};
-
-// Sockel pro Tile; ihre Seiten werden beim Platzieren zufällig verteilt.
-export const DEFAULT_SOCKETS = ['landschaft', 'industrie', 'landschaft', 'zukunft'];
 
 // gives: Gold-Bonus pro Nachbar-Typ (8 Felder rundherum). Wird einmal ausgezahlt, sobald das Paar entsteht
 // (egal welches Tile zuerst lag). Gleiche Typen zählen als ein Paar (Feld an Feld = einmal +1);
