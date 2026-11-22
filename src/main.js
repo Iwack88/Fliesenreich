@@ -41,7 +41,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=1');
+    const response = await fetch('assets/card-art.svg?v=2');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -415,7 +415,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=1#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=2#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
@@ -1042,27 +1042,13 @@ $('btn-shuffle').onclick = () => {
 
 // ---------- Zeichnen ----------
 const TILE_GROUND = {
-  gras: ['#b2c77c', '#809f5b', '#60764b'],
-  erde: ['#cfb482', '#a8855e', '#796247'],
-  wasser: ['#c5d6a1', '#8ba971', '#647e5d'],
-  feld: ['#d3c28a', '#b69d6a', '#857752'],
-  banditen: ['#b4a78a', '#93856b', '#6d6252'],
+  gras: '#9caf73',
+  erde: '#ba9b72',
+  wasser: '#8eb8ad',
+  feld: '#c9b57d',
+  banditen: '#a7967c',
 };
-const DEFAULT_GROUND = ['#b8c78d', '#8ba26c', '#657a55'];
-
-function roundedTile(x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
+const DEFAULT_GROUND = '#a9bb85';
 
 function drawTile(tile, x, y, alpha = 1) {
   const def = TILES[tile.type];
@@ -1074,30 +1060,13 @@ function drawTile(tile, x, y, alpha = 1) {
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, TILE, TILE);
   } else {
-    const [light, ground, edge] = TILE_GROUND[tile.type] || DEFAULT_GROUND;
-    roundedTile(x + 2, y + 6, TILE - 4, TILE - 8, 9);
-    ctx.fillStyle = 'rgba(31,43,29,.28)';
-    ctx.fill();
-    roundedTile(x + 2, y + 3, TILE - 4, TILE - 8, 9);
-    ctx.fillStyle = edge;
-    ctx.fill();
-    roundedTile(x + 2, y + 2, TILE - 4, TILE - 15, 9);
-    const surface = ctx.createLinearGradient(x, y + 2, x, y + TILE - 13);
-    surface.addColorStop(0, light);
-    surface.addColorStop(1, ground);
-    ctx.fillStyle = surface;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(53,66,39,.45)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x + 12, y + 6);
-    ctx.lineTo(x + TILE - 12, y + 6);
-    ctx.strokeStyle = 'rgba(255,255,220,.3)';
+    ctx.fillStyle = TILE_GROUND[tile.type] || DEFAULT_GROUND;
+    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+    ctx.strokeStyle = 'rgba(53,66,39,.55)';
     ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
     if (tileArt[tile.type]) {
-      ctx.drawImage(tileArt[tile.type], x + 7, y + 1, TILE - 14, TILE - 14);
+      ctx.drawImage(tileArt[tile.type], x + 7, y + 7, TILE - 14, TILE - 14);
     } else if (def.icon) {
       ctx.font = `${TILE * 0.5}px sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1107,9 +1076,9 @@ function drawTile(tile, x, y, alpha = 1) {
   }
   if (tile.type !== 'banditen') {
     ctx.beginPath();
-    ctx.moveTo(x + TILE - 24, y + TILE - 9);
-    ctx.lineTo(x + TILE - 4, y + TILE - 29);
-    ctx.lineTo(x + TILE - 4, y + TILE - 9);
+    ctx.moveTo(x + TILE - 24, y + TILE - 4);
+    ctx.lineTo(x + TILE - 4, y + TILE - 24);
+    ctx.lineTo(x + TILE - 4, y + TILE - 4);
     ctx.closePath();
     ctx.fillStyle = RARITY[tileRarity(tile)].color;
     ctx.fill();
@@ -1289,25 +1258,25 @@ function draw() {
     drawTile({ type: state.hand, rarity: state.handRarity }, x, y, 0.88);
     ctx.strokeStyle = '#172d20';
     ctx.lineWidth = 8;
-    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 12);
+    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
     ctx.strokeStyle = '#fff6b0';
     ctx.lineWidth = 4;
-    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 12);
+    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
 
     for (const tile of previewPartners()) {
       ctx.fillStyle = 'rgba(255,174,50,.28)';
       ctx.fillRect(tile.x * TILE + 2, tile.y * TILE + 2, TILE - 4, TILE - 4);
       ctx.strokeStyle = '#ffb52e';
       ctx.lineWidth = 5;
-      ctx.strokeRect(tile.x * TILE + 4, tile.y * TILE + 4, TILE - 8, TILE - 12);
+      ctx.strokeRect(tile.x * TILE + 4, tile.y * TILE + 4, TILE - 8, TILE - 8);
     }
     for (const buff of previewBuffs()) {
       const bx = buff.tile.x * TILE, by = buff.tile.y * TILE;
       ctx.fillStyle = 'rgba(71,210,105,.24)';
-      ctx.fillRect(bx + 2, by + 2, TILE - 4, TILE - 12);
+      ctx.fillRect(bx + 2, by + 2, TILE - 4, TILE - 4);
       ctx.strokeStyle = '#6cff91';
       ctx.lineWidth = 5;
-      ctx.strokeRect(bx + 4, by + 4, TILE - 8, TILE - 12);
+      ctx.strokeRect(bx + 4, by + 4, TILE - 8, TILE - 8);
       ctx.beginPath();
       ctx.arc(bx + 16, by + 16, 11, 0, Math.PI * 2);
       ctx.fillStyle = '#1c5635';
