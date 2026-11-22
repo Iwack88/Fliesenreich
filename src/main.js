@@ -163,6 +163,24 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
 });
 
+const mobileMenu = matchMedia('(max-width: 899px)');
+let mobileMenuOpen = false;
+function updateMobileMenu() {
+  const collapsed = mobileMenu.matches && !mobileMenuOpen;
+  $('primary-actions').classList.toggle('menu-collapsed', collapsed);
+  $('primary-actions').inert = collapsed;
+  $('primary-toggle').setAttribute('aria-expanded', String(mobileMenuOpen));
+  $('primary-toggle').setAttribute('aria-label', mobileMenuOpen ? 'Menü schließen' : 'Menü öffnen');
+  $('primary-toggle').title = mobileMenuOpen ? 'Menü schließen' : 'Menü öffnen';
+  $('primary-toggle').textContent = mobileMenuOpen ? '❮' : '❯';
+}
+$('primary-toggle').onclick = () => {
+  mobileMenuOpen = !mobileMenuOpen;
+  updateMobileMenu();
+};
+mobileMenu.addEventListener('change', updateMobileMenu);
+updateMobileMenu();
+
 function pointerDistance() {
   const [a, b] = [...pointers.values()];
   return Math.hypot(a.x - b.x, a.y - b.y);

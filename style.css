@@ -15,6 +15,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #hud { flex-wrap: wrap; gap: 4px; }
 #actions { display: flex; align-items: center; }
 #primary-actions, #tool-actions { display: contents; }
+#primary-toggle { display: none; }
 #hud button { padding: 6px 10px; margin-left: 4px; }
 #actions .action-icon { display: none; }
 #btn-shuffle .action-icon { display: inline; }
@@ -36,7 +37,6 @@ button:disabled { background: #555; color: #999; }
 #crafting-jobs .job-timer { font-size: 16px; }
 #crafting-toggle { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 40px; height: 48px; margin: 0; padding: 0; border-radius: 8px 0 0 8px; background: var(--button-green); }
 @media (min-width: 900px) { #crafting-toggle:not(:disabled):hover, #crafting-toggle:not(:disabled):active { transform: translateY(-50%); } }
-@media (prefers-reduced-motion: reduce) { #crafting-panel { transition: none; } }
 #idle-workshop, #ready-packs { position: fixed; bottom: 8px; min-width: 62px; min-height: 42px; margin: 0; padding: 6px 10px; background: #a76b27; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 #idle-workshop { right: 10px; }
 #ready-packs { right: 82px; }
@@ -56,22 +56,25 @@ button:disabled { background: #555; color: #999; }
   #res .hud-resource { padding: 3px 4px; margin: 0; border-radius: 6px; font-size: 13px; }
   #res span { margin: 0 2px; font-size: 12px; }
   #actions { display: contents; }
-  #primary-actions { position: fixed; top: 40px; left: 6px; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 11px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; }
+  #primary-actions { position: fixed; top: 40px; left: 6px; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 11px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; transition: transform .2s ease; }
+  #primary-actions.menu-collapsed { transform: translateX(calc(-100% - 6px)); }
+  #hud #primary-toggle { position: fixed; top: 50%; left: 0; z-index: 4; display: flex; align-items: center; justify-content: center; width: 36px; height: 48px; margin: 0; padding: 0; border-radius: 0 8px 8px 0; background: var(--button-green); transform: translateY(-50%); transition: left .2s ease; }
+  #hud #primary-toggle[aria-expanded="true"] { left: 76px; }
   #primary-actions button { display: flex; width: 58px; min-height: 40px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; margin: 0; padding: 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: var(--button-green); }
   #primary-actions .action-icon { display: block; font-size: 19px; line-height: 1; }
   #primary-actions .action-label { display: block; max-width: 54px; overflow: hidden; font-size: 10px; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
-  #tool-actions { position: fixed; bottom: 62px; left: 8px; z-index: 3; display: flex; gap: 3px; padding: 4px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 10px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; }
+  #tool-actions { position: fixed; bottom: 6px; left: 8px; z-index: 3; display: flex; gap: 3px; padding: 4px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 10px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; }
   #tool-actions button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; margin: 0; padding: 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: var(--button-green); }
   #tool-actions .action-icon { display: block; font-size: 18px; line-height: 1; }
   #tool-actions .action-label { display: none; }
   #queue { top: calc(100% + 5px); right: 6px; width: 92px; padding: 5px; font-size: 10px; }
   #queue .card-art { width: 38px; height: 38px; margin: 3px auto; }
-  #panel { padding: 6px 8px; font-size: 13px; }
-  #panel.has-ready-packs, #panel.has-idle-workshop { padding-right: 78px; }
-  #panel.has-ready-packs.has-idle-workshop { padding-right: 150px; }
+  #panel { bottom: 60px; padding: 6px 8px; font-size: 13px; }
+  #panel.has-ready-packs, #panel.has-idle-workshop, #panel.has-ready-packs.has-idle-workshop { padding-right: 8px; }
   #panel-info { max-width: calc(100vw - 130px); }
   #panel-info .preview-buffs { display: block; margin-top: 3px; font-size: 11px; }
 }
+@media (prefers-reduced-motion: reduce) { #crafting-panel, #primary-actions, #hud #primary-toggle { transition: none; } }
 @media (min-width: 900px) {
   button { transition: filter .12s, transform .12s; }
   button:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); }
