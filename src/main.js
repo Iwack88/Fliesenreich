@@ -16,6 +16,7 @@ let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der H
 let dpr = 1;
 const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
+let dragButton = null;
 
 const images = {};
 for (const id of Object.keys(TILES)) {
@@ -54,6 +55,8 @@ canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   dragMoved = 0;
+  dragButton = e.button;
+  canvas.style.cursor = e.button === 2 || e.button === 1 ? 'grabbing' : 'grab';
   if (pointers.size === 2) pinchDist = pointerDistance();
 });
 canvas.addEventListener('pointermove', (e) => {
@@ -74,13 +77,41 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   const wasSingle = pointers.size === 1;
   pointers.delete(e.pointerId);
-  if (wasSingle && dragMoved < 10) onTap(e.clientX, e.clientY);
+  if (wasSingle && dragMoved < 10 && e.button === 0) onTap(e.clientX, e.clientY);
+  canvas.style.cursor = 'grab';
 });
 canvas.addEventListener('pointercancel', (e) => pointers.delete(e.pointerId));
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  const before = toWorld(e.clientX, e.clientY);
   setZoom(cam.zoom * (e.deltaY < 0 ? 1.1 : 0.9));
+  const after = toWorld(e.clientX, e.clientY);
+  cam.x += before.x - after.x;
+  cam.y += before.y - after.y;
 }, { passive: false });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('auxclick', (e) => e.preventDefault());
+canvas.style.cursor = 'grab';
+
+window.addEventListener('keydown', (e) => {
+  if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
+  const pan = 48 / cam.zoom;
+  if (e.key === 'ArrowLeft') cam.x -= pan;
+  else if (e.key === 'ArrowRight') cam.x += pan;
+  else if (e.key === 'ArrowUp') cam.y -= pan;
+  else if (e.key === 'ArrowDown') cam.y += pan;
+  else if (e.key === '+' || e.key === '=') setZoom(cam.zoom * 1.1);
+  else if (e.key === '-') setZoom(cam.zoom / 1.1);
+  else if (e.key.toLowerCase() === 'n') $('btn-next').click();
+  else if (e.key.toLowerCase() === 'd') showInventory();
+  else if (e.key.toLowerCase() === 'a') showArchive();
+  else if (e.key.toLowerCase() === 's') showShop();
+  else if (e.key === 'Escape') {
+    closeOverlay();
+    if (selected) { selected = null; updatePanel(); }
+  } else return;
+  e.preventDefault();
+});
 
 function pointerDistance() {
   const [a, b] = [...pointers.values()];
