@@ -1050,6 +1050,55 @@ const TILE_GROUND = {
 };
 const DEFAULT_GROUND = '#a9bb85';
 
+function drawTerrain(type, x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.rect(2, 2, TILE - 4, TILE - 4);
+  ctx.clip();
+  ctx.lineCap = 'round';
+  const offsetX = ((Math.round(x / TILE) * 13 + Math.round(y / TILE) * 7) % 28 + 28) % 28;
+  const offsetY = ((Math.round(x / TILE) * 5 + Math.round(y / TILE) * 11) % 26 + 26) % 26;
+  if (type === 'gras') {
+    ctx.strokeStyle = '#698a50';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let row = -1; row < 4; row++) for (let col = -1; col < 4; col++) {
+      const px = col * 28 + offsetX + (row % 2 ? 9 : 0), py = row * 26 + offsetY;
+      ctx.moveTo(px - 4, py - 4);
+      ctx.lineTo(px, py);
+      ctx.lineTo(px + 4, py - 6);
+      ctx.moveTo(px, py);
+      ctx.lineTo(px - 1, py - 8);
+    }
+    ctx.stroke();
+  } else if (type === 'erde') {
+    ctx.strokeStyle = '#927450';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let row = -1; row < 4; row++) for (let col = -1; col < 4; col++) {
+      const px = col * 28 + offsetX + (row % 2 ? 9 : 0), py = row * 26 + offsetY;
+      ctx.moveTo(px - 5, py + 1);
+      ctx.lineTo(px + 1, py - 1);
+      ctx.moveTo(px + 7, py + 5);
+      ctx.lineTo(px + 9, py + 5);
+    }
+    ctx.stroke();
+  } else if (type === 'wasser') {
+    ctx.strokeStyle = '#d1e4d7';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let row = -1; row < 4; row++) for (let col = -1; col < 4; col++) {
+      const px = col * 28 + offsetX + (row % 2 ? 12 : 0), py = row * 26 + offsetY;
+      ctx.moveTo(px - 8, py);
+      ctx.quadraticCurveTo(px - 4, py - 4, px, py);
+      ctx.quadraticCurveTo(px + 4, py + 4, px + 8, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawTile(tile, x, y, alpha = 1) {
   const def = TILES[tile.type];
   ctx.save();
@@ -1062,10 +1111,9 @@ function drawTile(tile, x, y, alpha = 1) {
   } else {
     ctx.fillStyle = TILE_GROUND[tile.type] || DEFAULT_GROUND;
     ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    ctx.strokeStyle = 'rgba(53,66,39,.55)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    if (tileArt[tile.type]) {
+    if (tile.type === 'gras' || tile.type === 'erde' || tile.type === 'wasser') {
+      drawTerrain(tile.type, x, y);
+    } else if (tileArt[tile.type]) {
       ctx.drawImage(tileArt[tile.type], x + 7, y + 7, TILE - 14, TILE - 14);
     } else if (def.icon) {
       ctx.font = `${TILE * 0.5}px sans-serif`;
@@ -1073,6 +1121,9 @@ function drawTile(tile, x, y, alpha = 1) {
       ctx.fillStyle = '#000';
       ctx.fillText(def.icon, x + TILE / 2, y + TILE / 2);
     }
+    ctx.strokeStyle = 'rgba(53,66,39,.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
   }
   if (tile.type !== 'banditen') {
     ctx.beginPath();
