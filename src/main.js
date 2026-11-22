@@ -1,5 +1,5 @@
 import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL } from './config.js?v=10';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery } from './logic.js?v=10';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery } from './logic.js?v=11';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -180,6 +180,18 @@ function flashPairs(pairs) {
 const fmt = (n) => String(Math.round(n * 100) / 100);
 const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${TILES[id].name} +${n}`).join(', ');
 
+function displayPartners(tile) {
+  const otherType = tile.type === 'workshop' ? 'lagerhalle' : tile.type === 'lagerhalle' ? 'workshop' : null;
+  if (!otherType) return partnersOf(state, tile);
+  const neighbors = [];
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    if (!dx && !dy) continue;
+    const neighbor = tileAt(state, tile.x + dx, tile.y + dy);
+    if (neighbor?.type === otherType) neighbors.push(neighbor);
+  }
+  return neighbors;
+}
+
 function updatePanel() {
   const panel = $('panel');
   const hand = state.hand && CARDS[state.hand];
@@ -203,7 +215,7 @@ function updateTilePopup() {
   const el = $('tile-popup');
   if (!selected || state.hand) { el.classList.add('hidden'); return; }
   const def = TILES[selected.type];
-  const partners = partnersOf(state, selected);
+  const partners = displayPartners(selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
   const descriptions = {
@@ -217,6 +229,12 @@ function updateTilePopup() {
     lagerhalle: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
+  if (selected.type === 'workshop') {
+    const count = warehouseCount(state, selected);
+    html += `<div>📦 Lagerhallen: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
+  } else if (selected.type === 'lagerhalle') {
+    html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
+  }
   if (def.gives) {
     html += `<div>Bonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek.</div>`;
   }
@@ -420,6 +438,11 @@ function showWorkshops() {
     jump.onclick = () => jumpTo(tile);
     head.append(title, jump);
     section.appendChild(head);
+    const warehouses = warehouseCount(state, tile);
+    const bonus = document.createElement('div');
+    bonus.className = 'pack-chances';
+    bonus.textContent = `📦 ${warehouses} Lagerhallen · Herstellungszeit −${Math.min(60, warehouses * 20)} %`;
+    section.appendChild(bonus);
     if (tile.job) {
       const status = document.createElement('div');
       const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
@@ -429,6 +452,12 @@ function showWorkshops() {
       timer.textContent = formatTime(tile.job.endsAt - Date.now());
       status.appendChild(timer);
       section.appendChild(status);
+      if (tile.job.duration == null) {
+        const notice = document.createElement('div');
+        notice.className = 'pack-chances';
+        notice.textContent = 'Dieser ältere Auftrag behält seine bisherige Zeit; neue Aufträge nutzen den aktuellen Bonus.';
+        section.appendChild(notice);
+      }
     } else {
       for (const [id, pack] of Object.entries(PACKS)) {
         const row = document.createElement('div');
@@ -452,7 +481,7 @@ function showWorkshops() {
       if (canStartRecovery(state, tile)) {
         const row = document.createElement('div');
         row.className = 'pack';
-        row.textContent = 'Starthilfe-Pack: kostenlos, mit Wald und Feld · 0:30';
+        row.textContent = `Starthilfe-Pack: kostenlos, mit Wald und Feld · ${formatTime(workshopDuration(state, tile, 'starthilfe'))}`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.onclick = () => {
@@ -582,7 +611,7 @@ function draw() {
   const workshopCount = tiles.filter(t => t.type === 'workshop').length;
   for (const t of tiles) {
     drawTile(t, t.x * TILE, t.y * TILE);
-    const partners = partnersOf(state, t).length;
+    const partners = displayPartners(t).length;
     if (partners) {
       ctx.fillStyle = '#ffd54f';
       ctx.font = `bold ${TILE * 0.22}px sans-serif`;
@@ -623,7 +652,7 @@ function draw() {
   }
 
   if (selected && !state.hand) {
-    for (const b of partnersOf(state, selected)) {
+    for (const b of displayPartners(selected)) {
       ctx.fillStyle = 'rgba(255,152,0,.35)';
       ctx.fillRect(b.x * TILE, b.y * TILE, TILE, TILE);
       ctx.strokeStyle = '#ff9800';

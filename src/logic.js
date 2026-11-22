@@ -135,11 +135,13 @@ export function shuffleDeck(s) {
   return true;
 }
 
-export function placeHand(s, x, y) {
+export function placeHand(s, x, y, now = Date.now()) {
   if (!TILES[s.hand]) return null;
   const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
+  const affected = s.hand === 'lagerhalle' ? affectedWorkshopJobs(s, x, y) : [];
   const tile = addTile(s, s.hand, x, y);
+  adjustWorkshopJobs(s, affected, now);
   s.hand = null;
   return { tile, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
@@ -158,13 +160,15 @@ export function partnersOf(s, tile) {
   return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o && pairValue(tile, o) > 0);
 }
 
-export function useJoker(s, x, y) {
+export function useJoker(s, x, y, now = Date.now()) {
   const tile = tileAt(s, x, y);
   if (!tile) return null;
   if (tile.type === 'workshop' && (tile.job || Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1)) return null;
   if (s.hand === 'joker_loeschen') {
     if (Object.keys(s.tiles).length <= 1) return null;
+    const affected = tile.type === 'lagerhalle' ? affectedWorkshopJobs(s, x, y) : [];
     delete s.tiles[key(x, y)];
+    adjustWorkshopJobs(s, affected, now);
     s.hand = null;
     return { kind: 'deleted', tile };
   }
@@ -172,7 +176,9 @@ export function useJoker(s, x, y) {
   const types = Object.keys(TILES).filter(type => type !== tile.type);
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
+  const affected = oldType === 'lagerhalle' || newType === 'lagerhalle' ? affectedWorkshopJobs(s, x, y) : [];
   tile.type = newType;
+  adjustWorkshopJobs(s, affected, now);
   s.hand = null;
   return { kind: 'transformed', tile, oldType, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
@@ -219,9 +225,28 @@ export function updateProduction(s, now = Date.now()) {
   return changed;
 }
 
+export function warehouseCount(s, tile) {
+  return NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)).filter(t => t?.type === 'lagerhalle').length;
+}
+
 export function workshopDuration(s, tile, packId) {
-  const warehouses = NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)).filter(t => t?.type === 'lagerhalle').length;
-  return Math.round(PACKS[packId].duration * Math.max(0.4, 1 - warehouses * 0.2));
+  const baseDuration = packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
+  return Math.round(baseDuration * Math.max(0.4, 1 - warehouseCount(s, tile) * 0.2));
+}
+
+function affectedWorkshopJobs(s, x, y) {
+  return NEIGHBORS.map(([dx, dy]) => tileAt(s, x + dx, y + dy))
+    .filter(tile => tile?.type === 'workshop' && tile.job)
+    .map(tile => ({ tile, duration: tile.job.duration ?? workshopDuration(s, tile, tile.job.pack) }));
+}
+
+function adjustWorkshopJobs(s, affected, now) {
+  for (const { tile, duration } of affected) {
+    if (tile.job.endsAt <= now) continue;
+    const newDuration = workshopDuration(s, tile, tile.job.pack);
+    tile.job.endsAt = now + Math.round((tile.job.endsAt - now) * newDuration / duration);
+    tile.job.duration = newDuration;
+  }
 }
 
 export function canStartPack(s, tile, packId) {
@@ -233,7 +258,8 @@ export function canStartPack(s, tile, packId) {
 export function startPack(s, tile, packId, now = Date.now()) {
   if (!canStartPack(s, tile, packId)) return false;
   for (const [id, amount] of Object.entries(PACKS[packId].cost)) s.resources[id] -= amount;
-  tile.job = { pack: packId, endsAt: now + workshopDuration(s, tile, packId) };
+  const duration = workshopDuration(s, tile, packId);
+  tile.job = { pack: packId, duration, endsAt: now + duration };
   return true;
 }
 
@@ -248,7 +274,8 @@ export function canStartRecovery(s, tile) {
 
 export function startRecovery(s, tile, now = Date.now()) {
   if (!canStartRecovery(s, tile)) return false;
-  tile.job = { pack: 'starthilfe', endsAt: now + 30000 };
+  const duration = workshopDuration(s, tile, 'starthilfe');
+  tile.job = { pack: 'starthilfe', duration, endsAt: now + duration };
   return true;
 }
 

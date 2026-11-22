@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addTile, newState, migrateState, productionRates, updateProduction, startPack, workshopDuration, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
+import { TILES } from '../src/config.js';
+import { addTile, newState, migrateState, productionRates, updateProduction, startPack, warehouseCount, workshopDuration, placeHand, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
 
 test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
   const s = newState();
@@ -56,6 +57,70 @@ test('insufficient resources cannot start and warehouse speed has a limit', () =
   assert.equal(startPack(s, w, 'natur', 0), false);
   assert.deepEqual(s.resources, { holz: 2, korn: 2 });
   assert.equal(w.job, undefined);
+});
+
+test('adding and removing a warehouse adjusts only remaining production time, including after reload', () => {
+  let s = newState();
+  const w = s.tiles['0,0'];
+  s.tiles = { '0,0': w };
+  startPack(s, w, 'natur', 0);
+  s.hand = 'lagerhalle';
+  assert.ok(placeHand(s, 1, 0, 15000));
+  assert.equal(warehouseCount(s, w), 1);
+  assert.equal(w.job.endsAt, 27000);
+  assert.equal(w.job.duration, 24000);
+  s = JSON.parse(JSON.stringify(s));
+  s.hand = 'joker_loeschen';
+  assert.ok(useJoker(s, 1, 0, 21000));
+  assert.equal(warehouseCount(s, s.tiles['0,0']), 0);
+  assert.equal(s.tiles['0,0'].job.endsAt, 28500);
+  assert.equal(updateProduction(s, 28499), true);
+  assert.equal(s.packs.natur, undefined);
+  updateProduction(s, 28500);
+  assert.equal(s.packs.natur, 1);
+});
+
+test('transforming a tile to or from a warehouse updates neighboring workshops', (t) => {
+  const s = newState();
+  const w = s.tiles['0,0'];
+  s.tiles = { '0,0': w };
+  addTile(s, 'gras', 1, 1);
+  startPack(s, w, 'natur', 0);
+  let index = Object.keys(TILES).filter(type => type !== 'gras').indexOf('lagerhalle');
+  const poolSize = Object.keys(TILES).length - 1;
+  t.mock.method(Math, 'random', () => (index + 0.5) / poolSize);
+  s.hand = 'joker_verwandeln';
+  assert.ok(useJoker(s, 1, 1, 15000));
+  assert.equal(w.job.endsAt, 27000);
+  index = Object.keys(TILES).filter(type => type !== 'lagerhalle').indexOf('gras');
+  s.hand = 'joker_verwandeln';
+  assert.ok(useJoker(s, 1, 1, 21000));
+  assert.equal(w.job.endsAt, 28500);
+});
+
+test('legacy jobs without a recorded duration keep working when a warehouse is added', () => {
+  const s = newState();
+  const w = s.tiles['0,0'];
+  s.tiles = { '0,0': w };
+  w.job = { pack: 'natur', endsAt: 30000 };
+  s.hand = 'lagerhalle';
+  placeHand(s, 1, 0, 15000);
+  assert.equal(w.job.endsAt, 27000);
+  assert.equal(w.job.duration, 24000);
+});
+
+test('one warehouse accelerates every neighboring workshop, including starthilfe', () => {
+  const s = newState();
+  const first = s.tiles['0,0'];
+  s.tiles = { '0,0': first };
+  const second = addTile(s, 'workshop', 2, 0);
+  startPack(s, first, 'natur', 0);
+  second.job = { pack: 'starthilfe', duration: 30000, endsAt: 30000 };
+  s.hand = 'lagerhalle';
+  placeHand(s, 1, 0, 15000);
+  assert.equal(first.job.endsAt, 27000);
+  assert.equal(second.job.endsAt, 27000);
+  assert.equal(workshopDuration(s, second, 'starthilfe'), 24000);
 });
 
 test('migration preserves old progress and provides a workshop card only once', () => {
