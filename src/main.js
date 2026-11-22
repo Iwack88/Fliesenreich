@@ -275,8 +275,9 @@ function updateTilePopup() {
   }
   html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
   el.innerHTML = html;
-  el.style.top = `${$('hud').getBoundingClientRect().bottom + 8}px`;
-  el.style.maxHeight = `calc(100vh - ${$('hud').getBoundingClientRect().bottom + 16}px)`;
+  const top = Math.max($('hud').getBoundingClientRect().bottom, $('queue').getBoundingClientRect().bottom) + 8;
+  el.style.top = `${top}px`;
+  el.style.maxHeight = `calc(100vh - ${top + 8}px)`;
   el.classList.remove('hidden');
   $('tile-close').onclick = () => { selected = null; updatePanel(); };
 }
@@ -287,13 +288,13 @@ function chip(id) {
   return `<span class="chip" style="background:${d.color}">${d.icon} ${d.name}</span>`;
 }
 function renderQueue() {
-  const key = `${state.hand}|${state.deck[0]}`;
+  const key = state.deck[0] || 'empty';
   if (key === queueKey) return;
   queueKey = key;
-  let html = '';
-  if (state.hand) html += `Jetzt: ${chip(state.hand)}`;
-  html += state.deck.length ? ` Danach: ${chip(state.deck[0])}` : ' Deck leer';
-  $('queue').innerHTML = html;
+  const card = CARDS[state.deck[0]];
+  $('queue').innerHTML = card
+    ? `<span class="queue-label">Als Nächstes</span><span class="queue-icon" style="background:${card.color}" aria-hidden="true">${card.icon}</span><b>${card.name}</b>`
+    : '<span class="queue-label">Deck leer</span>';
 }
 
 function updateHud() {
@@ -597,6 +598,72 @@ function updateJobIndicator(indicator, now = Date.now()) {
   }
 }
 
+function createJobStatus(tile) {
+  const status = document.createElement('div');
+  const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
+  status.className = 'job-status';
+  status.dataset.endsAt = tile.job.endsAt;
+  if (tile.job.duration != null) status.dataset.duration = tile.job.duration;
+  const heading = document.createElement('div');
+  heading.className = 'job-heading';
+  const packName = document.createElement('b');
+  packName.textContent = name;
+  const timer = document.createElement('strong');
+  timer.className = 'job-timer';
+  heading.append(packName, timer);
+  const progress = document.createElement('progress');
+  progress.max = 1;
+  progress.setAttribute('aria-label', `Fortschritt ${name} bei Workshop ${tile.x}, ${tile.y}`);
+  status.append(heading, progress);
+  updateJobIndicator(status);
+  return status;
+}
+
+let craftingJobsKey = '';
+function updateCraftingPanel() {
+  if ($('crafting-panel').classList.contains('closed')) return;
+  const jobs = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && tile.job);
+  const key = JSON.stringify(jobs.map(tile => [tile.id, tile.x, tile.y, tile.job.pack, tile.job.duration, tile.job.endsAt]));
+  if (key === craftingJobsKey) return;
+  craftingJobsKey = key;
+  const body = $('crafting-jobs');
+  body.innerHTML = '';
+  if (!jobs.length) {
+    body.textContent = 'Zurzeit keine laufenden Aufträge.';
+    return;
+  }
+  for (const tile of jobs) {
+    const section = document.createElement('div');
+    section.className = 'workshop';
+    const title = document.createElement('b');
+    title.textContent = `Workshop (${tile.x}, ${tile.y})`;
+    section.append(title, createJobStatus(tile));
+    if (tile.job.duration == null) {
+      const notice = document.createElement('div');
+      notice.className = 'pack-chances';
+      notice.textContent = 'Fortschritt für diesen älteren Auftrag nicht verfügbar.';
+      section.appendChild(notice);
+    }
+    body.appendChild(section);
+  }
+}
+
+$('crafting-toggle').onclick = () => {
+  const panel = $('crafting-panel');
+  const open = panel.classList.contains('closed');
+  panel.classList.toggle('closed', !open);
+  $('crafting-content').inert = !open;
+  $('crafting-toggle').setAttribute('aria-expanded', String(open));
+  $('crafting-toggle').setAttribute('aria-label', open ? 'Herstellungsübersicht schließen' : 'Herstellungsübersicht öffnen');
+  $('crafting-toggle').textContent = open ? '❮' : '❯';
+  if (open) {
+    syncBandits();
+    syncProduction();
+    craftingJobsKey = '';
+    updateCraftingPanel();
+  }
+};
+
 let expandedWorkshopId = null;
 function showWorkshops() {
   const body = openOverlay('Workshops', 'workshops');
@@ -643,24 +710,7 @@ function showWorkshops() {
       section.appendChild(bonus);
     }
     if (tile.job) {
-      const status = document.createElement('div');
-      const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
-      status.className = 'job-status';
-      status.dataset.endsAt = tile.job.endsAt;
-      if (tile.job.duration != null) status.dataset.duration = tile.job.duration;
-      const heading = document.createElement('div');
-      heading.className = 'job-heading';
-      const packName = document.createElement('b');
-      packName.textContent = name;
-      const timer = document.createElement('strong');
-      timer.className = 'job-timer';
-      heading.append(packName, timer);
-      const progress = document.createElement('progress');
-      progress.max = 1;
-      progress.setAttribute('aria-label', `Fortschritt ${name} bei Workshop ${tile.x}, ${tile.y}`);
-      status.append(heading, progress);
-      updateJobIndicator(status);
-      section.appendChild(status);
+      section.appendChild(createJobStatus(tile));
       if (tile.job.duration == null) {
         const notice = document.createElement('div');
         notice.className = 'pack-chances';
@@ -1058,6 +1108,7 @@ function draw() {
 function frame() {
   draw();
   updateHud();
+  updateCraftingPanel();
   requestAnimationFrame(frame);
 }
 

@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -18,7 +18,6 @@
     <button class="hud-resource" data-hud-resource="korn" aria-label="Korn im Warehouse anzeigen">🌾 <b id="r-korn">0</b></button>
     <span title="Zeit bis zur nächsten Ausbreitung">🏴 <b id="r-banditen">5:00</b></span>
   </div>
-  <div id="queue"></div>
   <div id="actions">
     <button id="btn-full">⛶</button>
     <button id="btn-cards">Inventar</button>
@@ -30,7 +29,10 @@
     <button id="btn-shop">Shop</button>
     <button id="btn-new-game">Neues Spiel</button>
     <button id="btn-shuffle">🔀</button>
-    <button id="btn-next">Next</button>
+    <span id="next-control">
+      <button id="btn-next">Next</button>
+      <div id="queue" aria-label="Nächste Karte"></div>
+    </span>
   </div>
 </div>
 
@@ -38,6 +40,14 @@
   <div id="panel-info"></div>
   <button id="btn-return-card" hidden>Ans Deckende</button>
 </div>
+
+<aside id="crafting-panel" class="closed" aria-label="Laufende Herstellungsaufträge">
+  <div id="crafting-content" inert>
+    <b>🛠️ Laufende Herstellung</b>
+    <div id="crafting-jobs"></div>
+  </div>
+  <button id="crafting-toggle" aria-expanded="false" aria-controls="crafting-content" aria-label="Herstellungsübersicht öffnen">❯</button>
+</aside>
 
 <button id="idle-workshop" hidden aria-label="Untätige Workshops anzeigen" title="Untätige Workshops anzeigen">🛠️ <span id="idle-workshop-count"></span></button>
 
@@ -48,6 +58,6 @@
 <div id="toast"></div>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=25"></script>
+<script type="module" src="src/main.js?v=26"></script>
 </body>
 </html>

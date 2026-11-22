@@ -10,6 +10,8 @@ Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; da
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Platzieren; mit **▦ Grid** lässt es sich auch außerhalb des Baumodus ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
 
+Unter **Next** zeigt ein Symbol mit Namen die nächste Karte im Deck. Die aktuell gezogene Karte steht weiterhin im Platzierungsmenü unten; bei leerem Deck zeigt die Vorschau „Deck leer“.
+
 Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter ein Holzlager. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 
 ## Produktion und Workshops
@@ -25,6 +27,8 @@ Beim Antippen einer Ressource im Warehouse erscheint der Gesamtertrag pro Tick (
 Unter **Workshop** lassen sich alle Workshops finden und Packs herstellen: Landschaft kostet 20 Holz und 15 Korn und dauert 3 Minuten, Entdecker 35 Holz und 25 Korn und dauert 6 Minuten, **HumanCity** 50 Holz und 35 Korn und dauert 9 Minuten. Jede benachbarte Werkzeugschmiede verkürzt die Herstellungszeit um 20 %, höchstens um 60 %. Änderungen an den Schmieden wirken auch auf die verbleibende Zeit bereits laufender Produktionen. Ein Workshop produziert ein Pack gleichzeitig. Fertige Packs landen automatisch im **Inventar** und werden dort geöffnet; ihre Karten kommen ans Deckende. Der direkte Packverkauf im Shop bleibt deaktiviert, die Spielfelderweiterung ist dauerhaft verfügbar.
 
 Die Workshop-Übersicht listet alle Workshops kompakt auf. Ein Antippen klappt die Pack-Auswahl des jeweiligen Workshops auf; **Anzeigen** springt zu ihm auf der Karte. Laufende Aufträge zeigen auch in der geschlossenen Liste Restzeit und Fortschritt. Bereits vor dieser Umstellung gestartete Aufträge behalten ihre bisherige Restzeit und Dauer. Bei älteren Aufträgen ohne gespeicherte Dauer bleibt der Fortschritt unbekannt, auch wenn eine Schmiede die Restzeit verändert.
+
+Der Pfeil links öffnet eine Schnellübersicht aller laufenden Herstellungsaufträge mit Workshop-Position, Pack, Restzeit und Fortschritt. Sie aktualisiert sich automatisch und lässt sich mit dem Pfeil wieder schließen.
 
 Ein Hammer am unteren Bildschirmrand zeigt die Anzahl untätiger Workshops und öffnet direkt die Auswahl des ersten freien Workshops. Sind alle beschäftigt oder keine vorhanden, verschwindet er; nach Abschluss eines Auftrags erscheint er wieder. In der Pack-Auswahl stehen die möglichen Karten mit Symbol, Name und Chance pro Karte. Farbige Kästchen kennzeichnen Karten ohne eigenes Symbol.
 
