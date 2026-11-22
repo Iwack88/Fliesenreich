@@ -575,6 +575,7 @@ function updateJobIndicator(indicator, now = Date.now()) {
   }
 }
 
+let expandedWorkshopId = null;
 function showWorkshops() {
   const body = openOverlay('Workshops', 'workshops');
   body.innerHTML = '';
@@ -584,6 +585,7 @@ function showWorkshops() {
   summary.textContent = `Produktion alle ${PRODUCTION_INTERVAL / 1000} Sek.: 🪵 ${rates.holz} · 🌾 ${rates.korn} · 🪙 ${rates.gold}. Holz und Korn: max. ${RESOURCE_CAP}.`;
   body.appendChild(summary);
   const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
+  if (!workshops.some(tile => tile.id === expandedWorkshopId)) expandedWorkshopId = null;
   if (!workshops.length) {
     const notice = document.createElement('p');
     notice.textContent = 'Kein Workshop platziert. Ohne Workshop-Karte oder fertiges Pack ist ein neues Spiel nötig.';
@@ -594,18 +596,29 @@ function showWorkshops() {
     section.className = 'workshop';
     const head = document.createElement('div');
     head.className = 'workshop-head';
-    const title = document.createElement('b');
-    title.textContent = `🛠️ Workshop (${tile.x}, ${tile.y})`;
+    const expanded = tile.id === expandedWorkshopId;
+    const title = document.createElement('button');
+    title.className = 'workshop-toggle';
+    title.textContent = `🛠️ Workshop (${tile.x}, ${tile.y}) · ${tile.job ? 'Produziert' : 'Bereit'} ${expanded ? '▴' : '▾'}`;
+    title.setAttribute('aria-expanded', String(expanded));
+    title.onclick = () => {
+      expandedWorkshopId = expanded ? null : tile.id;
+      const scroll = $('overlay-box').scrollTop;
+      showWorkshops();
+      $('overlay-box').scrollTop = scroll;
+    };
     const jump = document.createElement('button');
     jump.textContent = 'Anzeigen';
     jump.onclick = () => jumpTo(tile);
     head.append(title, jump);
     section.appendChild(head);
-    const warehouses = warehouseCount(state, tile);
-    const bonus = document.createElement('div');
-    bonus.className = 'pack-chances';
-    bonus.textContent = `📦 ${warehouses} Lagerhallen · Herstellungszeit −${Math.min(60, warehouses * 20)} %`;
-    section.appendChild(bonus);
+    if (expanded) {
+      const warehouses = warehouseCount(state, tile);
+      const bonus = document.createElement('div');
+      bonus.className = 'pack-chances';
+      bonus.textContent = `📦 ${warehouses} Lagerhallen · Herstellungszeit −${Math.min(60, warehouses * 20)} %`;
+      section.appendChild(bonus);
+    }
     if (tile.job) {
       const status = document.createElement('div');
       const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
@@ -631,7 +644,7 @@ function showWorkshops() {
         notice.textContent = 'Bei diesem älteren Auftrag ist der Fortschritt nicht verfügbar; die Restzeit bleibt erhalten.';
         section.appendChild(notice);
       }
-    } else {
+    } else if (expanded) {
       for (const [id, pack] of Object.entries(PACKS)) {
         const row = document.createElement('div');
         row.className = 'pack';
@@ -751,7 +764,7 @@ function showArchive() {
 
 $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
-$('btn-workshop').onclick = () => { syncProduction(); showWorkshops(); };
+$('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
 $('btn-shop').onclick = () => { syncBandits(); syncProduction(); showShop(); };
 $('btn-shields').onclick = () => {
@@ -941,9 +954,19 @@ function draw() {
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
   if (selected && !state.hand) {
     const related = new Set([selected, ...displayPartners(selected)]);
+    const target = selected.type === 'banditen' ? selected.target : null;
     ctx.fillStyle = 'rgba(85,85,85,.82)';
     for (const tile of tiles) {
-      if (!related.has(tile)) ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
+      if (!related.has(tile) && !(target && tile.x === target.x && tile.y === target.y)) {
+        ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
+      }
+    }
+    if (target) {
+      ctx.fillStyle = 'rgba(255,35,35,.48)';
+      ctx.fillRect(target.x * TILE, target.y * TILE, TILE, TILE);
+      ctx.strokeStyle = '#ff3838';
+      ctx.lineWidth = 5;
+      ctx.strokeRect(target.x * TILE + 2, target.y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
 }

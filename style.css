@@ -48,6 +48,7 @@ button:disabled { background: #555; color: #999; }
 .pack button { flex-shrink: 0; }
 .workshop { width: 100%; padding: 10px; background: rgba(0,0,0,.25); border-radius: 8px; }
 .workshop-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.workshop .workshop-toggle { flex: 1; margin: 0; padding: 8px; text-align: left; background: #355a40; }
 .workshop .pack { margin-top: 6px; gap: 6px; }
 .workshop button { font-size: 14px; padding: 6px 8px; }
 .job-status { margin-top: 10px; }
