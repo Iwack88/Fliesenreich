@@ -6,18 +6,19 @@ import { openPack, packChances } from '../src/logic.js';
 test('displayed probabilities include the guarantee and sum to 100%', () => {
   const nature = Object.fromEntries(packChances(PACKS.natur));
   const explorer = Object.fromEntries(packChances(PACKS.basis));
-  assert.ok(Math.abs(nature.gras - 100 * (3 * 26 / 101) / 5) < 1e-10);
-  assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 101 + 2 * 6 / 23) / 5) < 1e-10);
-  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 101 + 2 * 2 / 31) / 5) < 1e-10);
+  assert.ok(Math.abs(nature.gras - 100 * (3 * 26 / 105) / 5) < 1e-10);
+  assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 105 + 2 * 6 / 27) / 5) < 1e-10);
+  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 105 + 2 * 2 / 35) / 5) < 1e-10);
   assert.equal(explorer.windmuehle, explorer.taverne);
   assert.ok(explorer.joker_loeschen > 0);
   assert.equal(explorer.joker_loeschen, explorer.joker_verwandeln);
   assert.equal(nature.joker_loeschen, undefined);
-  assert.ok(Math.abs(nature.banditen_niete - 100 * 3 * 2 / 101 / 5) < 1e-10);
+  assert.ok(Math.abs(nature.banditen_niete - 100 * 3 * 2 / 105 / 5) < 1e-10);
   assert.equal(explorer.banditen_niete, nature.banditen_niete);
   for (const pack of Object.values(PACKS)) {
     const chances = packChances(pack);
     assert.ok(Object.fromEntries(chances).joker_schutz > 0);
+    for (const id of ['lagerhalle', 'kornlager', 'goldlager', 'werkzeugschmiede']) assert.ok(Object.fromEntries(chances)[id] > 0);
     assert.ok(Math.abs(chances.reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
   }
 });
@@ -49,8 +50,8 @@ test('a missing pack does not change the deck', () => {
 
 test('HumanCity offers houses, taverns and guards with guarantee-adjusted chances', () => {
   const chances = Object.fromEntries(packChances(PACKS.humancity));
-  assert.ok(Math.abs(chances.wachturm - 100 * (3 * 8 / 101 + 2 * 8 / 51) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.haus - 100 * (3 * 30 / 101 + 2 * 30 / 51) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.taverne - 100 * (3 * 12 / 101 + 2 * 12 / 51) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.banditen_niete - 100 * 3 * 5 / 101 / 5) < 1e-10);
+  assert.ok(Math.abs(chances.wachturm - 100 * (3 * 8 / 107 + 2 * 8 / 57) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.haus - 100 * (3 * 30 / 107 + 2 * 30 / 57) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.taverne - 100 * (3 * 12 / 107 + 2 * 12 / 57) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.banditen_niete - 100 * 3 * 5 / 107 / 5) < 1e-10);
 });

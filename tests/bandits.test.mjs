@@ -261,16 +261,17 @@ test('global clock advances only by supplied active time and persists its remain
   assert.equal(saved.banditElapsed, 0);
 });
 
-test('capturing a warehouse updates active workshop timers and can capture a workshop', () => {
+test('capturing a forge updates active workshop timers and can capture a workshop', () => {
   const s = emptyWorld();
+  s.resources = { holz: 100, korn: 100 };
   const workshop = addTile(s, 'workshop', 0, 0);
-  addTile(s, 'lagerhalle', 1, 0);
+  addTile(s, 'werkzeugschmiede', 1, 0);
   addTile(s, 'banditen', 2, 0);
   startPack(s, workshop, 'natur', 0);
-  assert.equal(workshop.job.endsAt, 24000);
-  assert.equal(spreadBandits(s, 12000)[0].previous.type, 'lagerhalle');
-  assert.equal(workshop.job.endsAt, 27000);
-  assert.equal(spreadBandits(s, 13000)[0].previous.type, 'workshop');
+  assert.equal(workshop.job.endsAt, 144000);
+  assert.equal(spreadBandits(s, 72000)[0].previous.type, 'werkzeugschmiede');
+  assert.equal(workshop.job.endsAt, 162000);
+  assert.equal(spreadBandits(s, 73000)[0].previous.type, 'workshop');
   assert.equal(s.tiles['0,0'].type, 'banditen');
   assert.equal(s.packs.natur, undefined);
 });

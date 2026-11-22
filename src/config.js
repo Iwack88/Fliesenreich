@@ -13,7 +13,8 @@ export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
 export const START_DECK = { gras: 1, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
-export const RESOURCE_CAP = 100;
+export const BASE_CAPACITY = { gold: 300, holz: 100, korn: 100 };
+export const STORAGE_BONUS = 50;
 export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 5 * 60 * 1000;
@@ -33,16 +34,16 @@ export const PACK_MIN_SPECIAL = 2;
 // Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
 export const PACKS = {
   natur: {
-    name: 'Landschafts-Pack', cost: { holz: 3, korn: 2 }, duration: 30000, cards: 5,
-    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, banditen_niete: 2, joker_schutz: 1 },
+    name: 'Landschafts-Pack', cost: { holz: 20, korn: 15 }, duration: 180000, cards: 5,
+    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1 },
   },
   basis: {
-    name: 'Entdecker-Pack', cost: { holz: 6, korn: 5 }, duration: 60000, cards: 5,
-    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, banditen_niete: 2, joker_schutz: 1 },
+    name: 'Entdecker-Pack', cost: { holz: 35, korn: 25 }, duration: 360000, cards: 5,
+    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1 },
   },
   humancity: {
-    name: 'HumanCity-Pack', cost: { holz: 8, korn: 6 }, duration: 90000, cards: 5,
-    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, joker_schutz: 1 },
+    name: 'HumanCity-Pack', cost: { holz: 50, korn: 35 }, duration: 540000, cards: 5,
+    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1 },
   },
 };
 
@@ -66,7 +67,10 @@ export const TILES = {
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
-  lagerhalle:   { name: 'Lagerhalle',  color: '#9b8c76', icon: '📦', rarity: 'uncommon', category: 'industrie' },
+  lagerhalle:   { name: 'Holzlager',   color: '#9b8c76', icon: '🪵', rarity: 'uncommon', category: 'industrie', storage: 'holz' },
+  kornlager:    { name: 'Kornlager',   color: '#bda95c', icon: '🌾', rarity: 'uncommon', category: 'industrie', storage: 'korn' },
+  goldlager:    { name: 'Goldlager',   color: '#c69b39', icon: '🪙', rarity: 'uncommon', category: 'industrie', storage: 'gold' },
+  werkzeugschmiede: { name: 'Werkzeugschmiede', color: '#896960', icon: '⚒️', rarity: 'uncommon', category: 'industrie' },
   wachturm:     { name: 'Wachturm',    color: '#a4b7c8', icon: '🗼', rarity: 'uncommon', category: 'verteidigung' },
   banditen:     { name: 'Banditencamp', color: '#713d44', icon: '🏴', rarity: 'common', category: 'gefahr' },
 };

@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=14';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=18';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=15';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, storageCapacity, forgeCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=19';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -148,10 +148,10 @@ function onTap(sx, sy) {
     }
     selected = result.kind === 'transformed' || result.kind === 'protected' ? result.tile || null : null;
     if (result.kind === 'transformed') {
-      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}`);
+      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}${lossText(result.losses)}`);
       flashPairs(result.pairs);
     } else if (result.kind === 'protected') toast(`Feld (${result.x}, ${result.y}) dauerhaft vor Banditen geschützt`);
-    else toast(`${TILES[result.tile.type].name} gelöscht`);
+    else toast(`${TILES[result.tile.type].name} gelöscht${lossText(result.losses)}`);
     refreshTargets();
     save();
     return;
@@ -189,7 +189,7 @@ const fmt = (n) => String(Math.round(n * 100) / 100);
 const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${TILES[id].name} +${n}`).join(', ');
 
 function displayPartners(tile) {
-  const otherType = tile.type === 'workshop' ? 'lagerhalle' : tile.type === 'lagerhalle' ? 'workshop' : null;
+  const otherType = tile.type === 'workshop' ? 'werkzeugschmiede' : tile.type === 'werkzeugschmiede' ? 'workshop' : null;
   if (!otherType) return partnersOf(state, tile);
   const neighbors = [];
   for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
@@ -236,8 +236,11 @@ function updateTilePopup() {
     windmuehle: 'Produziert 1 Korn; +1 pro benachbartem Feld.',
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
     taverne: 'Ein benachbartes Haus gibt 2 Gold pro 10 Sekunden.',
-    workshop: 'Produziert Packs. Benachbarte Lagerhallen beschleunigen die Herstellung.',
-    lagerhalle: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
+    workshop: 'Produziert Packs. Benachbarte Werkzeugschmieden beschleunigen die Herstellung.',
+    lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS}.`,
+    kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS}.`,
+    goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS}.`,
+    werkzeugschmiede: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
     wachturm: `Schützt einen Bereich von ${GUARD_RADIUS * 2 + 1}×${GUARD_RADIUS * 2 + 1} Feldern und entfernt dort Banditencamps.`,
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
@@ -253,13 +256,15 @@ function updateTilePopup() {
     html += '<div class="dim">Gold zählt gemeinsam pro Paar, nicht doppelt pro Gebäude.</div>';
   }
   if (selected.type === 'workshop') {
-    const count = warehouseCount(state, selected);
-    html += `<div>📦 Lagerhallen: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
+    const count = forgeCount(state, selected);
+    html += `<div>⚒️ Werkzeugschmieden: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
     for (const [id, pack] of Object.entries(PACKS)) {
       html += `<div>${pack.name}: <b>1 Pack / ${formatTime(workshopDuration(state, selected, id))}</b></div>`;
     }
-  } else if (selected.type === 'lagerhalle') {
+  } else if (selected.type === 'werkzeugschmiede') {
     html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
+  } else if (def.storage) {
+    html += `<div>Aktuelle Gesamtkapazität: ${storageCapacity(state)[def.storage]} ${resourceNames[def.storage]}</div>`;
   } else if (selected.type === 'banditen') {
     const target = selected.target && tileAt(state, selected.target.x, selected.target.y);
     html += selected.target ? `<div>Nächstes Ziel: <b>${target ? TILES[target.type].name : 'Freies Feld'} (${selected.target.x}, ${selected.target.y})</b></div>` :
@@ -292,9 +297,10 @@ function renderQueue() {
 }
 
 function updateHud() {
-  $('r-gold').textContent = state.gold;
-  $('r-holz').textContent = `${state.resources.holz}/${RESOURCE_CAP}`;
-  $('r-korn').textContent = `${state.resources.korn}/${RESOURCE_CAP}`;
+  const caps = storageCapacity(state);
+  $('r-gold').textContent = `${state.gold}/${caps.gold}`;
+  $('r-holz').textContent = `${state.resources.holz}/${caps.holz}`;
+  $('r-korn').textContent = `${state.resources.korn}/${caps.korn}`;
   $('r-banditen').textContent = formatTime(BANDIT_INTERVAL - state.banditElapsed);
   $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
   $('btn-next').textContent = `Next (${cardCount(state)})`;
@@ -318,7 +324,13 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
+  toastTimer = setTimeout(() => el.classList.remove('show'), msg.includes('Lagerverlust:') ? 3500 : 1500);
+}
+
+function lossText(losses = {}) {
+  const names = { gold: 'Gold', holz: 'Holz', korn: 'Korn' };
+  const parts = Object.entries(losses).map(([id, amount]) => `${fmt(amount)} ${names[id]}`);
+  return parts.length ? ` · Lagerverlust: ${parts.join(', ')}` : '';
 }
 
 $('btn-next').onclick = () => {
@@ -332,7 +344,7 @@ $('btn-next').onclick = () => {
       selected = result.tile;
       cam.x = (selected.x + 0.5) * TILE;
       cam.y = (selected.y + 0.5) * TILE;
-      toast(result.previous ? `Banditen übernehmen ${TILES[result.previous.type].name}!` : 'Ein Banditencamp ist erschienen!');
+      toast(`${result.previous ? `Banditen übernehmen ${TILES[result.previous.type].name}!` : 'Ein Banditencamp ist erschienen!'}${lossText(result.losses)}`);
     } else {
       state.deck.push(state.hand);
       state.hand = null;
@@ -425,10 +437,11 @@ function showWarehouse(resourceId = null) {
 
 function updateWarehouse() {
   if (overlayView !== 'warehouse') return;
+  const caps = storageCapacity(state);
   for (const resource of WAREHOUSE_RESOURCES) {
     const stock = resource.id === 'gold' ? state.gold : state.resources[resource.id];
     const button = document.querySelector(`[data-resource="${resource.id}"]`);
-    button.textContent = `${resource.icon} ${resource.name} · Bestand: ${fmt(stock)}${resource.id === 'gold' ? '' : ` / ${RESOURCE_CAP}`}`;
+    button.textContent = `${resource.icon} ${resource.name} · Bestand: ${fmt(stock)} / ${caps[resource.id]}`;
     button.setAttribute('aria-pressed', String(warehouseResource?.id === resource.id));
   }
   const detail = $('warehouse-detail');
@@ -439,10 +452,9 @@ function updateWarehouse() {
   const { id, name, icon } = warehouseResource;
   const rate = productionRates(state)[id];
   detail.innerHTML = `<b>${icon} ${name}: +${fmt(rate)} pro Tick</b><div class="pack-chances">Ein Tick dauert ${PRODUCTION_INTERVAL / 1000} Sekunden. Gesamtertrag aller Tiles inklusive Nachbarschaftsboni; Goldpaare zählen nur einmal.</div>`;
-  if (id !== 'gold') {
-    const stored = Math.min(rate, Math.max(0, RESOURCE_CAP - state.resources[id]));
-    detail.innerHTML += `<div class="pack-chances">Bei aktuellem Lagerstand passen beim nächsten Tick ${fmt(stored)} ${name} ins Lager. Lagerlimit: ${RESOURCE_CAP}; Überschuss verfällt.</div>`;
-  }
+  const stock = id === 'gold' ? state.gold : state.resources[id];
+  const stored = Math.min(rate, Math.max(0, caps[id] - stock));
+  detail.innerHTML += `<div class="pack-chances">Bei aktuellem Lagerstand passen beim nächsten Tick ${fmt(stored)} ${name} ins Lager. Lagerlimit: ${caps[id]}; neu produzierter Überschuss verfällt.${stock > caps[id] ? ' Vorhandener Überschuss bleibt bis zur Ausgabe erhalten.' : ''}</div>`;
 }
 
 function showInventory() {
@@ -592,7 +604,7 @@ function showWorkshops() {
   const rates = productionRates(state);
   const summary = document.createElement('div');
   summary.className = 'pack-chances';
-  summary.textContent = `Produktion alle ${PRODUCTION_INTERVAL / 1000} Sek.: 🪵 ${rates.holz} · 🌾 ${rates.korn} · 🪙 ${rates.gold}. Holz und Korn: max. ${RESOURCE_CAP}.`;
+  summary.textContent = `Produktion alle ${PRODUCTION_INTERVAL / 1000} Sek.: 🪵 ${rates.holz} · 🌾 ${rates.korn} · 🪙 ${rates.gold}. Lagerlimits siehe Warehouse.`;
   body.appendChild(summary);
   const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
   if (!workshops.some(tile => tile.id === expandedWorkshopId)) expandedWorkshopId = null;
@@ -624,10 +636,10 @@ function showWorkshops() {
     head.append(title, jump);
     section.appendChild(head);
     if (expanded) {
-      const warehouses = warehouseCount(state, tile);
+      const forges = forgeCount(state, tile);
       const bonus = document.createElement('div');
       bonus.className = 'pack-chances';
-      bonus.textContent = `📦 ${warehouses} Lagerhallen · Herstellungszeit −${Math.min(60, warehouses * 20)} %`;
+      bonus.textContent = `⚒️ ${forges} Werkzeugschmieden · Herstellungszeit −${Math.min(60, forges * 20)} %`;
       section.appendChild(bonus);
     }
     if (tile.job) {
@@ -752,7 +764,9 @@ function syncBandits() {
     else showArchive();
     box.scrollTop = scroll;
   }
-  toast(`Banditen breiten sich auf ${captured.length} ${captured.length === 1 ? 'Feld' : 'Felder'} aus!`);
+  const losses = {};
+  for (const result of captured) for (const [id, amount] of Object.entries(result.losses || {})) losses[id] = (losses[id] || 0) + amount;
+  toast(`Banditen breiten sich auf ${captured.length} ${captured.length === 1 ? 'Feld' : 'Felder'} aus!${lossText(losses)}`);
 }
 
 let archiveFilter = 'all';
