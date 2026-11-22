@@ -4,6 +4,7 @@ import { newState, tileAt, drawCard, placeHand, placeCells, expandWorld, buyPack
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
 const BG = '#1e5aa8';
+const BOARD_COLOR = '#355b38';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -11,7 +12,10 @@ const $ = (id) => document.getElementById(id);
 
 const loadedState = load();
 let state = loadedState || newState();
-let cam = { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
+function initialCamera() {
+  return { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
+}
+let cam = initialCamera();
 let selected = null;   // angetipptes Tile (nur Info)
 let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
 let dpr = 1;
@@ -97,6 +101,7 @@ canvas.style.cursor = 'grab';
 
 window.addEventListener('keydown', (e) => {
   if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
+  if (!$('overlay').classList.contains('hidden') && e.key !== 'Escape') return;
   const pan = 48 / cam.zoom;
   if (e.key === 'ArrowLeft') cam.x -= pan;
   else if (e.key === 'ArrowRight') cam.x += pan;
@@ -234,6 +239,28 @@ function openOverlay(title) {
 }
 function closeOverlay() { $('overlay').classList.add('hidden'); }
 $('overlay-close').onclick = closeOverlay;
+
+$('btn-new-game').onclick = () => {
+  const body = openOverlay('Neues Spiel');
+  body.innerHTML = '<p>Der aktuelle Spielstand wird gelöscht. Möchtest du neu anfangen?</p>';
+  const cancel = document.createElement('button');
+  cancel.textContent = 'Abbrechen';
+  cancel.onclick = closeOverlay;
+  const confirm = document.createElement('button');
+  confirm.textContent = 'Neu starten';
+  confirm.onclick = () => {
+    const newGame = newState();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(newGame));
+    state = newGame;
+    cam = initialCamera();
+    selected = null;
+    flashes.length = 0;
+    closeOverlay();
+    refreshTargets();
+    toast('Neues Spiel gestartet');
+  };
+  body.append(cancel, confirm);
+};
 
 const costText = (cost) => `${cost} ${GOLD_ICON}`;
 
@@ -373,21 +400,23 @@ function draw() {
   ctx.translate(-cam.x, -cam.y);
 
   const half = state.size / 2;
-  ctx.fillStyle = 'rgba(255,255,255,.09)';
+  ctx.fillStyle = BOARD_COLOR;
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
-  ctx.strokeStyle = 'rgba(255,255,255,.25)';
-  ctx.lineWidth = 1;
-  for (let i = -half; i <= half; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * TILE, -half * TILE);
-    ctx.lineTo(i * TILE, half * TILE);
-    ctx.moveTo(-half * TILE, i * TILE);
-    ctx.lineTo(half * TILE, i * TILE);
-    ctx.stroke();
+  if (state.hand) {
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1;
+    for (let i = -half; i <= half; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * TILE, -half * TILE);
+      ctx.lineTo(i * TILE, half * TILE);
+      ctx.moveTo(-half * TILE, i * TILE);
+      ctx.lineTo(half * TILE, i * TILE);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
   }
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
 
   for (const t of Object.values(state.tiles)) {
     drawTile(t, t.x * TILE, t.y * TILE);
