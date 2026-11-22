@@ -11,7 +11,11 @@ export const EXPANSION_COST = 30;
 export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
-export const START_DECK = { gras: 2, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
+export const START_DECK = { gras: 1, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
+
+export const RESOURCE_CAP = 100;
+export const START_RESOURCES = { holz: 8, korn: 8 };
+export const PRODUCTION_INTERVAL = 10000;
 
 // Zwei Karten pro Pack sind garantiert keine dieser Grundkarten.
 export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser'];
@@ -20,12 +24,12 @@ export const PACK_MIN_SPECIAL = 2;
 // Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
 export const PACKS = {
   natur: {
-    name: 'Landschafts-Pack', cost: 8, cards: 5,
-    weights: { gras: 30, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6 },
+    name: 'Landschafts-Pack', cost: { holz: 3, korn: 2 }, duration: 30000, cards: 5,
+    weights: { gras: 28, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2 },
   },
   basis: {
-    name: 'Entdecker-Pack', cost: 15, cards: 5,
-    weights: { gras: 26, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1 },
+    name: 'Entdecker-Pack', cost: { holz: 6, korn: 5 }, duration: 60000, cards: 5,
+    weights: { gras: 22, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2 },
   },
 };
 
@@ -37,19 +41,19 @@ export const RARITY = {
   rare:     { name: 'Episch' },
 };
 
-// gives: Gold-Bonus pro Nachbar-Typ (8 Felder rundherum). Wird einmal ausgezahlt, sobald das Paar entsteht
-// (egal welches Tile zuerst lag). Gleiche Typen zählen als ein Paar (Feld an Feld = einmal +1);
-// bei verschiedenen Typen werden die gives beider Seiten addiert.
+// gives beschreibt die Stärke benachbarter Paare (auch diagonal).
 export const TILES = {
   gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   category: 'landschaft' },
   erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   category: 'landschaft' },
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   category: 'landschaft' },
-  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   category: 'landschaft', gives: { wald: 1 } },
-  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft', gives: { feld: 1 } },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', category: 'industrie', gives: { wald: 2 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', category: 'industrie', gives: { feld: 2 } },
+  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   category: 'landschaft' },
+  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft' },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', category: 'industrie', gives: { wald: 1 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', category: 'industrie', gives: { feld: 1 } },
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
+  workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
+  lagerhalle:   { name: 'Lagerhalle',  color: '#9b8c76', icon: '📦', rarity: 'uncommon', category: 'industrie' },
 };
 
 export const JOKERS = {
@@ -59,4 +63,4 @@ export const JOKERS = {
 
 export const CARDS = { ...TILES, ...JOKERS };
 
-export const START_TILE = 'gras';
+export const START_TILE = 'workshop';

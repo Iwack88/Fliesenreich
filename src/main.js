@@ -1,5 +1,5 @@
-import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL } from './config.js?v=9';
-import { newState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, buyPack, packChances, canAfford, cardCount, shuffleDeck, partnersOf } from './logic.js?v=9';
+import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL } from './config.js?v=10';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery } from './logic.js?v=10';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -12,6 +12,8 @@ const $ = (id) => document.getElementById(id);
 
 const loadedState = load();
 let state = loadedState || newState();
+if (loadedState && migrateState(state)) save();
+if (updateProduction(state)) save();
 function initialCamera() {
   return { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
 }
@@ -110,7 +112,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') setZoom(cam.zoom * 1.1);
   else if (e.key === '-') setZoom(cam.zoom / 1.1);
   else if (e.key.toLowerCase() === 'n') $('btn-next').click();
-  else if (e.key.toLowerCase() === 'd') showInventory();
+  else if (e.key.toLowerCase() === 'd') { syncProduction(); showInventory(); }
   else if (e.key.toLowerCase() === 'a') showArchive();
   else if (e.key.toLowerCase() === 's') showShop();
   else if (e.key === 'Escape') {
@@ -127,17 +129,20 @@ function pointerDistance() {
 function setZoom(z) { cam.zoom = Math.min(2.5, Math.max(0.4, z)); }
 
 function onTap(sx, sy) {
+  syncProduction();
   const c = toCell(sx, sy);
   if (JOKERS[state.hand]) {
     const result = useJoker(state, c.x, c.y);
     if (!result) {
-      toast(Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
-        ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
+      const tile = tileAt(state, c.x, c.y);
+      toast(tile?.type === 'workshop' ? 'Letzter oder beschäftigter Workshop ist geschützt' :
+        Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
+          ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
       return;
     }
     selected = result.kind === 'transformed' ? result.tile : null;
     if (result.kind === 'transformed') {
-      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.gold ? ` · +${result.gold} ${GOLD_ICON}` : ''}`);
+      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}`);
       flashPairs(result.pairs);
     } else toast(`${TILES[result.tile.type].name} gelöscht`);
     refreshTargets();
@@ -149,10 +154,7 @@ function onTap(sx, sy) {
     if (target) {
       const res = placeHand(state, target.x, target.y);
       if (!res) { toast('Dieses Feld ist nicht frei'); return; }
-      if (res && res.gold) {
-        toast(`+${res.gold} ${GOLD_ICON}`);
-        flashPairs(res.pairs);
-      }
+      flashPairs(res.pairs);
       selected = res?.tile || null;
       refreshTargets();
       save();
@@ -184,7 +186,7 @@ function updatePanel() {
   if (hand) {
     panel.classList.remove('hidden');
     const blockedDelete = state.hand === 'joker_loeschen' && Object.keys(state.tiles).length <= 1;
-    $('btn-return-card').hidden = !blockedDelete;
+    $('btn-return-card').hidden = !JOKERS[state.hand];
     const message = blockedDelete ? 'Das letzte Tile kann nicht gelöscht werden.' :
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
@@ -204,15 +206,24 @@ function updateTilePopup() {
   const partners = partnersOf(state, selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
-  html += `<div>Bisher eingebracht: <b>${selected.earned || 0} ${GOLD_ICON}</b></div>`;
+  const descriptions = {
+    wald: 'Produziert 1 Holz pro 10 Sekunden.',
+    holzfaeller: 'Produziert 1 Holz; +1 pro benachbartem Wald.',
+    feld: 'Produziert 1 Korn pro 10 Sekunden.',
+    windmuehle: 'Produziert 1 Korn; +1 pro benachbartem Feld.',
+    haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
+    taverne: 'Ein benachbartes Haus gibt 2 Gold pro 10 Sekunden.',
+    workshop: 'Produziert Packs. Benachbarte Lagerhallen beschleunigen die Herstellung.',
+    lagerhalle: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
+  };
+  html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   if (def.gives) {
-    html += `<div>Gold-Bonus je Nachbar: <b>${givesText(def)}</b></div>`;
-    html += '<div class="dim">Einmalig, sobald das Paar entsteht</div>';
-  } else {
-    html += '<div class="dim">Gibt keinen Gold-Bonus</div>';
+    html += `<div>Bonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek.</div>`;
   }
   html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
   el.innerHTML = html;
+  el.style.top = `${$('hud').getBoundingClientRect().bottom + 8}px`;
+  el.style.maxHeight = `calc(100vh - ${$('hud').getBoundingClientRect().bottom + 16}px)`;
   el.classList.remove('hidden');
   $('tile-close').onclick = () => { selected = null; updatePanel(); };
 }
@@ -234,8 +245,12 @@ function renderQueue() {
 
 function updateHud() {
   $('r-gold').textContent = state.gold;
+  $('r-holz').textContent = `${state.resources.holz}/${RESOURCE_CAP}`;
+  $('r-korn').textContent = `${state.resources.korn}/${RESOURCE_CAP}`;
   $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
   $('btn-next').textContent = `Next (${cardCount(state)})`;
+  const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
+  $('btn-cards').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
   $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
   renderQueue();
@@ -251,14 +266,15 @@ function toast(msg) {
 }
 
 $('btn-next').onclick = () => {
-  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte platzieren' : 'Keine Karten – kaufe ein Pack'); return; }
+  syncProduction();
+  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte einsetzen' : 'Keine Karten – stelle ein Pack her'); return; }
   selected = null;
   refreshTargets();
   save();
 };
 
 $('btn-return-card').onclick = () => {
-  if (state.hand !== 'joker_loeschen' || Object.keys(state.tiles).length > 1) return;
+  if (!JOKERS[state.hand]) return;
   state.deck.push(state.hand);
   state.hand = null;
   refreshTargets();
@@ -266,12 +282,14 @@ $('btn-return-card').onclick = () => {
   toast('Joker ans Deckende gelegt');
 };
 
-function openOverlay(title) {
+let overlayView = '';
+function openOverlay(title, view = '') {
+  overlayView = view;
   $('overlay-title').textContent = title;
   $('overlay').classList.remove('hidden');
   return $('overlay-body');
 }
-function closeOverlay() { $('overlay').classList.add('hidden'); }
+function closeOverlay() { overlayView = ''; $('overlay').classList.add('hidden'); }
 $('overlay-close').onclick = closeOverlay;
 
 $('btn-new-game').onclick = () => {
@@ -299,9 +317,44 @@ $('btn-new-game').onclick = () => {
 const costText = (cost) => `${cost} ${GOLD_ICON}`;
 
 function showInventory() {
-  const body = openOverlay(`Deck (${cardCount(state)}) – Reihenfolge der Ziehung`);
+  const body = openOverlay(`Inventar & Deck (${cardCount(state)} Karten)`, 'inventory');
   body.innerHTML = '';
-  if (!state.deck.length) body.textContent = 'Keine Karten. Kaufe ein Pack im Shop.';
+  const packTitle = document.createElement('h3');
+  packTitle.className = 'section-title';
+  packTitle.textContent = 'Fertige Packs';
+  body.appendChild(packTitle);
+  const packEntries = Object.entries(state.packs).filter(([, count]) => count > 0);
+  if (!packEntries.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'Noch keine Packs im Inventar.';
+    body.appendChild(empty);
+  }
+  for (const [id, count] of packEntries) {
+    const row = document.createElement('div');
+    row.className = 'pack';
+    const name = id === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[id].name;
+    row.innerHTML = `<span>📦 ${name} ×${count}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Öffnen';
+    btn.onclick = () => {
+      const cards = openPack(state, id);
+      if (!cards) { toast('Pack nicht verfügbar'); return; }
+      save();
+      showInventory();
+      toast(`Erhalten: ${cards.map(card => CARDS[card].name).join(', ')}`);
+    };
+    row.appendChild(btn);
+    body.appendChild(row);
+  }
+  const deckTitle = document.createElement('h3');
+  deckTitle.className = 'section-title';
+  deckTitle.textContent = 'Deck – Reihenfolge der Ziehung';
+  body.appendChild(deckTitle);
+  if (!state.deck.length) {
+    const empty = document.createElement('div');
+    empty.textContent = 'Keine Karten im Deck.';
+    body.appendChild(empty);
+  }
   state.deck.forEach((id, i) => {
     const d = CARDS[id];
     const el = document.createElement('div');
@@ -313,15 +366,9 @@ function showInventory() {
   });
 }
 
-function showShop(result) {
+function showShop() {
   const body = openOverlay('Shop');
   body.innerHTML = '';
-  if (result) {
-    const r = document.createElement('div');
-    r.style.width = '100%';
-    r.textContent = 'Gezogen: ' + result.map(id => `${CARDS[id].icon} ${CARDS[id].name}`.trim()).join(' · ');
-    body.appendChild(r);
-  }
   if (state.size === START_SIZE) {
     const row = document.createElement('div');
     row.className = 'pack';
@@ -339,20 +386,98 @@ function showShop(result) {
     row.appendChild(btn);
     body.appendChild(row);
   }
-  for (const [id, p] of Object.entries(PACKS)) {
-    const row = document.createElement('div');
-    row.className = 'pack';
-    const info = document.createElement('div');
-    const chances = packChances(p).map(([type, chance]) =>
-      `${CARDS[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
-    info.innerHTML = `<b>${p.name}</b> – ${p.cards} Karten<div class="pack-chances">Mindestens ${PACK_MIN_SPECIAL} Karten außer Gras, Erde und Wasser.<br>Chance je zufälliger Karte: ${chances}</div>`;
-    row.appendChild(info);
-    const btn = document.createElement('button');
-    btn.textContent = costText(p.cost);
-    btn.disabled = !canAfford(state, p.cost);
-    btn.onclick = () => { const drawn = buyPack(state, id); if (drawn) { save(); showShop(drawn); } };
-    row.appendChild(btn);
-    body.appendChild(row);
+  if (state.size !== START_SIZE) body.textContent = 'Das Spielfeld ist bereits erweitert.';
+}
+
+function formatTime(ms) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function showWorkshops() {
+  const body = openOverlay('Workshops', 'workshops');
+  body.innerHTML = '';
+  const rates = productionRates(state);
+  const summary = document.createElement('div');
+  summary.className = 'pack-chances';
+  summary.textContent = `Produktion alle ${PRODUCTION_INTERVAL / 1000} Sek.: 🪵 ${rates.holz} · 🌾 ${rates.korn} · 🪙 ${rates.gold}. Holz und Korn: max. ${RESOURCE_CAP}.`;
+  body.appendChild(summary);
+  const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
+  if (!workshops.length) {
+    const notice = document.createElement('p');
+    notice.textContent = 'Noch kein Workshop platziert. Ziehe und platziere die Workshop-Karte aus deinem Deck.';
+    body.appendChild(notice);
+  }
+  for (const tile of workshops) {
+    const section = document.createElement('div');
+    section.className = 'workshop';
+    const head = document.createElement('div');
+    head.className = 'workshop-head';
+    const title = document.createElement('b');
+    title.textContent = `🛠️ Workshop (${tile.x}, ${tile.y})`;
+    const jump = document.createElement('button');
+    jump.textContent = 'Anzeigen';
+    jump.onclick = () => jumpTo(tile);
+    head.append(title, jump);
+    section.appendChild(head);
+    if (tile.job) {
+      const status = document.createElement('div');
+      const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
+      status.textContent = `${name} · `;
+      const timer = document.createElement('span');
+      timer.dataset.endsAt = tile.job.endsAt;
+      timer.textContent = formatTime(tile.job.endsAt - Date.now());
+      status.appendChild(timer);
+      section.appendChild(status);
+    } else {
+      for (const [id, pack] of Object.entries(PACKS)) {
+        const row = document.createElement('div');
+        row.className = 'pack';
+        const info = document.createElement('div');
+        const chances = packChances(pack).map(([type, chance]) =>
+          `${CARDS[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
+        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde und Wasser.<br>Chance je zufälliger Karte: ${chances}</div>`;
+        const button = document.createElement('button');
+        button.textContent = 'Herstellen';
+        button.disabled = !canStartPack(state, tile, id);
+        button.onclick = () => {
+          syncProduction();
+          if (!startPack(state, tile, id)) { toast('Herstellung nicht möglich'); return; }
+          save();
+          showWorkshops();
+        };
+        row.append(info, button);
+        section.appendChild(row);
+      }
+      if (canStartRecovery(state, tile)) {
+        const row = document.createElement('div');
+        row.className = 'pack';
+        row.textContent = 'Starthilfe-Pack: kostenlos, mit Wald und Feld · 0:30';
+        const button = document.createElement('button');
+        button.textContent = 'Herstellen';
+        button.onclick = () => {
+          syncProduction();
+          if (!startRecovery(state, tile)) { toast('Starthilfe nicht verfügbar'); return; }
+          save();
+          showWorkshops();
+        };
+        row.appendChild(button);
+        section.appendChild(row);
+      }
+    }
+    body.appendChild(section);
+  }
+}
+
+function syncProduction() {
+  if (!updateProduction(state)) return;
+  save();
+  if (overlayView === 'workshops' || overlayView === 'inventory') {
+    const box = $('overlay-box');
+    const scroll = box.scrollTop;
+    if (overlayView === 'workshops') showWorkshops();
+    else showInventory();
+    box.scrollTop = scroll;
   }
 }
 
@@ -390,14 +515,15 @@ function showArchive() {
   for (const t of tiles.filter(t => archiveFilter === 'all' || t.type === archiveFilter)) {
     const row = document.createElement('div');
     row.className = 'row';
-    row.innerHTML = `${chip(t.type)}<span>${t.x}, ${t.y}</span><span>${t.earned || 0} ${GOLD_ICON}</span>`;
+    row.innerHTML = `${chip(t.type)}<span>${t.x}, ${t.y}</span>`;
     row.onclick = () => jumpTo(t);
     body.appendChild(row);
   }
 }
 
 $('btn-archive').onclick = showArchive;
-$('btn-cards').onclick = showInventory;
+$('btn-cards').onclick = () => { syncProduction(); showInventory(); };
+$('btn-workshop').onclick = () => { syncProduction(); showWorkshops(); };
 $('btn-shop').onclick = () => showShop();
 $('btn-shuffle').onclick = () => {
   if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);
@@ -453,6 +579,7 @@ function draw() {
   }
 
   const tiles = Object.values(state.tiles);
+  const workshopCount = tiles.filter(t => t.type === 'workshop').length;
   for (const t of tiles) {
     drawTile(t, t.x * TILE, t.y * TILE);
     const partners = partnersOf(state, t).length;
@@ -462,7 +589,8 @@ function draw() {
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
     }
-    if (JOKERS[state.hand] && (state.hand !== 'joker_loeschen' || tiles.length > 1)) {
+    if (JOKERS[state.hand] && (state.hand !== 'joker_loeschen' || tiles.length > 1) &&
+        (t.type !== 'workshop' || (!t.job && workshopCount > 1))) {
       ctx.strokeStyle = '#d39cff';
       ctx.lineWidth = 4;
       ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
@@ -491,7 +619,7 @@ function draw() {
     ctx.fillStyle = `rgba(255,255,255,${1 - p})`;
     ctx.font = `bold ${TILE * 0.3}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`+${f.value}`, (f.x + 0.5) * TILE, (f.y + 0.5) * TILE - p * TILE * 0.4);
+    ctx.fillText(`+${f.value}/10s`, (f.x + 0.5) * TILE, (f.y + 0.5) * TILE - p * TILE * 0.4);
   }
 
   if (selected && !state.hand) {
@@ -516,6 +644,10 @@ function frame() {
 
 refreshTargets();
 frame();
+setInterval(() => {
+  syncProduction();
+  for (const timer of document.querySelectorAll('[data-ends-at]')) timer.textContent = formatTime(Number(timer.dataset.endsAt) - Date.now());
+}, 1000);
 
 $('btn-full').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();

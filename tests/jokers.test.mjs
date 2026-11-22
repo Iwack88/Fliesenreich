@@ -46,18 +46,17 @@ test('transformation can select every other tile type, never a joker or the old 
   }
 });
 
-test('transformation pays only newly added bonus values, including diagonal neighbors', (t) => {
+test('transformation updates bonuses without an immediate gold payout', (t) => {
   const state = { gold: 3, tiles: {}, nextId: 1, hand: 'joker_verwandeln' };
   const tile = addTile(state, 'haus', 0, 0);
   const house = addTile(state, 'haus', 1, 1);
   const pool = Object.keys(TILES).filter(type => type !== 'haus');
   t.mock.method(Math, 'random', () => (pool.indexOf('taverne') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
-  assert.equal(result.gold, 1);
-  assert.equal(state.gold, 4);
-  assert.equal(tile.earned, 1);
-  assert.equal(house.earned, 1);
-  assert.deepEqual(result.pairs, [{ tile: house, value: 1 }]);
+  assert.equal(state.gold, 3);
+  assert.equal(tile.earned, 0);
+  assert.equal(house.earned, 0);
+  assert.deepEqual(result.pairs, [{ tile: house, value: 2 }]);
   assert.equal(useJoker(state, 0, 0), null);
 });
 
@@ -72,8 +71,7 @@ test('transformation keeps the card on an empty target and never deducts lost bo
   const pool = Object.keys(TILES).filter(type => type !== 'taverne');
   t.mock.method(Math, 'random', () => (pool.indexOf('haus') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
-  assert.equal(result.gold, 0);
-  assert.deepEqual(result.pairs, []);
+  assert.deepEqual(result.pairs, [{ tile: house, value: 1 }]);
   assert.equal(state.gold, 7);
   assert.equal(tile.earned, 2);
   assert.equal(house.earned, 2);

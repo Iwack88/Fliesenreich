@@ -32,11 +32,11 @@ test('new worlds contain exactly 12 obstacles, reserve the start, and leave conn
     const state = newState();
     assert.equal(state.size, 8);
     assert.equal(Object.keys(state.tiles).length, 13);
-    assert.equal(state.tiles['0,0'].type, 'gras');
+    assert.equal(state.tiles['0,0'].type, 'workshop');
     for (const [dx, dy] of dirs) assert.equal(state.tiles[key(dx, dy)], undefined);
     for (const tile of Object.values(state.tiles)) {
       assert.ok(inBounds(8, tile.x, tile.y));
-      assert.ok(['gras', 'erde', 'wasser'].includes(tile.type));
+      assert.ok(['gras', 'erde', 'wasser', 'workshop'].includes(tile.type));
     }
     assertFreeConnected(state);
   }
@@ -53,8 +53,8 @@ test('free placement only allows unoccupied neighboring cells within the world',
   assert.equal(placeHand(state, 3, 0), null);
   assert.equal(placeHand(state, -4, -4), null);
   const gold = state.gold;
-  assert.equal(placeHand(state, 2, 0).gold, 2);
-  assert.equal(state.gold, gold + 2);
+  assert.equal(placeHand(state, 2, 0).pairs.length, 1);
+  assert.equal(state.gold, gold);
   assert.equal(placeHand(state, 2, 0), null);
 });
 

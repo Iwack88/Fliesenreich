@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -14,11 +14,14 @@
 <div id="hud">
   <div id="res">
     <span>🪙 <b id="r-gold">0</b></span>
+    <span>🪵 <b id="r-holz">0</b></span>
+    <span>🌾 <b id="r-korn">0</b></span>
   </div>
   <div id="queue"></div>
   <div id="actions">
     <button id="btn-full">⛶</button>
-    <button id="btn-cards">Deck</button>
+    <button id="btn-cards">Inventar</button>
+    <button id="btn-workshop">Workshop</button>
     <button id="btn-archive">Archiv</button>
     <button id="btn-shop">Shop</button>
     <button id="btn-new-game">Neues Spiel</button>
@@ -39,6 +42,6 @@
 <div id="toast"></div>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=10"></script>
+<script type="module" src="src/main.js?v=11"></script>
 </body>
 </html>

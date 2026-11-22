@@ -1,4 +1,4 @@
-import { TILES, CARDS, START_GOLD, START_TILE, START_DECK, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=9';
+import { TILES, JOKERS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=10';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -13,10 +13,21 @@ function shuffled(arr) {
 }
 
 export function newState() {
-  const s = { gold: START_GOLD, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   addTile(s, START_TILE, 0, 0);
   addObstacles(s, 0, START_OBSTACLES);
   return s;
+}
+
+export function migrateState(s, now = Date.now()) {
+  if (s.resources) return false;
+  s.resources = { ...START_RESOURCES };
+  s.productionAt = now;
+  s.packs = {};
+  if (!Object.values(s.tiles).some(tile => tile.type === 'workshop') && s.hand !== 'workshop' && !s.deck.includes('workshop')) {
+    s.deck.unshift('workshop');
+  }
+  return true;
 }
 
 export function addTile(s, type, x, y) {
@@ -130,29 +141,19 @@ export function placeHand(s, x, y) {
   if (!valid) return null;
   const tile = addTile(s, s.hand, x, y);
   s.hand = null;
-  let gold = 0;
-  const pairs = [];
-  for (const o of partnersOf(s, tile)) {
-    const v = pairValue(tile, o);
-    gold += v;
-    pairs.push({ tile: o, value: v });
-    o.earned = (o.earned || 0) + v;
-    tile.earned += v;
-  }
-  s.gold += gold;
-  return { tile, gold, pairs };
+  return { tile, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
 
-// Gold-Wert eines Nachbar-Paares.
+// Stärke eines Nachbar-Paares.
 export function pairValue(a, b) {
   const ga = TILES[a.type].gives?.[b.type] || 0;
   if (a.type === b.type) return ga;
   return ga + (TILES[b.type].gives?.[a.type] || 0);
 }
 
-// Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Gold-Paar bildet.
+// Nachbarn (8 Felder rundherum), mit denen dieses Tile ein Paar bildet.
 export function partnersOf(s, tile) {
   return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o && pairValue(tile, o) > 0);
 }
@@ -160,6 +161,7 @@ export function partnersOf(s, tile) {
 export function useJoker(s, x, y) {
   const tile = tileAt(s, x, y);
   if (!tile) return null;
+  if (tile.type === 'workshop' && (tile.job || Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1)) return null;
   if (s.hand === 'joker_loeschen') {
     if (Object.keys(s.tiles).length <= 1) return null;
     delete s.tiles[key(x, y)];
@@ -170,34 +172,100 @@ export function useJoker(s, x, y) {
   const types = Object.keys(TILES).filter(type => type !== tile.type);
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
-  const neighbors = NEIGHBORS.map(([dx, dy]) => tileAt(s, x + dx, y + dy)).filter(Boolean);
-  const before = neighbors.map(neighbor => pairValue(tile, neighbor));
   tile.type = newType;
-  const pairs = [];
-  let gold = 0;
-  neighbors.forEach((neighbor, i) => {
-    const value = Math.max(0, pairValue(tile, neighbor) - before[i]);
-    if (!value) return;
-    gold += value;
-    pairs.push({ tile: neighbor, value });
-    neighbor.earned = (neighbor.earned || 0) + value;
-    tile.earned = (tile.earned || 0) + value;
-  });
-  s.gold += gold;
   s.hand = null;
-  return { kind: 'transformed', tile, oldType, gold, pairs };
+  return { kind: 'transformed', tile, oldType, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
 export const canAfford = (s, cost) => s.gold >= cost;
 
-export function buyPack(s, packId) {
+export function productionRates(s) {
+  const rates = { holz: 0, korn: 0, gold: 0 };
+  for (const tile of Object.values(s.tiles)) {
+    if (tile.type === 'wald' || tile.type === 'holzfaeller') rates.holz++;
+    if (tile.type === 'feld' || tile.type === 'windmuehle') rates.korn++;
+    for (const other of partnersOf(s, tile)) {
+      if (tile.id >= other.id) continue;
+      const value = pairValue(tile, other);
+      if (tile.type === 'holzfaeller' || other.type === 'holzfaeller') rates.holz += value;
+      else if (tile.type === 'windmuehle' || other.type === 'windmuehle') rates.korn += value;
+      else rates.gold += value;
+    }
+  }
+  return rates;
+}
+
+export function updateProduction(s, now = Date.now()) {
+  let changed = false;
+  if (now < s.productionAt) {
+    s.productionAt = now;
+    changed = true;
+  }
+  const ticks = Math.floor((now - s.productionAt) / PRODUCTION_INTERVAL);
+  if (ticks > 0) {
+    const rates = productionRates(s);
+    for (const id of ['holz', 'korn']) s.resources[id] = Math.min(RESOURCE_CAP, s.resources[id] + rates[id] * ticks);
+    s.gold += rates.gold * ticks;
+    s.productionAt += ticks * PRODUCTION_INTERVAL;
+    changed = true;
+  }
+  for (const tile of Object.values(s.tiles)) {
+    if (tile.type === 'workshop' && tile.job && tile.job.endsAt <= now) {
+      s.packs[tile.job.pack] = (s.packs[tile.job.pack] || 0) + 1;
+      delete tile.job;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+export function workshopDuration(s, tile, packId) {
+  const warehouses = NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)).filter(t => t?.type === 'lagerhalle').length;
+  return Math.round(PACKS[packId].duration * Math.max(0.4, 1 - warehouses * 0.2));
+}
+
+export function canStartPack(s, tile, packId) {
+  const pack = PACKS[packId];
+  return !!(pack && tile?.type === 'workshop' && s.tiles[key(tile.x, tile.y)] === tile && !tile.job &&
+    Object.entries(pack.cost).every(([id, amount]) => s.resources[id] >= amount));
+}
+
+export function startPack(s, tile, packId, now = Date.now()) {
+  if (!canStartPack(s, tile, packId)) return false;
+  for (const [id, amount] of Object.entries(PACKS[packId].cost)) s.resources[id] -= amount;
+  tile.job = { pack: packId, endsAt: now + workshopDuration(s, tile, packId) };
+  return true;
+}
+
+export function canStartRecovery(s, tile) {
+  const rates = productionRates(s);
+  const cost = PACKS.natur.cost;
+  return tile?.type === 'workshop' && s.tiles[key(tile.x, tile.y)] === tile && !tile.job &&
+    (!s.hand || JOKERS[s.hand]) && s.deck.every(id => JOKERS[id]) && !Object.values(s.packs).some(Boolean) &&
+    !Object.values(s.tiles).some(t => t.job) &&
+    Object.entries(cost).some(([id, amount]) => s.resources[id] < amount && rates[id] === 0);
+}
+
+export function startRecovery(s, tile, now = Date.now()) {
+  if (!canStartRecovery(s, tile)) return false;
+  tile.job = { pack: 'starthilfe', endsAt: now + 30000 };
+  return true;
+}
+
+export function openPack(s, packId) {
+  if (!s.packs[packId]) return null;
+  if (packId === 'starthilfe') {
+    s.packs[packId]--;
+    const cards = shuffled(['wald', 'feld', 'gras', 'erde', 'wasser']);
+    s.deck.push(...cards);
+    return cards;
+  }
   const pack = PACKS[packId];
   if (!pack) throw new Error(`Unbekanntes Pack: ${packId}`);
-  if (!canAfford(s, pack.cost)) return null;
   packChances(pack);
   const pool = Object.entries(pack.weights);
   const specialPool = pool.filter(([id]) => !PACK_FILLER_TYPES.includes(id));
-  s.gold -= pack.cost;
+  s.packs[packId]--;
   const drawn = [];
   for (let i = 0; i < pack.cards; i++) {
     const id = pickWeighted(i < PACK_MIN_SPECIAL ? specialPool : pool);
