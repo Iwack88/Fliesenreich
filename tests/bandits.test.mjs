@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BANDIT_INTERVAL, START_BANDITS, GUARD_RADIUS, TILES } from '../src/config.js';
+import { START_BANDITS, GUARD_RADIUS, TILES } from '../src/config.js';
 import { addTile, advanceBandits, drawCard, isProtected, migrateState, newState, placeHand, planBandits, spawnBandit, spreadBandits, startPack, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
@@ -250,11 +250,11 @@ test('a guard protects an announced target and forces a different target immedia
   assert.equal(s.tiles['1,0'].type, 'feld');
 });
 
-test('global clock advances only by supplied active time and persists its remainder', () => {
+test('global clock attacks after ten active minutes and persists its remainder', () => {
   const s = emptyWorld();
   addTile(s, 'banditen', 0, 0);
   addTile(s, 'feld', 1, 0);
-  assert.deepEqual(advanceBandits(s, BANDIT_INTERVAL - 1, 0), []);
+  assert.deepEqual(advanceBandits(s, 10 * 60 * 1000 - 1, 0), []);
   const saved = JSON.parse(JSON.stringify(s));
   assert.equal(saved.tiles['1,0'].type, 'feld');
   assert.equal(advanceBandits(saved, 1, 0).length, 1);
