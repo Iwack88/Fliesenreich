@@ -1,7 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TILES } from '../src/config.js';
-import { addTile, newState, migrateState, productionRates, updateProduction, startPack, warehouseCount, workshopDuration, placeHand, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
+import { addTile, newState, migrateState, tileProduction, productionRates, updateProduction, startPack, warehouseCount, workshopDuration, placeHand, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
+
+test('tile yield includes its own production buffs, not bonuses it grants other tiles', () => {
+  const s = { tiles: {}, nextId: 1 };
+  const forest = addTile(s, 'wald', 0, 0);
+  const logger = addTile(s, 'holzfaeller', 1, 0);
+  addTile(s, 'wald', 2, 1);
+  assert.deepEqual(tileProduction(s, logger), {
+    base: { holz: 1, korn: 0, gold: 0 }, bonus: { holz: 2, korn: 0, gold: 0 },
+  });
+  assert.equal(tileProduction(s, forest).bonus.holz, 0);
+  const field = addTile(s, 'feld', 0, 4);
+  const mill = addTile(s, 'windmuehle', 1, 4);
+  assert.equal(tileProduction(s, field).base.korn, 1);
+  assert.equal(tileProduction(s, mill).bonus.korn, 1);
+  assert.deepEqual(productionRates(s), { holz: 5, korn: 3, gold: 0 });
+});
 
 test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
   const s = newState();

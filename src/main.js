@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=12';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=15';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=16';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -237,9 +237,22 @@ function updateTilePopup() {
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
+  const { base, bonus } = tileProduction(state, selected);
+  const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold' };
+  for (const id of ['holz', 'korn', 'gold']) {
+    if (!base[id] && !bonus[id]) continue;
+    html += `<div>Aktueller Ertrag: <b>${base[id] + bonus[id]} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus</span></div>`;
+  }
+  if (selected.type === 'haus' || selected.type === 'taverne') {
+    if (!bonus.gold) html += '<div>Aktueller Ertrag: <b>0 Gold / 10 Sek.</b></div>';
+    html += '<div class="dim">Gold zählt gemeinsam pro Paar, nicht doppelt pro Gebäude.</div>';
+  }
   if (selected.type === 'workshop') {
     const count = warehouseCount(state, selected);
     html += `<div>📦 Lagerhallen: ${count} · Herstellungszeit −${Math.min(60, count * 20)} %</div>`;
+    for (const [id, pack] of Object.entries(PACKS)) {
+      html += `<div>${pack.name}: <b>1 Pack / ${formatTime(workshopDuration(state, selected, id))}</b></div>`;
+    }
   } else if (selected.type === 'lagerhalle') {
     html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
   } else if (selected.type === 'banditen') {
@@ -815,6 +828,13 @@ function draw() {
     for (const tile of tiles) if (isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
+  if (selected && !state.hand) {
+    const related = new Set([selected, ...displayPartners(selected)]);
+    ctx.fillStyle = 'rgba(150,150,150,.4)';
+    for (const tile of tiles) {
+      if (!related.has(tile)) ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
+    }
+  }
 }
 
 function frame() {

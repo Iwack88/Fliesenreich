@@ -16,6 +16,8 @@ Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten,
 
 Alle 10 Sekunden erzeugen Wald und Holzfäller je 1 Holz, Feld und Windmühle je 1 Korn. Jeder benachbarte Wald erhöht die Holzfäller-Produktion um 1, jedes Feld die einer Windmühle um 1. Ein Haus/Haus-Paar erzeugt 1 Gold und ein Haus/Taverne-Paar 2 Gold pro Intervall; jedes Paar zählt einmal. Holz und Korn sind jeweils auf 100 begrenzt. Produktion und Workshop-Timer laufen auch bei geschlossenem Spiel anhand der vergangenen Zeit weiter.
 
+Beim Antippen eines Tiles bleiben es und seine direkten Bonus-Partner hervorgehoben; andere Tiles werden leicht ausgegraut. Die Detailansicht zeigt den aktuellen Ertrag mit Basis und Nachbarschaftsbonus sowie bei Workshops die gebufften Herstellungszeiten. Gold-Erträge beziehen sich auf die gemeinsamen Paare und zählen nicht doppelt.
+
 Unter **Workshop** lassen sich alle Workshops finden und Packs herstellen: Landschaft kostet 3 Holz und 2 Korn und dauert 30 Sekunden, Entdecker 6 Holz und 5 Korn und dauert 60 Sekunden. Jede benachbarte Lagerhalle verkürzt die Herstellungszeit um 20 %, höchstens um 60 %. Änderungen an den Lagerhallen wirken auch auf die verbleibende Zeit bereits laufender Produktionen. Ein Workshop produziert ein Pack gleichzeitig. Fertige Packs landen automatisch im **Inventar** und werden dort geöffnet; ihre Karten kommen ans Deckende. Der direkte Packverkauf im Shop ist deaktiviert, die Spielfelderweiterung bleibt verfügbar.
 
 Laufende Aufträge zeigen Restzeit und Fortschritt. Vor der Bonus-Aktualisierung gestartete Aufträge behalten zunächst ihre bisherige Restzeit; ein genauer Fortschritt ist für sie nicht verfügbar, da ihre ursprünglichen Lagerhallen nicht gespeichert wurden.

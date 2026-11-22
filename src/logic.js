@@ -324,18 +324,28 @@ export function useJoker(s, x, y, now = Date.now()) {
 
 export const canAfford = (s, cost) => s.gold >= cost;
 
+export function tileProduction(s, tile) {
+  const base = { holz: 0, korn: 0, gold: 0 };
+  const bonus = { holz: 0, korn: 0, gold: 0 };
+  if (tile.type === 'wald' || tile.type === 'holzfaeller') base.holz = 1;
+  if (tile.type === 'feld' || tile.type === 'windmuehle') base.korn = 1;
+  for (const other of partnersOf(s, tile)) {
+    const value = pairValue(tile, other);
+    if (tile.type === 'holzfaeller') bonus.holz += value;
+    else if (tile.type === 'windmuehle') bonus.korn += value;
+    else if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += value;
+  }
+  return { base, bonus };
+}
+
 export function productionRates(s) {
   const rates = { holz: 0, korn: 0, gold: 0 };
   for (const tile of Object.values(s.tiles)) {
-    if (tile.type === 'wald' || tile.type === 'holzfaeller') rates.holz++;
-    if (tile.type === 'feld' || tile.type === 'windmuehle') rates.korn++;
-    for (const other of partnersOf(s, tile)) {
-      if (tile.id >= other.id) continue;
-      const value = pairValue(tile, other);
-      if (tile.type === 'holzfaeller' || other.type === 'holzfaeller') rates.holz += value;
-      else if (tile.type === 'windmuehle' || other.type === 'windmuehle') rates.korn += value;
-      else rates.gold += value;
-    }
+    const { base, bonus } = tileProduction(s, tile);
+    rates.holz += base.holz + bonus.holz;
+    rates.korn += base.korn + bonus.korn;
+    // Gold belongs to a pair, which appears in both tiles' detail views.
+    rates.gold += (base.gold + bonus.gold) / 2;
   }
   return rates;
 }
