@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=13';
+import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=14';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -15,6 +15,7 @@ function shuffled(arr) {
 export function newState() {
   const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   s.shop = { elapsed: 0, round: 0, offers: [] };
+  s.protectedFields = {};
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
   addObstacles(s, 0, START_OBSTACLES);
@@ -25,6 +26,10 @@ export function newState() {
 
 export function migrateState(s, now = Date.now()) {
   let changed = false;
+  if (!s.protectedFields) {
+    s.protectedFields = {};
+    changed = true;
+  }
   if (!s.shop) {
     s.shop = { elapsed: 0, round: 0, offers: [] };
     changed = true;
@@ -216,7 +221,7 @@ export function placeHand(s, x, y, now = Date.now()) {
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
 
 export function isProtected(s, x, y, tiles = Object.values(s.tiles)) {
-  return tiles.some(t => t.type === 'wachturm' &&
+  return !!s.protectedFields?.[key(x, y)] || tiles.some(t => t.type === 'wachturm' &&
     Math.abs(t.x - x) <= GUARD_RADIUS && Math.abs(t.y - y) <= GUARD_RADIUS);
 }
 
@@ -332,6 +337,15 @@ export function partnersOf(s, tile) {
 
 export function useJoker(s, x, y, now = Date.now()) {
   const tile = tileAt(s, x, y);
+  if (s.hand === 'joker_schutz') {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || !inBounds(s.size, x, y) ||
+        tile?.type === 'banditen' || s.protectedFields?.[key(x, y)]) return null;
+    if (!s.protectedFields) s.protectedFields = {};
+    s.protectedFields[key(x, y)] = true;
+    planBandits(s);
+    s.hand = null;
+    return { kind: 'protected', tile, x, y };
+  }
   if (!tile || tile.type === 'banditen') return null;
   if (tile.type === 'workshop' && (tile.job || Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1)) return null;
   if (s.hand === 'joker_loeschen') {

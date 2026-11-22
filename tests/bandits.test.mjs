@@ -33,16 +33,83 @@ test('guard shields all cells within its square and clears existing camps when p
   assert.equal(isProtected(s, 1 - GUARD_RADIUS - 1, 0), false);
 });
 
-test('camps cannot be deleted or transformed by jokers', () => {
+test('camps cannot be deleted, transformed or protected by jokers', () => {
   const s = emptyWorld();
   addTile(s, 'banditen', 0, 0);
   addTile(s, 'gras', 1, 0);
-  for (const joker of ['joker_loeschen', 'joker_verwandeln']) {
+  for (const joker of ['joker_loeschen', 'joker_verwandeln', 'joker_schutz']) {
     s.hand = joker;
     assert.equal(useJoker(s, 0, 0), null);
     assert.equal(s.hand, joker);
     assert.equal(s.tiles['0,0'].type, 'banditen');
   }
+});
+
+test('protection joker saves a field, reroutes attacks, and survives changing the tile and reloading', (t) => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  const house = addTile(s, 'haus', 1, 0);
+  camp.target = { x: 1, y: 0 };
+  s.hand = 'joker_schutz';
+  const result = useJoker(s, 1, 0);
+  assert.equal(result.kind, 'protected');
+  assert.equal(result.tile, house);
+  assert.equal(s.hand, null);
+  assert.equal(isProtected(s, 1, 0), true);
+  assert.notDeepEqual(camp.target, { x: 1, y: 0 });
+  t.mock.method(Math, 'random', () => 0);
+  s.hand = 'joker_verwandeln';
+  assert.equal(useJoker(s, 1, 0).kind, 'transformed');
+  assert.equal(isProtected(s, 1, 0), true);
+  s.hand = 'joker_loeschen';
+  assert.equal(useJoker(s, 1, 0).kind, 'deleted');
+  s.hand = 'feld';
+  assert.equal(placeHand(s, 1, 0).tile.type, 'feld');
+  const loaded = JSON.parse(JSON.stringify(s));
+  assert.equal(isProtected(loaded, 1, 0), true);
+  spreadBandits(loaded);
+  assert.equal(loaded.tiles['1,0'].type, 'feld');
+});
+
+test('old saves gain empty permanent protection without altering the world', () => {
+  const s = newState();
+  delete s.protectedFields;
+  const tiles = JSON.stringify(s.tiles);
+  assert.equal(migrateState(s), true);
+  assert.deepEqual(s.protectedFields, {});
+  assert.equal(JSON.stringify(s.tiles), tiles);
+  assert.equal(migrateState(s), false);
+});
+
+test('protection joker can protect free or tower-protected fields but rejects invalid targets', () => {
+  const s = emptyWorld();
+  addTile(s, 'wachturm', 0, 0);
+  const workshop = addTile(s, 'workshop', 1, 0);
+  workshop.job = { pack: 'natur', duration: 30000, endsAt: 30000 };
+  s.hand = 'joker_schutz';
+  assert.equal(useJoker(s, 8, 0), null);
+  assert.equal(useJoker(s, 0.5, 0), null);
+  assert.equal(s.hand, 'joker_schutz');
+  assert.equal(useJoker(s, 1, 0).kind, 'protected');
+  assert.equal(workshop.job.pack, 'natur');
+  s.hand = 'joker_schutz';
+  assert.equal(useJoker(s, 1, 0), null);
+  assert.equal(s.hand, 'joker_schutz');
+  assert.equal(useJoker(s, 2, 0).kind, 'protected');
+  delete s.tiles['0,0'];
+  assert.equal(isProtected(s, 1, 0), true);
+  assert.equal(isProtected(s, 2, 0), true);
+});
+
+test('bandit cards cannot spawn on permanently protected occupied or empty fields', () => {
+  const s = emptyWorld();
+  s.size = 2;
+  s.protectedFields = { '-1,-1': true, '-1,0': true, '0,-1': true, '0,0': true };
+  addTile(s, 'haus', 0, 0);
+  s.hand = 'banditen_niete';
+  assert.equal(spawnBandit(s), null);
+  assert.equal(s.hand, 'banditen_niete');
+  assert.equal(s.tiles['0,0'].type, 'haus');
 });
 
 test('a tile transformed into a guard clears camps in range', (t) => {

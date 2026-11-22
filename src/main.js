@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=13';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=17';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=14';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=18';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -140,16 +140,18 @@ function onTap(sx, sy) {
     if (!result) {
       const tile = tileAt(state, c.x, c.y);
       toast(tile?.type === 'banditen' ? 'Banditencamps sind gegen Joker geschützt' :
+        state.hand === 'joker_schutz' ? (state.protectedFields[`${c.x},${c.y}`] ? 'Dieses Feld ist bereits dauerhaft geschützt' : 'Wähle ein Feld innerhalb des Spielfelds') :
         tile?.type === 'workshop' ? 'Letzter oder beschäftigter Workshop ist geschützt' :
         Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
           ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
       return;
     }
-    selected = result.kind === 'transformed' ? result.tile : null;
+    selected = result.kind === 'transformed' || result.kind === 'protected' ? result.tile || null : null;
     if (result.kind === 'transformed') {
       toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}`);
       flashPairs(result.pairs);
-    } else toast(`${TILES[result.tile.type].name} gelöscht`);
+    } else if (result.kind === 'protected') toast(`Feld (${result.x}, ${result.y}) dauerhaft vor Banditen geschützt`);
+    else toast(`${TILES[result.tile.type].name} gelöscht`);
     refreshTargets();
     save();
     return;
@@ -208,6 +210,7 @@ function updatePanel() {
     const message = blockedDelete ? 'Das letzte Tile kann nicht gelöscht werden.' :
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
+      state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
       targets.length ? 'Grünes Feld antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
@@ -225,6 +228,7 @@ function updateTilePopup() {
   const partners = displayPartners(selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[def.rarity].name} · Position ${selected.x}, ${selected.y}</div>`;
+  if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
     wald: 'Produziert 1 Holz pro 10 Sekunden.',
     holzfaeller: 'Produziert 1 Holz; +1 pro benachbartem Wald.',
@@ -842,7 +846,7 @@ function drawTile(tile, x, y, alpha = 1) {
   ctx.globalAlpha = 1;
 }
 
-function drawShield(tile) {
+function drawShield(tile, permanent = false) {
   const x = tile.x * TILE + TILE - 32, y = tile.y * TILE + 4;
   ctx.beginPath();
   ctx.moveTo(x + 14, y);
@@ -852,7 +856,7 @@ function drawShield(tile) {
   ctx.quadraticCurveTo(x + 4, y + 24, x + 2, y + 17);
   ctx.lineTo(x + 1, y + 5);
   ctx.closePath();
-  ctx.fillStyle = '#20659d';
+  ctx.fillStyle = permanent ? '#b9790d' : '#20659d';
   ctx.fill();
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
@@ -936,11 +940,23 @@ function draw() {
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
     }
-    if (JOKERS[state.hand] && t.type !== 'banditen' && (state.hand !== 'joker_loeschen' || tiles.length > 1) &&
-        (t.type !== 'workshop' || (!t.job && workshopCount > 1))) {
+    if (JOKERS[state.hand] && t.type !== 'banditen' &&
+        (state.hand === 'joker_schutz' ? !state.protectedFields[`${t.x},${t.y}`] :
+          (state.hand !== 'joker_loeschen' || tiles.length > 1) && (t.type !== 'workshop' || (!t.job && workshopCount > 1)))) {
       ctx.strokeStyle = '#d39cff';
       ctx.lineWidth = 4;
       ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
+    }
+  }
+
+  if (state.hand === 'joker_schutz') {
+    for (let x = -half; x < half; x++) for (let y = -half; y < half; y++) {
+      if (tileAt(state, x, y) || state.protectedFields[`${x},${y}`]) continue;
+      ctx.fillStyle = 'rgba(177,115,230,.22)';
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      ctx.strokeStyle = 'rgba(211,156,255,.7)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
 
@@ -998,7 +1014,7 @@ function draw() {
 
   if (showShields) {
     const guards = tiles.filter(tile => tile.type === 'wachturm');
-    for (const tile of tiles) if (isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
+    for (const tile of tiles) if (!state.protectedFields[`${tile.x},${tile.y}`] && isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
   if (selected && !state.hand) {
@@ -1017,6 +1033,10 @@ function draw() {
       ctx.lineWidth = 5;
       ctx.strokeRect(target.x * TILE + 2, target.y * TILE + 2, TILE - 4, TILE - 4);
     }
+  }
+  for (const field of Object.keys(state.protectedFields)) {
+    const [x, y] = field.split(',').map(Number);
+    drawShield({ x, y }, true);
   }
   if (showGrid && !TILES[state.hand]) drawGrid(half);
 }

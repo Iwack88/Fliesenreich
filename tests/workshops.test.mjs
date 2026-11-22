@@ -29,7 +29,7 @@ test('HumanCity is crafted with resources, gains warehouse speed and opens from 
   assert.equal(workshop.job.duration, 72000);
   updateProduction(s, 73000);
   assert.equal(s.packs.humancity, 1);
-  t.mock.method(Math, 'random', () => 0.999);
+  t.mock.method(Math, 'random', () => 0.97);
   const cards = openPack(s, 'humancity');
   assert.equal(cards.length, 5);
   assert.ok(cards.includes('wachturm'));

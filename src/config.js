@@ -34,15 +34,15 @@ export const PACK_MIN_SPECIAL = 2;
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: { holz: 3, korn: 2 }, duration: 30000, cards: 5,
-    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, banditen_niete: 2 },
+    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, banditen_niete: 2, joker_schutz: 1 },
   },
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 6, korn: 5 }, duration: 60000, cards: 5,
-    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, banditen_niete: 2 },
+    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, banditen_niete: 2, joker_schutz: 1 },
   },
   humancity: {
     name: 'HumanCity-Pack', cost: { holz: 8, korn: 6 }, duration: 90000, cards: 5,
-    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8 },
+    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, joker_schutz: 1 },
   },
 };
 
@@ -74,6 +74,7 @@ export const TILES = {
 export const JOKERS = {
   joker_loeschen: { name: 'Lösch-Joker', icon: '🗑️', color: '#b88bdb', rarity: 'rare' },
   joker_verwandeln: { name: 'Verwandlungs-Joker', icon: '✨', color: '#b88bdb', rarity: 'rare' },
+  joker_schutz: { name: 'Schutz-Joker', icon: '🛡️', color: '#b88bdb', rarity: 'rare' },
 };
 
 export const HAZARDS = {
