@@ -6,16 +6,16 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <canvas id="game"></canvas>
 
 <div id="hud">
   <div id="res">
-    <span>🪙 <b id="r-gold">0</b></span>
-    <span>🪵 <b id="r-holz">0</b></span>
-    <span>🌾 <b id="r-korn">0</b></span>
+    <button class="hud-resource" data-hud-resource="gold" aria-label="Gold im Warehouse anzeigen">🪙 <b id="r-gold">0</b></button>
+    <button class="hud-resource" data-hud-resource="holz" aria-label="Holz im Warehouse anzeigen">🪵 <b id="r-holz">0</b></button>
+    <button class="hud-resource" data-hud-resource="korn" aria-label="Korn im Warehouse anzeigen">🌾 <b id="r-korn">0</b></button>
     <span title="Zeit bis zur nächsten Ausbreitung">🏴 <b id="r-banditen">5:00</b></span>
   </div>
   <div id="queue"></div>
@@ -25,6 +25,7 @@
     <button id="btn-workshop">Workshop</button>
     <button id="btn-warehouse">Warehouse</button>
     <button id="btn-archive">Archiv</button>
+    <button id="btn-grid" aria-pressed="false" title="Raster außerhalb des Baumodus anzeigen">▦ Grid</button>
     <button id="btn-shields" aria-pressed="false" title="Schutz auf Tiles anzeigen">🛡️ Schutz</button>
     <button id="btn-shop">Shop</button>
     <button id="btn-new-game">Neues Spiel</button>
@@ -45,6 +46,6 @@
 <div id="toast"></div>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=21"></script>
+<script type="module" src="src/main.js?v=22"></script>
 </body>
 </html>

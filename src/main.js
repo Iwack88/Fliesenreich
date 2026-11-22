@@ -26,6 +26,7 @@ const FLASH_MS = 900;
 let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 let showShields = false;
+let showGrid = false;
 
 const images = {};
 for (const id of Object.keys(TILES)) {
@@ -389,8 +390,8 @@ const WAREHOUSE_RESOURCES = [
 ];
 let warehouseResource = null;
 
-function showWarehouse() {
-  warehouseResource = null;
+function showWarehouse(resourceId = null) {
+  warehouseResource = WAREHOUSE_RESOURCES.find(resource => resource.id === resourceId) || null;
   const body = openOverlay('Warehouse', 'warehouse');
   body.innerHTML = '';
   for (const resource of WAREHOUSE_RESOURCES) {
@@ -766,7 +767,14 @@ $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
+for (const button of document.querySelectorAll('[data-hud-resource]')) {
+  button.onclick = () => { syncBandits(); syncProduction(); showWarehouse(button.dataset.hudResource); };
+}
 $('btn-shop').onclick = () => { syncBandits(); syncProduction(); showShop(); };
+$('btn-grid').onclick = () => {
+  showGrid = !showGrid;
+  $('btn-grid').setAttribute('aria-pressed', String(showGrid));
+};
 $('btn-shields').onclick = () => {
   showShields = !showShields;
   $('btn-shields').setAttribute('aria-pressed', String(showShields));
@@ -849,6 +857,22 @@ function drawBanditArrow(tile) {
   ctx.restore();
 }
 
+function drawGrid(half) {
+  ctx.strokeStyle = 'rgba(255,255,255,.25)';
+  ctx.lineWidth = 1;
+  for (let i = -half; i <= half; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * TILE, -half * TILE);
+    ctx.lineTo(i * TILE, half * TILE);
+    ctx.moveTo(-half * TILE, i * TILE);
+    ctx.lineTo(half * TILE, i * TILE);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
+}
+
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = BG;
@@ -861,19 +885,7 @@ function draw() {
   ctx.fillStyle = BOARD_COLOR;
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
   if (TILES[state.hand]) {
-    ctx.strokeStyle = 'rgba(255,255,255,.25)';
-    ctx.lineWidth = 1;
-    for (let i = -half; i <= half; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * TILE, -half * TILE);
-      ctx.lineTo(i * TILE, half * TILE);
-      ctx.moveTo(-half * TILE, i * TILE);
-      ctx.lineTo(half * TILE, i * TILE);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
+    drawGrid(half);
   }
 
   const tiles = Object.values(state.tiles);
@@ -969,6 +981,7 @@ function draw() {
       ctx.strokeRect(target.x * TILE + 2, target.y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
+  if (showGrid && !TILES[state.hand]) drawGrid(half);
 }
 
 function frame() {

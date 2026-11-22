@@ -8,7 +8,7 @@ Das Spielfeld startet mit 8×8 Feldern, einem Workshop, einem benachbarten Wacht
 
 Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles und zwei Banditencamps ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend.
 
-Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint nur, solange eine Karte zum Platzieren gezogen ist.
+Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Platzieren; mit **▦ Grid** lässt es sich auch außerhalb des Baumodus ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
 
 Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter eine Lagerhalle. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 
@@ -18,7 +18,7 @@ Alle 10 Sekunden erzeugen Wald und Holzfäller je 1 Holz, Feld und Windmühle je
 
 Beim Antippen eines Tiles bleiben es und seine direkten Bonus-Partner hervorgehoben; andere Tiles werden deutlich ausgegraut. Die Detailansicht zeigt den aktuellen Ertrag mit Basis und Nachbarschaftsbonus sowie bei Workshops die gebufften Herstellungszeiten. Gold-Erträge beziehen sich auf die gemeinsamen Paare und zählen nicht doppelt.
 
-**Warehouse** zeigt den Bestand aller Ressourcen (Gold, Holz und Korn). Beim Antippen einer Ressource erscheint der Gesamtertrag pro Tick (10 Sekunden), inklusive aller Nachbarschaftsboni. Bei Holz und Korn wird zusätzlich angezeigt, wie viel bei aktuellem Lagerstand noch ins Lager passt. Die Übersicht aktualisiert sich während sie geöffnet ist.
+**Warehouse** zeigt den Bestand aller Ressourcen (Gold, Holz und Korn). Beim Antippen einer Ressource erscheint der Gesamtertrag pro Tick (10 Sekunden), inklusive aller Nachbarschaftsboni. Die Ressourcen oben im Menü öffnen das Warehouse direkt mit der jeweiligen Ressource. Bei Holz und Korn wird zusätzlich angezeigt, wie viel bei aktuellem Lagerstand noch ins Lager passt. Die Übersicht aktualisiert sich während sie geöffnet ist.
 
 Unter **Workshop** lassen sich alle Workshops finden und Packs herstellen: Landschaft kostet 3 Holz und 2 Korn und dauert 30 Sekunden, Entdecker 6 Holz und 5 Korn und dauert 60 Sekunden, **HumanCity** 8 Holz und 6 Korn und dauert 90 Sekunden. Jede benachbarte Lagerhalle verkürzt die Herstellungszeit um 20 %, höchstens um 60 %. Änderungen an den Lagerhallen wirken auch auf die verbleibende Zeit bereits laufender Produktionen. Ein Workshop produziert ein Pack gleichzeitig. Fertige Packs landen automatisch im **Inventar** und werden dort geöffnet; ihre Karten kommen ans Deckende. Der direkte Packverkauf im Shop bleibt deaktiviert, die Spielfelderweiterung ist dauerhaft verfügbar.
 

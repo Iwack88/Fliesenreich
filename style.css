@@ -10,7 +10,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
 #hud { flex-wrap: wrap; gap: 4px; }
 #hud button { padding: 6px 10px; margin-left: 4px; }
-#btn-shields[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
+#hud .hud-resource { padding: 4px; margin: 0 2px 0 0; background: transparent; font-size: 16px; }
+#hud .hud-resource:focus-visible { outline: 2px solid #a8e1ff; }
+#btn-shields[aria-pressed="true"], #btn-grid[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
 button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; background: #3d8b4f; color: #fff; margin-left: 8px; }
 button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
@@ -21,6 +23,7 @@ button:disabled { background: #555; color: #999; }
 @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
 @media (max-width: 800px) {
   #hud button { font-size: 13px; padding: 5px 6px; margin-left: 2px; }
+  #hud .hud-resource { font-size: 14px; padding: 4px; margin: 0; }
   #res span { font-size: 14px; margin-right: 5px; }
 }
 @media (min-width: 900px) {
