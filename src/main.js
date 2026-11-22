@@ -412,6 +412,15 @@ function formatTime(ms) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+function updateJobIndicator(indicator, now = Date.now()) {
+  const remaining = Math.max(0, Number(indicator.dataset.endsAt) - now);
+  indicator.querySelector('.job-timer').textContent = `Noch ${formatTime(remaining)}`;
+  const duration = Number(indicator.dataset.duration);
+  if (duration > 0) {
+    indicator.querySelector('progress').value = Math.max(0, Math.min(1, 1 - remaining / duration));
+  }
+}
+
 function showWorkshops() {
   const body = openOverlay('Workshops', 'workshops');
   body.innerHTML = '';
@@ -446,16 +455,26 @@ function showWorkshops() {
     if (tile.job) {
       const status = document.createElement('div');
       const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
-      status.textContent = `${name} · `;
-      const timer = document.createElement('span');
-      timer.dataset.endsAt = tile.job.endsAt;
-      timer.textContent = formatTime(tile.job.endsAt - Date.now());
-      status.appendChild(timer);
+      status.className = 'job-status';
+      status.dataset.endsAt = tile.job.endsAt;
+      if (tile.job.duration != null) status.dataset.duration = tile.job.duration;
+      const heading = document.createElement('div');
+      heading.className = 'job-heading';
+      const packName = document.createElement('b');
+      packName.textContent = name;
+      const timer = document.createElement('strong');
+      timer.className = 'job-timer';
+      heading.append(packName, timer);
+      const progress = document.createElement('progress');
+      progress.max = 1;
+      progress.setAttribute('aria-label', `Fortschritt ${name} bei Workshop ${tile.x}, ${tile.y}`);
+      status.append(heading, progress);
+      updateJobIndicator(status);
       section.appendChild(status);
       if (tile.job.duration == null) {
         const notice = document.createElement('div');
         notice.className = 'pack-chances';
-        notice.textContent = 'Dieser ältere Auftrag behält seine bisherige Zeit; neue Aufträge nutzen den aktuellen Bonus.';
+        notice.textContent = 'Bei diesem älteren Auftrag ist der Fortschritt nicht verfügbar; die Restzeit bleibt erhalten.';
         section.appendChild(notice);
       }
     } else {
@@ -675,7 +694,7 @@ refreshTargets();
 frame();
 setInterval(() => {
   syncProduction();
-  for (const timer of document.querySelectorAll('[data-ends-at]')) timer.textContent = formatTime(Number(timer.dataset.endsAt) - Date.now());
+  for (const indicator of document.querySelectorAll('.job-status')) updateJobIndicator(indicator);
 }, 1000);
 
 $('btn-full').onclick = () => {
