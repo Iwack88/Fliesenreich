@@ -4,7 +4,7 @@ Bau-/Management-Spiel mit Tiles. Platzhalter-Grafiken: PNGs als `assets/tiles/<i
 
 ## Spielfeld
 
-Das Spielfeld startet mit 8×8 Feldern, einem Workshop, einem benachbarten Wachturm, zwei Banditencamps und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die übrigen drei Felder direkt neben dem Workshop bleiben frei. Grüne Felder sind frei und grenzen seitlich an ein vorhandenes Tile; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
+Das Spielfeld startet mit 8×8 Feldern, einem Workshop, einem benachbarten Wachturm, zwei Banditencamps und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die übrigen drei Felder direkt neben dem Workshop bleiben frei. Im Baumodus markieren hellgrüne Felder mit einem weißen Plus die freien Plätze, die seitlich an ein vorhandenes Tile grenzen; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
 Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles und zwei Banditencamps ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend.
 
@@ -31,6 +31,8 @@ Die Workshop-Übersicht listet alle Workshops kompakt auf. Ein Antippen klappt d
 Der Pfeil links öffnet eine Schnellübersicht aller laufenden Herstellungsaufträge mit Workshop-Position, Pack, Restzeit und Fortschritt. Sie aktualisiert sich automatisch und lässt sich mit dem Pfeil wieder schließen.
 
 Ein Hammer am unteren Bildschirmrand zeigt die Anzahl untätiger Workshops und öffnet direkt die Auswahl des ersten freien Workshops. Sind alle beschäftigt oder keine vorhanden, verschwindet er; nach Abschluss eines Auftrags erscheint er wieder. In der Pack-Auswahl stehen die möglichen Karten mit Symbol, Name und Chance pro Karte. Farbige Kästchen kennzeichnen Karten ohne eigenes Symbol.
+
+Ein Pack-Symbol links unten zeigt die Anzahl fertiger Packs und öffnet das Inventar. Sobald alle geöffnet sind, verschwindet es.
 
 Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald, Haus und Banditen-Nieten. Das Entdecker-Pack enthält zusätzlich Holzfäller, Windmühlen, Tavernen, Workshops und Joker. Das HumanCity-Pack enthält Gras, Erde, Wasser, Banditen-Nieten, Häuser, Tavernen und Wachtürme. Diese drei Packs können die drei Lagertypen, Werkzeugschmieden, Schutz-Joker und Banditenzeit-Joker enthalten und garantieren mindestens zwei Karten außer Gras, Erde, Wasser oder Banditen-Nieten. Das Joker-Pack enthält ausschließlich fünf zufällige Joker: Lösch-, Verwandlungs-, Schutz- und Banditenzeit-Joker, je 25 % pro Karte; Wiederholungen sind möglich. Die Übersicht zeigt die Chancen je zufälliger Karte; ein Turm ist nicht garantiert. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet ein freier Workshop ein kostenloses Starthilfe-Pack mit Wald und Feld an.
 

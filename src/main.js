@@ -211,7 +211,7 @@ function updatePanel() {
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
       state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
-      targets.length ? 'Grünes Feld antippen zum Platzieren' :
+      targets.length ? 'Hellgrünes Feld mit + antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
     $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}${guardHint}`;
@@ -307,6 +307,10 @@ function updateHud() {
   $('btn-next').textContent = `Next (${cardCount(state)})`;
   const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
   $('btn-cards').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
+  $('ready-packs').hidden = !readyPacks;
+  $('ready-packs-count').textContent = readyPacks;
+  $('ready-packs').setAttribute('aria-label', `${readyPacks} fertige Packs öffnen`);
+  $('panel').classList.toggle('has-ready-packs', readyPacks > 0);
   $('btn-shuffle').textContent = `🔀 ${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
   const sale = shopStatus(state);
@@ -870,6 +874,7 @@ function showArchive() {
 
 $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
+$('ready-packs').onclick = () => { syncBandits(); syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
 $('idle-workshop').onclick = () => {
   syncBandits();
@@ -1048,11 +1053,28 @@ function draw() {
   }
 
   for (const g of targets) {
-    ctx.fillStyle = 'rgba(60,220,90,.45)';
-    ctx.fillRect(g.x * TILE, g.y * TILE, TILE, TILE);
-    ctx.strokeStyle = '#3cdc5a';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(g.x * TILE + 2, g.y * TILE + 2, TILE - 4, TILE - 4);
+    const x = g.x * TILE, y = g.y * TILE;
+    ctx.fillStyle = 'rgba(85,240,90,.8)';
+    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+    ctx.strokeStyle = '#15421c';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
+    ctx.strokeStyle = '#f3ffb8';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + TILE * 0.32, y + TILE / 2);
+    ctx.lineTo(x + TILE * 0.68, y + TILE / 2);
+    ctx.moveTo(x + TILE / 2, y + TILE * 0.32);
+    ctx.lineTo(x + TILE / 2, y + TILE * 0.68);
+    ctx.strokeStyle = '#15421c';
+    ctx.lineWidth = 12;
+    ctx.stroke();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.lineCap = 'butt';
   }
 
 
