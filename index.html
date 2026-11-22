@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -39,6 +39,8 @@
   <button id="btn-return-card" hidden>Ans Deckende</button>
 </div>
 
+<button id="idle-workshop" hidden aria-label="Untätige Workshops anzeigen" title="Untätige Workshops anzeigen">🛠️ <span id="idle-workshop-count"></span></button>
+
 <div id="tile-popup" class="hidden"></div>
 
 <div id="overlay" class="hidden"><div id="overlay-box"><div id="overlay-head"><b id="overlay-title"></b><button id="overlay-close">✕</button></div><div id="overlay-body"></div></div></div>
@@ -46,6 +48,6 @@
 <div id="toast"></div>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=22"></script>
+<script type="module" src="src/main.js?v=23"></script>
 </body>
 </html>

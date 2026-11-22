@@ -17,6 +17,9 @@ button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; back
 button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
 #panel.hidden { display: none; }
+#panel.has-idle-workshop { padding-right: 95px; }
+#idle-workshop { position: fixed; right: 10px; bottom: 8px; min-width: 62px; min-height: 42px; margin: 0; padding: 6px 10px; background: #a76b27; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+#idle-workshop[hidden] { display: none; }
 #toast { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 14px; border-radius: 8px; opacity: 0; transition: opacity .3s; pointer-events: none; }
 #toast.show { opacity: 1; }
 #rotate { display: none; position: fixed; inset: 0; background: #000; align-items: center; justify-content: center; font-size: 20px; text-align: center; z-index: 10; }
@@ -53,6 +56,12 @@ button:disabled { background: #555; color: #999; }
 .workshop-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .workshop .workshop-toggle { flex: 1; margin: 0; padding: 8px; text-align: left; background: #355a40; }
 .workshop .pack { margin-top: 6px; gap: 6px; }
+.workshop .pack-recipe { display: block; }
+.pack-recipe-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.pack-contents { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.pack-item { width: 70px; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; }
+.pack-item-icon { display: flex; width: 40px; height: 40px; margin: 0 auto 3px; align-items: center; justify-content: center; border-radius: 6px; font-size: 25px; }
+.pack-item-chance { display: block; margin-top: 2px; color: #d7e5d9; font-variant-numeric: tabular-nums; }
 .workshop button { font-size: 14px; padding: 6px 8px; }
 .job-status { margin-top: 10px; }
 .job-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

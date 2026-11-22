@@ -300,6 +300,11 @@ function updateHud() {
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
   const sale = shopStatus(state);
   $('btn-shop').textContent = sale.open ? `Shop SALE ${formatTime(sale.remaining)}` : `Shop ${formatTime(sale.remaining)}`;
+  const idleWorkshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && !tile.job).length;
+  $('idle-workshop').hidden = !idleWorkshops;
+  $('idle-workshop-count').textContent = idleWorkshops;
+  $('idle-workshop').setAttribute('aria-label', `${idleWorkshops} untätige Workshops anzeigen`);
+  $('panel').classList.toggle('has-idle-workshop', idleWorkshops > 0);
   renderQueue();
 }
 
@@ -595,6 +600,7 @@ function showWorkshops() {
   for (const tile of workshops) {
     const section = document.createElement('div');
     section.className = 'workshop';
+    section.dataset.workshopId = tile.id;
     const head = document.createElement('div');
     head.className = 'workshop-head';
     const expanded = tile.id === expandedWorkshopId;
@@ -648,11 +654,11 @@ function showWorkshops() {
     } else if (expanded) {
       for (const [id, pack] of Object.entries(PACKS)) {
         const row = document.createElement('div');
-        row.className = 'pack';
+        row.className = 'pack pack-recipe';
+        const head = document.createElement('div');
+        head.className = 'pack-recipe-head';
         const info = document.createElement('div');
-        const chances = packChances(pack).map(([type, chance]) =>
-          `${CARDS[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
-        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete.<br>Chance je zufälliger Karte: ${chances}</div>`;
+        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete. Chance je zufälliger Karte:</div>`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.disabled = !canStartPack(state, tile, id);
@@ -663,7 +669,29 @@ function showWorkshops() {
           save();
           showWorkshops();
         };
-        row.append(info, button);
+        head.append(info, button);
+        row.appendChild(head);
+        const contents = document.createElement('div');
+        contents.className = 'pack-contents';
+        for (const [type, chance] of packChances(pack)) {
+          const card = CARDS[type];
+          const item = document.createElement('div');
+          item.className = 'pack-item';
+          const percent = `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`;
+          const icon = document.createElement('span');
+          icon.className = 'pack-item-icon';
+          icon.style.background = card.color;
+          icon.textContent = card.icon;
+          icon.setAttribute('aria-hidden', 'true');
+          const name = document.createElement('span');
+          name.textContent = card.name;
+          const value = document.createElement('span');
+          value.className = 'pack-item-chance';
+          value.textContent = percent;
+          item.append(icon, name, value);
+          contents.appendChild(item);
+        }
+        row.appendChild(contents);
         section.appendChild(row);
       }
       if (canStartRecovery(state, tile)) {
@@ -766,6 +794,15 @@ function showArchive() {
 $('btn-archive').onclick = showArchive;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
+$('idle-workshop').onclick = () => {
+  syncBandits();
+  syncProduction();
+  const tile = Object.values(state.tiles).find(tile => tile.type === 'workshop' && !tile.job);
+  if (!tile) { toast('Kein untätiger Workshop vorhanden'); return; }
+  expandedWorkshopId = tile.id;
+  showWorkshops();
+  document.querySelector(`[data-workshop-id="${tile.id}"]`).scrollIntoView({ block: 'nearest' });
+};
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
 for (const button of document.querySelectorAll('[data-hud-resource]')) {
   button.onclick = () => { syncBandits(); syncProduction(); showWarehouse(button.dataset.hudResource); };
