@@ -37,6 +37,28 @@ test('HumanCity is crafted with resources, gains forge speed and opens from inve
   assert.equal(s.packs.humancity, 0);
 });
 
+test('Joker pack charges gold once, uses forge speed and delivers only jokers offline', () => {
+  const s = newState();
+  s.productionAt = 1000;
+  s.gold = 249;
+  const workshop = s.tiles['0,0'];
+  addTile(s, 'werkzeugschmiede', 1, 1);
+  assert.equal(startPack(s, workshop, 'joker', 1000), false);
+  assert.equal(s.gold, 249);
+  s.gold = 250;
+  const resources = { ...s.resources };
+  assert.equal(startPack(s, workshop, 'joker', 1000), true);
+  assert.equal(s.gold, 0);
+  assert.deepEqual(s.resources, resources);
+  assert.equal(workshop.job.duration, 288000);
+  assert.equal(startPack(s, workshop, 'joker', 1000), false);
+  updateProduction(s, 289000);
+  assert.equal(s.packs.joker, 1);
+  const cards = openPack(s, 'joker');
+  assert.equal(cards.length, 5);
+  assert.ok(cards.every(id => id.startsWith('joker_')));
+});
+
 test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
   const s = newState();
   s.tiles = {};

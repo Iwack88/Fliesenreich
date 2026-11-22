@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=15';
+import { TILES, JOKERS, HAZARDS, CARDS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=16';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -194,8 +194,10 @@ export function buyShopCard(s, card, round) {
 
 export function drawCard(s) {
   if (s.hand || !s.deck.length) return null;
-  s.hand = s.deck.shift();
-  return s.hand;
+  const card = s.deck.shift();
+  if (card === 'joker_banditenzeit') s.banditElapsed = 0;
+  else s.hand = card;
+  return card;
 }
 
 export function shuffleDeck(s) {
@@ -482,12 +484,15 @@ function adjustWorkshopJobs(s, affected, now) {
 export function canStartPack(s, tile, packId) {
   const pack = PACKS[packId];
   return !!(pack && tile?.type === 'workshop' && s.tiles[key(tile.x, tile.y)] === tile && !tile.job &&
-    Object.entries(pack.cost).every(([id, amount]) => s.resources[id] >= amount));
+    Object.entries(pack.cost).every(([id, amount]) => (id === 'gold' ? s.gold : s.resources[id]) >= amount));
 }
 
 export function startPack(s, tile, packId, now = Date.now()) {
   if (!canStartPack(s, tile, packId)) return false;
-  for (const [id, amount] of Object.entries(PACKS[packId].cost)) s.resources[id] -= amount;
+  for (const [id, amount] of Object.entries(PACKS[packId].cost)) {
+    if (id === 'gold') s.gold -= amount;
+    else s.resources[id] -= amount;
+  }
   const duration = workshopDuration(s, tile, packId);
   tile.job = { pack: packId, duration, endsAt: now + duration };
   return true;

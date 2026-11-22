@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TILES, START_DECK } from '../src/config.js';
+import { TILES, START_DECK, BANDIT_INTERVAL } from '../src/config.js';
 import { addTile, drawCard, newState, placeHand, useJoker } from '../src/logic.js';
 
 test('new games have one of each joker and drawing preserves them', () => {
@@ -14,6 +14,25 @@ test('new games have one of each joker and drawing preserves them', () => {
   state.deck = ['joker_loeschen'];
   assert.equal(drawCard(state), 'joker_loeschen');
   assert.equal(placeHand(state, 1, 0), null);
+});
+
+test('bandit timer joker is consumed immediately and resets the timer without changing camp targets', () => {
+  const s = newState();
+  const camp = Object.values(s.tiles).find(tile => tile.type === 'banditen');
+  const target = JSON.stringify(camp.target);
+  s.deck = ['joker_banditenzeit', 'gras'];
+  s.banditElapsed = BANDIT_INTERVAL - 1;
+  s.hand = 'wald';
+  assert.equal(drawCard(s), null);
+  assert.equal(s.banditElapsed, BANDIT_INTERVAL - 1);
+  s.hand = null;
+  assert.equal(drawCard(s), 'joker_banditenzeit');
+  assert.equal(s.banditElapsed, 0);
+  assert.equal(s.hand, null);
+  assert.deepEqual(s.deck, ['gras']);
+  assert.equal(JSON.stringify(camp.target), target);
+  assert.equal(JSON.parse(JSON.stringify(s)).banditElapsed, 0);
+  assert.equal(drawCard(s), 'gras');
 });
 
 test('delete joker consumes itself only on an existing tile, and protects the last tile', () => {

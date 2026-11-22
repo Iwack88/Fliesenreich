@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=15';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, storageCapacity, forgeCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=19';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=16';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, tileProduction, productionRates, updateProduction, storageCapacity, forgeCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=20';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -293,7 +293,7 @@ function renderQueue() {
   queueKey = key;
   const card = CARDS[state.deck[0]];
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes</span><span class="queue-icon" style="background:${card.color}" aria-hidden="true">${card.icon}</span><b>${card.name}</b>`
+    ? `<span class="queue-label">Als Nächstes</span><span class="queue-icon" style="background:${card.color}" aria-hidden="true">${card.icon}</span><b>${card.name}</b>${state.deck[0] === 'joker_banditenzeit' ? '<div>Wirkt sofort</div>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -339,6 +339,13 @@ $('btn-next').onclick = () => {
   syncProduction();
   const card = drawCard(state);
   if (!card) { toast(state.hand ? 'Erst die Karte einsetzen' : 'Keine Karten – stelle ein Pack her'); return; }
+  if (card === 'joker_banditenzeit') {
+    selected = null;
+    refreshTargets();
+    save();
+    toast('⏳ Banditen-Timer auf 5:00 zurückgesetzt');
+    return;
+  }
   if (HAZARDS[card]) {
     const result = spawnBandit(state);
     if (result) {
@@ -503,7 +510,7 @@ function showInventory() {
     el.className = `card ${d.rarity}`;
     el.style.cursor = 'default';
     el.style.background = d.color;
-    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>#${i + 1}`;
+    el.innerHTML = `<div class="ic">${d.icon}</div><b>${d.name}</b><br>#${i + 1}${id === 'joker_banditenzeit' ? '<br>Wirkt sofort' : ''}`;
     body.appendChild(el);
   });
 }
@@ -524,7 +531,7 @@ function showShop() {
       const card = CARDS[offer.card];
       const row = document.createElement('div');
       row.className = 'pack';
-      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : ''}</span>`;
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : ''}</span>`;
       const button = document.createElement('button');
       button.dataset.shopCard = offer.card;
       button.onclick = () => {
@@ -724,7 +731,9 @@ function showWorkshops() {
         const head = document.createElement('div');
         head.className = 'pack-recipe-head';
         const info = document.createElement('div');
-        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete. Chance je zufälliger Karte:</div>`;
+        const cost = Object.entries(pack.cost).map(([resource, amount]) => `${{ gold: '🪙', holz: '🪵', korn: '🌾' }[resource]} ${amount}`).join(' · ');
+        const guarantee = id === 'joker' ? 'nur Joker' : `mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete`;
+        info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, ${guarantee}. Chance je zufälliger Karte:</div>`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.disabled = !canStartPack(state, tile, id);
@@ -750,7 +759,7 @@ function showWorkshops() {
           icon.textContent = card.icon;
           icon.setAttribute('aria-hidden', 'true');
           const name = document.createElement('span');
-          name.textContent = card.name;
+          name.textContent = card.name + (type === 'joker_banditenzeit' ? ' (wirkt sofort)' : '');
           const value = document.createElement('span');
           value.className = 'pack-item-chance';
           value.textContent = percent;
