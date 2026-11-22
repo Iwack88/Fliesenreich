@@ -6,13 +6,15 @@ import { openPack, packChances } from '../src/logic.js';
 test('displayed probabilities include the guarantee and sum to 100%', () => {
   const nature = Object.fromEntries(packChances(PACKS.natur));
   const explorer = Object.fromEntries(packChances(PACKS.basis));
-  assert.ok(Math.abs(nature.gras - 16.8) < 1e-10);
+  assert.ok(Math.abs(nature.gras - 15.6) < 1e-10);
   assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 100 + 2 * 6 / 22) / 5) < 1e-10);
   assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 100 + 2 * 2 / 30) / 5) < 1e-10);
   assert.equal(explorer.windmuehle, explorer.taverne);
   assert.ok(explorer.joker_loeschen > 0);
   assert.equal(explorer.joker_loeschen, explorer.joker_verwandeln);
   assert.equal(nature.joker_loeschen, undefined);
+  assert.equal(nature.banditen_niete, 1.2);
+  assert.equal(explorer.banditen_niete, 1.2);
   for (const pack of Object.values(PACKS)) {
     assert.ok(Math.abs(packChances(pack).reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
   }

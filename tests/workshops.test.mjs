@@ -86,13 +86,13 @@ test('transforming a tile to or from a warehouse updates neighboring workshops',
   s.tiles = { '0,0': w };
   addTile(s, 'gras', 1, 1);
   startPack(s, w, 'natur', 0);
-  let index = Object.keys(TILES).filter(type => type !== 'gras').indexOf('lagerhalle');
-  const poolSize = Object.keys(TILES).length - 1;
+  let index = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen').indexOf('lagerhalle');
+  const poolSize = Object.keys(TILES).length - 2;
   t.mock.method(Math, 'random', () => (index + 0.5) / poolSize);
   s.hand = 'joker_verwandeln';
   assert.ok(useJoker(s, 1, 1, 15000));
   assert.equal(w.job.endsAt, 27000);
-  index = Object.keys(TILES).filter(type => type !== 'lagerhalle').indexOf('gras');
+  index = Object.keys(TILES).filter(type => type !== 'lagerhalle' && type !== 'banditen').indexOf('gras');
   s.hand = 'joker_verwandeln';
   assert.ok(useJoker(s, 1, 1, 21000));
   assert.equal(w.job.endsAt, 28500);
@@ -128,7 +128,7 @@ test('migration preserves old progress and provides a workshop card only once', 
   addTile(s, 'gras', 0, 0);
   assert.equal(migrateState(s, 123), true);
   assert.equal(s.gold, 13);
-  assert.deepEqual(s.deck, ['workshop', 'gras']);
+  assert.deepEqual(s.deck, ['wachturm', 'workshop', 'gras', 'banditen_niete']);
   assert.equal(s.productionAt, 123);
   assert.equal(migrateState(s, 456), false);
   assert.equal(s.deck.filter(id => id === 'workshop').length, 1);

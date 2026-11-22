@@ -16,20 +16,23 @@ export const START_DECK = { gras: 1, erde: 1, wasser: 1, wald: 2, feld: 2, holzf
 export const RESOURCE_CAP = 100;
 export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;
+export const BANDIT_INTERVAL = 5 * 60 * 1000;
+export const START_BANDITS = 2;
+export const GUARD_RADIUS = 3;
 
-// Zwei Karten pro Pack sind garantiert keine dieser Grundkarten.
-export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser'];
+// Zwei Karten pro Pack sind garantiert keine Grundkarten oder Nieten.
+export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser', 'banditen_niete'];
 export const PACK_MIN_SPECIAL = 2;
 
 // Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: { holz: 3, korn: 2 }, duration: 30000, cards: 5,
-    weights: { gras: 28, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2 },
+    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, banditen_niete: 2 },
   },
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 6, korn: 5 }, duration: 60000, cards: 5,
-    weights: { gras: 22, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2 },
+    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, banditen_niete: 2 },
   },
 };
 
@@ -54,6 +57,8 @@ export const TILES = {
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
   lagerhalle:   { name: 'Lagerhalle',  color: '#9b8c76', icon: '📦', rarity: 'uncommon', category: 'industrie' },
+  wachturm:     { name: 'Wachturm',    color: '#a4b7c8', icon: '🗼', rarity: 'uncommon', category: 'verteidigung' },
+  banditen:     { name: 'Banditencamp', color: '#713d44', icon: '🏴', rarity: 'common', category: 'gefahr' },
 };
 
 export const JOKERS = {
@@ -61,6 +66,10 @@ export const JOKERS = {
   joker_verwandeln: { name: 'Verwandlungs-Joker', icon: '✨', color: '#b88bdb', rarity: 'rare' },
 };
 
-export const CARDS = { ...TILES, ...JOKERS };
+export const HAZARDS = {
+  banditen_niete: { name: 'Banditen-Niete', icon: '🏴', color: '#713d44', rarity: 'common' },
+};
+
+export const CARDS = { ...TILES, ...JOKERS, ...HAZARDS };
 
 export const START_TILE = 'workshop';

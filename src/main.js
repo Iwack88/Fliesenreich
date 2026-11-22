@@ -1,5 +1,5 @@
-import { TILES, JOKERS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL } from './config.js?v=10';
-import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery } from './logic.js?v=11';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, RESOURCE_CAP, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS } from './config.js?v=11';
+import { newState, migrateState, tileAt, drawCard, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, productionRates, updateProduction, warehouseCount, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected } from './logic.js?v=12';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -24,6 +24,7 @@ let dpr = 1;
 const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
 let dragButton = null;
+let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 
 const images = {};
 for (const id of Object.keys(TILES)) {
@@ -129,20 +130,22 @@ function pointerDistance() {
 function setZoom(z) { cam.zoom = Math.min(2.5, Math.max(0.4, z)); }
 
 function onTap(sx, sy) {
+  syncBandits();
   syncProduction();
   const c = toCell(sx, sy);
   if (JOKERS[state.hand]) {
     const result = useJoker(state, c.x, c.y);
     if (!result) {
       const tile = tileAt(state, c.x, c.y);
-      toast(tile?.type === 'workshop' ? 'Letzter oder beschäftigter Workshop ist geschützt' :
+      toast(tile?.type === 'banditen' ? 'Banditencamps sind gegen Joker geschützt' :
+        tile?.type === 'workshop' ? 'Letzter oder beschäftigter Workshop ist geschützt' :
         Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
           ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
       return;
     }
     selected = result.kind === 'transformed' ? result.tile : null;
     if (result.kind === 'transformed') {
-      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}`);
+      toast(`${TILES[result.oldType].name} → ${TILES[result.tile.type].name}${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}`);
       flashPairs(result.pairs);
     } else toast(`${TILES[result.tile.type].name} gelöscht`);
     refreshTargets();
@@ -154,6 +157,7 @@ function onTap(sx, sy) {
     if (target) {
       const res = placeHand(state, target.x, target.y);
       if (!res) { toast('Dieses Feld ist nicht frei'); return; }
+      if (res.cleared) toast(`${res.cleared} Banditencamps vertrieben`);
       flashPairs(res.pairs);
       selected = res?.tile || null;
       refreshTargets();
@@ -204,7 +208,8 @@ function updatePanel() {
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
       targets.length ? 'Grünes Feld antippen zum Platzieren' :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}`;
+    const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}${guardHint}`;
   } else {
     panel.classList.add('hidden');
   }
@@ -227,6 +232,8 @@ function updateTilePopup() {
     taverne: 'Ein benachbartes Haus gibt 2 Gold pro 10 Sekunden.',
     workshop: 'Produziert Packs. Benachbarte Lagerhallen beschleunigen die Herstellung.',
     lagerhalle: 'Beschleunigt benachbarte Workshops um 20 %, bis zu 60 %.',
+    wachturm: `Schützt einen Bereich von ${GUARD_RADIUS * 2 + 1}×${GUARD_RADIUS * 2 + 1} Feldern und entfernt dort Banditencamps.`,
+    banditen: 'Übernimmt bei jedem Banditen-Timer ein zufälliges ungeschütztes Nachbar-Tile. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   if (selected.type === 'workshop') {
@@ -265,6 +272,7 @@ function updateHud() {
   $('r-gold').textContent = state.gold;
   $('r-holz').textContent = `${state.resources.holz}/${RESOURCE_CAP}`;
   $('r-korn').textContent = `${state.resources.korn}/${RESOURCE_CAP}`;
+  $('r-banditen').textContent = formatTime(BANDIT_INTERVAL - state.banditElapsed);
   $('btn-next').disabled = !!state.hand || cardCount(state) < 1;
   $('btn-next').textContent = `Next (${cardCount(state)})`;
   const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
@@ -284,8 +292,27 @@ function toast(msg) {
 }
 
 $('btn-next').onclick = () => {
+  syncBandits();
   syncProduction();
-  if (!drawCard(state)) { toast(state.hand ? 'Erst die Karte einsetzen' : 'Keine Karten – stelle ein Pack her'); return; }
+  const card = drawCard(state);
+  if (!card) { toast(state.hand ? 'Erst die Karte einsetzen' : 'Keine Karten – stelle ein Pack her'); return; }
+  if (HAZARDS[card]) {
+    const result = spawnBandit(state);
+    if (result) {
+      selected = result.tile;
+      cam.x = (selected.x + 0.5) * TILE;
+      cam.y = (selected.y + 0.5) * TILE;
+      toast(result.previous ? `Banditen übernehmen ${TILES[result.previous.type].name}!` : 'Ein Banditencamp ist erschienen!');
+    } else {
+      state.deck.push(state.hand);
+      state.hand = null;
+      selected = null;
+      toast('Kein ungeschütztes Feld – Niete ans Deckende gelegt');
+    }
+    refreshTargets();
+    save();
+    return;
+  }
   selected = null;
   refreshTargets();
   save();
@@ -322,6 +349,7 @@ $('btn-new-game').onclick = () => {
     const newGame = newState();
     localStorage.setItem(SAVE_KEY, JSON.stringify(newGame));
     state = newGame;
+    activeSince = document.visibilityState === 'visible' ? performance.now() : null;
     cam = initialCamera();
     selected = null;
     flashes.length = 0;
@@ -432,7 +460,7 @@ function showWorkshops() {
   const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
   if (!workshops.length) {
     const notice = document.createElement('p');
-    notice.textContent = 'Noch kein Workshop platziert. Ziehe und platziere die Workshop-Karte aus deinem Deck.';
+    notice.textContent = 'Kein Workshop platziert. Ohne Workshop-Karte oder fertiges Pack ist ein neues Spiel nötig.';
     body.appendChild(notice);
   }
   for (const tile of workshops) {
@@ -484,11 +512,12 @@ function showWorkshops() {
         const info = document.createElement('div');
         const chances = packChances(pack).map(([type, chance]) =>
           `${CARDS[type].name}: ${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`).join(' · ');
-        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde und Wasser.<br>Chance je zufälliger Karte: ${chances}</div>`;
+        info.innerHTML = `<b>${pack.name}</b> · 🪵 ${pack.cost.holz} · 🌾 ${pack.cost.korn} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete.<br>Chance je zufälliger Karte: ${chances}</div>`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.disabled = !canStartPack(state, tile, id);
         button.onclick = () => {
+          syncBandits();
           syncProduction();
           if (!startPack(state, tile, id)) { toast('Herstellung nicht möglich'); return; }
           save();
@@ -504,6 +533,7 @@ function showWorkshops() {
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.onclick = () => {
+          syncBandits();
           syncProduction();
           if (!startRecovery(state, tile)) { toast('Starthilfe nicht verfügbar'); return; }
           save();
@@ -529,6 +559,28 @@ function syncProduction() {
   }
 }
 
+function syncBandits() {
+  if (activeSince == null) return;
+  const now = performance.now();
+  const elapsed = Math.max(0, now - activeSince);
+  activeSince = now;
+  if (!elapsed) return;
+  if (state.banditElapsed + elapsed >= BANDIT_INTERVAL) syncProduction();
+  const captured = advanceBandits(state, elapsed);
+  save();
+  if (!captured.length) return;
+  if (selected && tileAt(state, selected.x, selected.y) !== selected) selected = null;
+  refreshTargets();
+  if (overlayView === 'workshops' || overlayView === 'archive') {
+    const box = $('overlay-box');
+    const scroll = box.scrollTop;
+    if (overlayView === 'workshops') showWorkshops();
+    else showArchive();
+    box.scrollTop = scroll;
+  }
+  toast(`Banditen übernehmen ${captured.length} ${captured.length === 1 ? 'Tile' : 'Tiles'}!`);
+}
+
 let archiveFilter = 'all';
 
 function jumpTo(tile) {
@@ -539,7 +591,7 @@ function jumpTo(tile) {
 }
 
 function showArchive() {
-  const body = openOverlay('Tile-Archiv');
+  const body = openOverlay('Tile-Archiv', 'archive');
   body.innerHTML = '';
   const tiles = Object.values(state.tiles);
   const counts = {};
@@ -637,12 +689,26 @@ function draw() {
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
     }
-    if (JOKERS[state.hand] && (state.hand !== 'joker_loeschen' || tiles.length > 1) &&
+    if (JOKERS[state.hand] && t.type !== 'banditen' && (state.hand !== 'joker_loeschen' || tiles.length > 1) &&
         (t.type !== 'workshop' || (!t.job && workshopCount > 1))) {
       ctx.strokeStyle = '#d39cff';
       ctx.lineWidth = 4;
       ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
     }
+  }
+
+  const visibleGuards = TILES[state.hand] ? tiles.filter(t => t.type === 'wachturm') :
+    selected?.type === 'wachturm' && !state.hand ? [selected] : [];
+  for (const guard of visibleGuards) {
+    const minX = Math.max(-half, guard.x - GUARD_RADIUS);
+    const minY = Math.max(-half, guard.y - GUARD_RADIUS);
+    const maxX = Math.min(half - 1, guard.x + GUARD_RADIUS);
+    const maxY = Math.min(half - 1, guard.y + GUARD_RADIUS);
+    ctx.fillStyle = 'rgba(80, 175, 255, .18)';
+    ctx.fillRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
+    ctx.strokeStyle = '#63c7ff';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
   }
 
   for (const g of targets) {
@@ -693,9 +759,23 @@ function frame() {
 refreshTargets();
 frame();
 setInterval(() => {
+  syncBandits();
   syncProduction();
   for (const indicator of document.querySelectorAll('.job-status')) updateJobIndicator(indicator);
 }, 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    syncBandits();
+    activeSince = null;
+  } else {
+    activeSince = performance.now();
+    syncProduction();
+  }
+});
+window.addEventListener('pagehide', () => { syncBandits(); activeSince = null; });
+window.addEventListener('pageshow', () => {
+  if (document.visibilityState === 'visible' && activeSince == null) activeSince = performance.now();
+});
 
 $('btn-full').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();

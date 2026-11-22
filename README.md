@@ -4,13 +4,13 @@ Bau-/Management-Spiel mit Tiles. Platzhalter-Grafiken: PNGs als `assets/tiles/<i
 
 ## Spielfeld
 
-Das Spielfeld startet mit 8×8 Feldern, einem Workshop in der Mitte und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die vier Felder direkt neben dem Start-Tile bleiben frei. Grüne Felder sind frei und grenzen seitlich an ein vorhandenes Tile; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
+Das Spielfeld startet mit 8×8 Feldern, einem Workshop, einem benachbarten Wachturm, zwei Banditencamps und 12 zufälligen Gras-, Erde- oder Wasser-Tiles. Die übrigen drei Felder direkt neben dem Workshop bleiben frei. Grüne Felder sind frei und grenzen seitlich an ein vorhandenes Tile; dort können Karten unabhängig von ihrem Typ platziert werden. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
 Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen 36 zufällige Tiles ausschließlich auf der neuen Fläche. Die freien Felder der generierten Fläche bleiben zusammenhängend.
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint nur, solange eine Karte zum Platzieren gezogen ist.
 
-Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter eine Lagerhalle. Bestehende Spielstände behalten ihre Welt und erhalten einmalig die Startrohstoffe sowie, falls nötig, eine Workshop-Karte am Deckanfang.
+Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter eine Lagerhalle. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 
 ## Produktion und Workshops
 
@@ -20,8 +20,16 @@ Unter **Workshop** lassen sich alle Workshops finden und Packs herstellen: Lands
 
 Laufende Aufträge zeigen Restzeit und Fortschritt. Vor der Bonus-Aktualisierung gestartete Aufträge behalten zunächst ihre bisherige Restzeit; ein genauer Fortschritt ist für sie nicht verfügbar, da ihre ursprünglichen Lagerhallen nicht gespeichert wurden.
 
-Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald, Haus und Lagerhalle. Das Entdecker-Pack enthält zusätzlich Holzfäller, Windmühlen, Tavernen, Workshops und Joker. Beide Packs enthalten fünf Karten, mindestens zwei davon nicht Gras, Erde oder Wasser. Die Übersicht zeigt die Chancen je zufälliger Karte. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet ein freier Workshop ein kostenloses Starthilfe-Pack mit Wald und Feld an.
+Das Landschafts-Pack enthält Gras, Erde, Wasser, Feld, Wald, Haus, Lagerhalle und Banditen-Nieten. Das Entdecker-Pack enthält zusätzlich Holzfäller, Windmühlen, Tavernen, Workshops und Joker. Beide Packs enthalten fünf Karten, mindestens zwei davon nicht Gras, Erde, Wasser oder Banditen-Nieten. Die Übersicht zeigt die Chancen je zufälliger Karte. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet ein freier Workshop ein kostenloses Starthilfe-Pack mit Wald und Feld an.
+
+## Banditen und Wachtürme
+
+Ein Wachturm schützt ein Quadrat von 7×7 Feldern um sich und vertreibt vorhandene Camps in diesem Bereich beim Platzieren. Der Schutzbereich erscheint beim Antippen des Turms und beim Platzieren einer Karte. Ein neu gestartetes Spiel hat zwei Camps außerhalb dieses Bereichs.
+
+Alle fünf Minuten aktiver Spielzeit versucht jedes vorhandene Camp gleichzeitig, ein zufälliges benachbartes, bereits belegtes und ungeschütztes Tile zu übernehmen; auch diagonale Nachbarn zählen. Das übernommene Tile wird ein neues Camp, das erst beim nächsten Durchgang selbst angreift. Workshop-Aufträge auf zerstörten Tiles gehen verloren. Der gemeinsame Countdown steht oben im Spiel und pausiert, wenn das Spiel geschlossen oder der Tab ausgeblendet ist. Rohstoffproduktion und Workshop-Aufträge laufen weiterhin offline.
+
+Eine gezogene Banditen-Niete erscheint sofort auf einem zufälligen ungeschützten freien Feld und die Kamera springt dorthin. Falls kein solches Feld frei ist, wird ein ungeschütztes Tile übernommen. Gibt es kein geeignetes Feld, wird die Niete ans Deckende gelegt. Wachturm-Packs und Waffen sind noch nicht enthalten.
 
 ## Joker
 
-Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Eine gezogene Jokerkarte wird durch Antippen eines vorhandenen Tiles verbraucht. Löschen entfernt das Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Typ aus allen Tile-Typen; neue Nachbarschaften wirken auf die zukünftige Produktion. Das letzte Tile, der letzte Workshop und beschäftigte Workshops sind geschützt. Joker können ans Deckende gelegt werden.
+Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Eine gezogene Jokerkarte wird durch Antippen eines vorhandenen Tiles verbraucht. Löschen entfernt das Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Tile-Typ außer Banditencamps; neue Nachbarschaften wirken auf die zukünftige Produktion. Banditencamps, das letzte Tile, der letzte Workshop und beschäftigte Workshops sind vor Jokern geschützt. Joker können ans Deckende gelegt werden.

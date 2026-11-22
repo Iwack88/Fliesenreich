@@ -31,7 +31,7 @@ test('delete joker consumes itself only on an existing tile, and protects the la
 });
 
 test('transformation can select every other tile type, never a joker or the old type', (t) => {
-  const types = Object.keys(TILES).filter(type => type !== 'gras');
+  const types = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen');
   let value = 0;
   t.mock.method(Math, 'random', () => value);
   for (let i = 0; i < types.length; i++) {
@@ -50,7 +50,7 @@ test('transformation updates bonuses without an immediate gold payout', (t) => {
   const state = { gold: 3, tiles: {}, nextId: 1, hand: 'joker_verwandeln' };
   const tile = addTile(state, 'haus', 0, 0);
   const house = addTile(state, 'haus', 1, 1);
-  const pool = Object.keys(TILES).filter(type => type !== 'haus');
+  const pool = Object.keys(TILES).filter(type => type !== 'haus' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('taverne') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
   assert.equal(state.gold, 3);
@@ -68,7 +68,7 @@ test('transformation keeps the card on an empty target and never deducts lost bo
   house.earned = 2;
   assert.equal(useJoker(state, 2, 0), null);
   assert.equal(state.hand, 'joker_verwandeln');
-  const pool = Object.keys(TILES).filter(type => type !== 'taverne');
+  const pool = Object.keys(TILES).filter(type => type !== 'taverne' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('haus') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
   assert.deepEqual(result.pairs, [{ tile: house, value: 1 }]);

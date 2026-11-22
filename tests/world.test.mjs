@@ -27,16 +27,18 @@ function assertFreeConnected(state, oldSize = 0) {
   assert.equal(seen.size, cells.size);
 }
 
-test('new worlds contain exactly 12 obstacles, reserve the start, and leave connected space', () => {
+test('new worlds contain a workshop, guard, camps and 12 obstacles with connected free space', () => {
   for (let i = 0; i < 30; i++) {
     const state = newState();
     assert.equal(state.size, 8);
-    assert.equal(Object.keys(state.tiles).length, 13);
+    assert.equal(Object.keys(state.tiles).length, 16);
     assert.equal(state.tiles['0,0'].type, 'workshop');
-    for (const [dx, dy] of dirs) assert.equal(state.tiles[key(dx, dy)], undefined);
+    assert.equal(state.tiles['1,0'].type, 'wachturm');
+    for (const [dx, dy] of dirs.filter(([dx, dy]) => dx !== 1 || dy !== 0)) assert.equal(state.tiles[key(dx, dy)], undefined);
+    assert.equal(Object.values(state.tiles).filter(t => t.type === 'banditen').length, 2);
     for (const tile of Object.values(state.tiles)) {
       assert.ok(inBounds(8, tile.x, tile.y));
-      assert.ok(['gras', 'erde', 'wasser', 'workshop'].includes(tile.type));
+      assert.ok(['gras', 'erde', 'wasser', 'workshop', 'wachturm', 'banditen'].includes(tile.type));
     }
     assertFreeConnected(state);
   }
@@ -73,7 +75,7 @@ test('expansion costs gold once and adds exactly 36 obstacles in new area', () =
     assert.equal(state.hand, 'wald');
     const oldTiles = Object.fromEntries(Object.entries(state.tiles).filter(([, t]) => inBounds(8, t.x, t.y)));
     assert.deepEqual(oldTiles, JSON.parse(original));
-    assert.equal(Object.keys(state.tiles).length, 49);
+    assert.equal(Object.keys(state.tiles).length, 52);
     assertFreeConnected(state, 8);
     assert.equal(expandWorld(state), false);
     assert.equal(JSON.stringify(JSON.parse(JSON.stringify(state))), JSON.stringify(state));
