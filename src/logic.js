@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=18';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=19';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -7,6 +7,9 @@ export const baseRarity = type => CARDS[type].rarity;
 export const tileRarity = tile => tile.rarity || baseRarity(tile.type);
 export const tileStrength = tile => RARITY[tileRarity(tile)].strength;
 export const guardRadius = tile => GUARD_RADIUS + tileStrength(tile) - 1;
+export const matchesTileFilter = (tile, filter) => filter.kind === 'resource'
+  ? RESOURCE_CHAINS[filter.id].includes(tile.type)
+  : tile.type === filter.id;
 
 export function rollRarity(type) {
   const base = baseRarity(type);

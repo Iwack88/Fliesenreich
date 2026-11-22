@@ -14,6 +14,8 @@ Die anklickbare Kartenvorschau oben rechts zieht die nächste Karte aus dem Deck
 
 Auf schmalen Bildschirmen zeigt die obere Leiste nur die Ressourcen und den Banditen-Timer. Häufige Ansichten liegen in einer einklappbaren Icon-Leiste links; der Pfeil öffnet und schließt sie. Raster, Schutz, Shop, neues Spiel und Mischen sind als kompakte Aktionsleiste unten links angeordnet. Fertige Packs und untätige Workshops sitzen unten rechts nebeneinander; die Herstellungsübersicht öffnet sich vom rechten Bildschirmrand. Die Aktionsbuttons verwenden ein gedecktes Salbeigrün.
 
+Mit **Filter** werden einzelne Tile-Typen oder Rohstoffketten hervorgehoben; andere Tiles werden wie bei einer Tile-Auswahl abgedunkelt. Die Ketten umfassen Wald, Holzfäller und Holzlager; Feld, Windmühle und Kornlager; beziehungsweise Haus, Taverne und Goldlager. Ein aktiver Filter wird am Button markiert und kann mit **✕** daneben sofort ausgeschaltet werden. Beim Platzieren oder Verwenden eines Jokers pausiert die Hervorhebung, damit die Zielfelder sichtbar bleiben; danach erscheint sie wieder. Der Filter gilt nur für die aktuelle Spielsitzung.
+
 Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn sowie 12 Karten, darunter ein Holzlager. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 
 ## Seltenheit

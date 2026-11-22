@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -30,6 +30,8 @@
     <div id="tool-actions">
       <button id="btn-grid" aria-label="Grid umschalten" aria-pressed="false" title="Raster außerhalb des Baumodus anzeigen"><span class="action-icon" aria-hidden="true">▦</span><span class="action-label">Grid</span></button>
       <button id="btn-shields" aria-label="Schutz anzeigen" aria-pressed="false" title="Schutz auf Tiles anzeigen"><span class="action-icon" aria-hidden="true">🛡️</span><span class="action-label">Schutz</span></button>
+      <button id="btn-filter" aria-label="Tile-Filter öffnen" aria-haspopup="dialog" title="Tile-Filter öffnen"><span class="action-icon" aria-hidden="true">🔎</span><span class="action-label">Filter</span></button>
+      <button id="filter-clear" aria-label="Filter ausschalten" title="Filter ausschalten" hidden>✕</button>
       <button id="btn-shop" aria-label="Shop" title="Shop"><span class="action-icon" aria-hidden="true">🪙</span><span id="btn-shop-label" class="action-label">Shop</span></button>
       <button id="btn-new-game" aria-label="Neues Spiel" title="Neues Spiel"><span class="action-icon" aria-hidden="true">🔄</span><span class="action-label">Neues Spiel</span></button>
       <button id="btn-shuffle" aria-label="Deck mischen" title="Deck mischen"><span class="action-icon" aria-hidden="true">🔀</span><span id="btn-shuffle-label" class="action-label">5🪙</span></button>
@@ -56,11 +58,11 @@
 
 <div id="tile-popup" class="hidden"></div>
 
-<div id="overlay" class="hidden"><div id="overlay-box"><div id="overlay-head"><b id="overlay-title"></b><button id="overlay-close">✕</button></div><div id="overlay-body"></div></div></div>
+<div id="overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="overlay-title"><div id="overlay-box"><div id="overlay-head"><b id="overlay-title"></b><button id="overlay-close" aria-label="Fenster schließen">✕</button></div><div id="overlay-body"></div></div></div>
 
 <div id="toast"></div>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=39"></script>
+<script type="module" src="src/main.js?v=40"></script>
 </body>
 </html>

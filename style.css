@@ -22,6 +22,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #hud .hud-resource { padding: 4px; margin: 0 2px 0 0; background: transparent; font-size: 16px; }
 #hud .hud-resource:focus-visible { outline: 2px solid #a8e1ff; }
 #btn-shields[aria-pressed="true"], #btn-grid[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
+#hud #btn-filter.filter-active { background: #b98539; outline: 2px solid #ffe2a1; }
+#hud #filter-clear[hidden] { display: none; }
 button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--button-green); color: #fff; margin-left: 8px; }
 button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
@@ -73,6 +75,14 @@ button:disabled { background: #555; color: #999; }
   #panel.has-ready-packs, #panel.has-idle-workshop, #panel.has-ready-packs.has-idle-workshop { padding-right: 8px; }
   #panel-info { max-width: calc(100vw - 130px); }
   #panel-info .preview-buffs { display: block; margin-top: 3px; font-size: 11px; }
+}
+@media (max-width: 500px) {
+  #tool-actions { gap: 2px; }
+  #tool-actions button { width: 31px; }
+}
+@media (max-width: 410px) {
+  #tool-actions { max-width: calc(100vw - 170px); flex-wrap: wrap; }
+  #panel { bottom: 100px; }
 }
 @media (prefers-reduced-motion: reduce) { #crafting-panel, #primary-actions, #hud #primary-toggle { transition: none; } }
 @media (min-width: 900px) {
@@ -135,3 +145,6 @@ button:disabled { background: #555; color: #999; }
 .row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(0,0,0,.25); border-radius: 8px; cursor: pointer; font-size: 14px; }
 .resource-option { margin: 0; padding: 12px; text-align: left; }
 .resource-option[aria-pressed="true"] { background: var(--button-green); outline: 2px solid #a8e1ff; }
+.filter-options { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-option { margin: 0; padding: 8px 10px; text-align: left; }
+.filter-option[aria-pressed="true"] { background: #b98539; outline: 2px solid #ffe2a1; }

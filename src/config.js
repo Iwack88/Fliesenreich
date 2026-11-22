@@ -14,6 +14,11 @@ export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 export const START_DECK = { gras: 1, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
 export const BASE_CAPACITY = { gold: 300, holz: 100, korn: 100 };
+export const RESOURCE_CHAINS = {
+  holz: ['wald', 'holzfaeller', 'lagerhalle'],
+  korn: ['feld', 'windmuehle', 'kornlager'],
+  gold: ['haus', 'taverne', 'goldlager'],
+};
 export const STORAGE_BONUS = 50;
 export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;

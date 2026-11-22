@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=18';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard } from './logic.js?v=23';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=19';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=24';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -30,6 +30,7 @@ let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 let showShields = false;
 let showGrid = false;
+let activeFilter = null;
 
 const images = {};
 const tileArt = {};
@@ -144,6 +145,15 @@ canvas.style.cursor = 'grab';
 
 window.addEventListener('keydown', (e) => {
   if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
+  if (overlayView === 'tile-filter' && e.key === 'Tab') {
+    const buttons = [...$('overlay-box').querySelectorAll('button:not(:disabled)')];
+    const index = buttons.indexOf(document.activeElement);
+    if ((e.shiftKey && index <= 0) || (!e.shiftKey && (index === -1 || index === buttons.length - 1))) {
+      buttons[e.shiftKey ? buttons.length - 1 : 0].focus();
+      e.preventDefault();
+    }
+    return;
+  }
   if (!$('overlay').classList.contains('hidden') && e.key !== 'Escape') return;
   const pan = 48 / cam.zoom;
   if (e.key === 'ArrowLeft') cam.x -= pan;
@@ -452,6 +462,7 @@ function updateHud() {
   $('idle-workshop-count').textContent = idleWorkshops;
   $('idle-workshop').setAttribute('aria-label', `${idleWorkshops} untätige Workshops anzeigen`);
   $('panel').classList.toggle('has-idle-workshop', idleWorkshops > 0);
+  updateFilterControls();
   renderQueue();
 }
 
@@ -521,7 +532,12 @@ function openOverlay(title, view = '') {
   $('overlay').classList.remove('hidden');
   return $('overlay-body');
 }
-function closeOverlay() { overlayView = ''; $('overlay').classList.add('hidden'); }
+function closeOverlay() {
+  const wasFilter = overlayView === 'tile-filter';
+  overlayView = '';
+  $('overlay').classList.add('hidden');
+  if (wasFilter) $('btn-filter').focus();
+}
 $('overlay-close').onclick = closeOverlay;
 
 $('btn-new-game').onclick = () => {
@@ -556,6 +572,76 @@ const WAREHOUSE_RESOURCES = [
   { id: 'holz', name: 'Holz', icon: '🪵' },
   { id: 'korn', name: 'Korn', icon: '🌾' },
 ];
+
+function filterName(filter) {
+  return filter.kind === 'resource'
+    ? WAREHOUSE_RESOURCES.find(resource => resource.id === filter.id).name
+    : TILES[filter.id].name;
+}
+
+function updateFilterControls() {
+  const name = activeFilter && filterName(activeFilter);
+  const label = name ? `Filter ${name} aktiv${state.hand ? ', während des Platzierens pausiert' : ''} – Filter öffnen` : 'Tile-Filter öffnen';
+  $('btn-filter').classList.toggle('filter-active', !!activeFilter);
+  $('btn-filter').setAttribute('aria-label', label);
+  $('btn-filter').title = label;
+  $('filter-clear').hidden = !activeFilter;
+  $('filter-clear').setAttribute('aria-label', name ? `Filter ${name} ausschalten` : 'Filter ausschalten');
+  $('filter-clear').title = name ? `Filter ${name} ausschalten` : 'Filter ausschalten';
+}
+
+function setTileFilter(filter) {
+  activeFilter = filter;
+  updateFilterControls();
+  toast(filter ? `Filter: ${filterName(filter)}${state.hand ? ' · nach dem Platzieren sichtbar' : ''}` : 'Filter ausgeschaltet');
+}
+
+function showTileFilters() {
+  const body = openOverlay('Tile-Filter', 'tile-filter');
+  body.innerHTML = '';
+  const hint = document.createElement('div');
+  hint.className = 'pack-chances';
+  hint.textContent = 'Wähle eine Rohstoffkette oder einen Tile-Typ. Beim Platzieren pausiert die Hervorhebung.';
+  body.appendChild(hint);
+
+  const addGroup = (title, options) => {
+    const heading = document.createElement('h3');
+    heading.className = 'section-title';
+    heading.textContent = title;
+    body.appendChild(heading);
+    const group = document.createElement('div');
+    group.className = 'filter-options';
+    for (const option of options) {
+      const button = document.createElement('button');
+      button.className = 'filter-option';
+      button.dataset.filterKind = option.kind;
+      button.dataset.filterId = option.id;
+      button.textContent = option.label;
+      button.setAttribute('aria-pressed', String(activeFilter?.kind === option.kind && activeFilter.id === option.id));
+      button.onclick = () => {
+        setTileFilter({ kind: option.kind, id: option.id });
+        closeOverlay();
+      };
+      group.appendChild(button);
+    }
+    body.appendChild(group);
+  };
+  addGroup('Rohstoffketten', WAREHOUSE_RESOURCES.map(resource => ({
+    kind: 'resource', id: resource.id,
+    label: `${resource.icon} ${resource.name} · ${RESOURCE_CHAINS[resource.id].map(id => TILES[id].name).join(', ')}`,
+  })));
+  addGroup('Einzelne Tile-Typen', Object.entries(TILES).map(([id, tile]) => ({
+    kind: 'tile', id, label: `${tile.icon ? `${tile.icon} ` : ''}${tile.name}`,
+  })));
+  body.querySelector('button').focus();
+}
+
+$('btn-filter').onclick = showTileFilters;
+$('filter-clear').onclick = () => {
+  setTileFilter(null);
+  $('btn-filter').focus();
+};
+
 let warehouseResource = null;
 
 function showWarehouse(resourceId = null) {
@@ -1377,14 +1463,21 @@ function draw() {
     for (const tile of tiles) if (!state.protectedFields[`${tile.x},${tile.y}`] && isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
-  if (selected && !state.hand) {
-    const related = new Set([selected, ...displayPartners(selected)]);
-    const target = selected.type === 'banditen' ? selected.target : null;
+  if ((selected || activeFilter) && !state.hand) {
+    const related = selected ? new Set([selected, ...displayPartners(selected)]) : new Set();
+    const matches = activeFilter ? tiles.filter(tile => matchesTileFilter(tile, activeFilter)) : [];
+    for (const tile of matches) related.add(tile);
+    const target = selected?.type === 'banditen' ? selected.target : null;
     ctx.fillStyle = 'rgba(85,85,85,.82)';
     for (const tile of tiles) {
       if (!related.has(tile) && !(target && tile.x === target.x && tile.y === target.y)) {
         ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
       }
+    }
+    if (activeFilter) {
+      ctx.strokeStyle = '#ffeb3b';
+      ctx.lineWidth = 4;
+      for (const tile of matches) ctx.strokeRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
     }
     if (target) {
       ctx.fillStyle = 'rgba(255,35,35,.48)';
