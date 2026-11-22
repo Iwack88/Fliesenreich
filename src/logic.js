@@ -1,4 +1,4 @@
-import { TILES, START_GOLD, START_TILE, START_DECK, RARITY_ORDER, PACKS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=5';
+import { TILES, START_GOLD, START_TILE, START_DECK, PACKS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES } from './config.js?v=6';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -90,12 +90,19 @@ export function placeCells(s) {
   return [...cells.values()];
 }
 
-const rarityOk = (type, max) => !max || RARITY_ORDER.indexOf(TILES[type].rarity) <= RARITY_ORDER.indexOf(max);
-
 function pickWeighted(entries) {
   let r = Math.random() * entries.reduce((a, [, w]) => a + w, 0);
-  for (const [id, w] of entries) { r -= w; if (r <= 0) return id; }
+  for (const [id, w] of entries) { if (r < w) return id; r -= w; }
   return entries[entries.length - 1][0];
+}
+
+export function packChances(pack) {
+  const entries = Object.entries(pack.weights);
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  if (!total || entries.some(([id, weight]) => !TILES[id] || !Number.isFinite(weight) || weight <= 0)) {
+    throw new Error(`Ungültige Kartengewichte für ${pack.name}`);
+  }
+  return entries.map(([id, weight]) => [id, weight * 100 / total]);
 }
 
 export const cardCount = (s) => s.deck.length;
@@ -150,9 +157,10 @@ export const canAfford = (s, cost) => s.gold >= cost;
 
 export function buyPack(s, packId) {
   const pack = PACKS[packId];
+  if (!pack) throw new Error(`Unbekanntes Pack: ${packId}`);
   if (!canAfford(s, pack.cost)) return null;
+  const pool = packChances(pack);
   s.gold -= pack.cost;
-  const pool = Object.entries(TILES).filter(([id]) => rarityOk(id, pack.maxRarity)).map(([id, d]) => [id, d.weight]);
   const drawn = [];
   for (let i = 0; i < pack.cards; i++) {
     const id = pickWeighted(pool);

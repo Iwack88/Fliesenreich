@@ -13,12 +13,16 @@ export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
 // Start-Deck (Karten pro Tile-Typ, wird beim ersten Start gemischt).
 export const START_DECK = { gras: 5, erde: 4, wasser: 3, wald: 3, feld: 3, holzfaeller: 1, windmuehle: 1 };
 
-export const RARITY_ORDER = ['common', 'uncommon', 'rare'];
-
-// Kartenpacks: Kosten in Gold, Anzahl Karten (Typ nach weight, begrenzt durch maxRarity).
+// Gewichte werden für jede Karte unabhängig in eine Wahrscheinlichkeit umgerechnet.
 export const PACKS = {
-  natur: { name: 'Natur-Pack', cost: 8, cards: 5, maxRarity: 'common' },
-  basis: { name: 'Basis-Pack', cost: 15, cards: 5, maxRarity: 'uncommon' },
+  natur: {
+    name: 'Landschafts-Pack', cost: 8, cards: 5,
+    weights: { gras: 30, erde: 25, wasser: 25, feld: 10, wald: 10 },
+  },
+  basis: {
+    name: 'Entdecker-Pack', cost: 15, cards: 5,
+    weights: { gras: 28, erde: 24, wasser: 24, feld: 10, wald: 10, windmuehle: 2, holzfaeller: 2 },
+  },
 };
 
 export const GOLD_ICON = '🪙';
@@ -33,13 +37,13 @@ export const RARITY = {
 // (egal welches Tile zuerst lag). Gleiche Typen zählen als ein Paar (Feld an Feld = einmal +1);
 // bei verschiedenen Typen werden die gives beider Seiten addiert.
 export const TILES = {
-  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   weight: 40, category: 'landschaft' },
-  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   weight: 25, category: 'landschaft' },
-  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   weight: 20, category: 'landschaft' },
-  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   weight: 20, category: 'landschaft', gives: { wald: 1 } },
-  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   weight: 20, category: 'landschaft', gives: { feld: 1 } },
-  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', weight: 8, category: 'industrie', gives: { wald: 2 } },
-  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', weight: 8, category: 'industrie', gives: { feld: 2 } },
+  gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   category: 'landschaft' },
+  erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   category: 'landschaft' },
+  wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   category: 'landschaft' },
+  wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   category: 'landschaft', gives: { wald: 1 } },
+  feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft', gives: { feld: 1 } },
+  holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'uncommon', category: 'industrie', gives: { wald: 2 } },
+  windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'uncommon', category: 'industrie', gives: { feld: 2 } },
 };
 
 export const START_TILE = 'gras';
