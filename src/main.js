@@ -783,7 +783,7 @@ $('crafting-toggle').onclick = () => {
   $('crafting-content').inert = !open;
   $('crafting-toggle').setAttribute('aria-expanded', String(open));
   $('crafting-toggle').setAttribute('aria-label', open ? 'Herstellungsübersicht schließen' : 'Herstellungsübersicht öffnen');
-  $('crafting-toggle').textContent = open ? '❮' : '❯';
+  $('crafting-toggle').textContent = open ? '❯' : '❮';
   if (open) {
     syncBandits();
     syncProduction();
