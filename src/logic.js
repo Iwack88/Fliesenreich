@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=23';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE } from './config.js?v=24';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -49,13 +49,43 @@ export function newState() {
   s.protectedFields = {};
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
+  s.specialSlots = {};
+  addSpecialSlots(s);
   return s;
+}
+
+const RARITY_IDS = Object.keys(RARITY);
+export const upgradedRarity = rarity => RARITY_IDS[Math.min(RARITY_IDS.indexOf(rarity) + 1, RARITY_IDS.length - 1)];
+export const isSpecialSlot = (s, x, y) => !!s.specialSlots?.[key(x, y)];
+
+export function placementRarity(s, type, rarity, x, y) {
+  const own = rarity || baseRarity(type);
+  return isSpecialSlot(s, x, y) ? upgradedRarity(own) : own;
+}
+
+// Verteilt Spezial-Bauplätze auf freie Felder ohne Slot, die nicht direkt am Startbereich liegen.
+function addSpecialSlots(s, isNew = () => true) {
+  const half = s.size / 2;
+  const cells = [];
+  for (let x = -half; x < half; x++) for (let y = -half; y < half; y++) {
+    if (!isNew(x, y) || s.tiles[key(x, y)]) continue;
+    if (Math.max(Math.abs(x), Math.abs(y)) <= SPECIAL_SLOT_CLEARANCE ||
+        Math.max(Math.abs(x - 1), Math.abs(y)) <= SPECIAL_SLOT_CLEARANCE) continue;
+    cells.push([x, y]);
+  }
+  const count = Math.round(cells.length * SPECIAL_SLOT_SHARE);
+  for (const [x, y] of shuffled(cells).slice(0, count)) s.specialSlots[key(x, y)] = true;
 }
 
 export function migrateState(s, now = Date.now()) {
   let changed = false;
   if (!s.protectedFields) {
     s.protectedFields = {};
+    changed = true;
+  }
+  if (!s.specialSlots) {
+    s.specialSlots = {};
+    addSpecialSlots(s);
     changed = true;
   }
   if (!s.shop) {
@@ -109,7 +139,10 @@ export function inBounds(size, x, y) {
 
 export function expandWorld(s) {
   if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
+  const oldSize = s.size;
   s.size = EXPANDED_SIZE;
+  s.specialSlots ||= {};
+  addSpecialSlots(s, (x, y) => !inBounds(oldSize, x, y));
   planBandits(s);
   s.gold -= EXPANSION_COST;
   return true;
@@ -220,19 +253,23 @@ export function placeHand(s, x, y, now = Date.now()) {
   const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const affected = s.hand === 'werkzeugschmiede' ? affectedWorkshopJobs(s, x, y) : [];
-  const tile = addTile(s, s.hand, x, y, s.handRarity || baseRarity(s.hand));
+  const special = isSpecialSlot(s, x, y);
+  const tile = addTile(s, s.hand, x, y, placementRarity(s, s.hand, s.handRarity, x, y));
+  if (special) delete s.specialSlots[key(x, y)];
   adjustWorkshopJobs(s, affected, now);
   const cleared = tile.type === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
   s.handRarity = null;
-  return { tile, cleared, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+  return { tile, cleared, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
 export function placeRandomLand(s) {
   if (!LAND_TYPES.includes(s.hand)) return null;
-  const cells = placeCells(s);
-  if (!cells.length) return null;
+  const all = placeCells(s);
+  if (!all.length) return null;
+  const plain = all.filter(([x, y]) => !isSpecialSlot(s, x, y));
+  const cells = plain.length ? plain : all;
   const [x, y] = cells[Math.floor(Math.random() * cells.length)];
   return placeHand(s, x, y);
 }

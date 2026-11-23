@@ -83,3 +83,42 @@ test('mountain cards are available from the start and landscape packs', () => {
   assert.ok(PACK_LAND_WEIGHTS.berge > 0);
   for (const pack of Object.values(PACKS)) assert.ok(pack.land > 0);
 });
+
+test('special slots avoid the start area, raise rarity once and are skipped by land cards', () => {
+  const state = newState();
+  const slots = Object.keys(state.specialSlots);
+  assert.ok(slots.length > 0);
+  for (const slot of slots) {
+    const [x, y] = slot.split(',').map(Number);
+    assert.ok(Math.max(Math.abs(x), Math.abs(y)) > 2 || Math.max(Math.abs(x - 1), Math.abs(y)) > 2);
+  }
+  state.tiles = {};
+  state.specialSlots = { '3,1': true };
+  addTile(state, 'gras', 3, 0);
+  state.hand = 'windmuehle';
+  state.handRarity = 'rare';
+  const result = placeHand(state, 3, 1);
+  assert.equal(result.special, true);
+  assert.equal(result.tile.rarity, 'epic');
+  assert.deepEqual(state.specialSlots, {});
+  state.specialSlots = { '2,0': true };
+  for (let i = 0; i < 20; i++) {
+    state.tiles = {};
+    addTile(state, 'gras', 3, 0);
+    state.hand = 'erde';
+    state.handRarity = 'common';
+    const { tile } = placeRandomLand(state);
+    assert.notEqual(`${tile.x},${tile.y}`, '2,0');
+  }
+  assert.ok(state.specialSlots['2,0']);
+});
+
+test('expanding adds special slots only in the new area', () => {
+  const state = newState();
+  const before = { ...state.specialSlots };
+  state.gold = 100;
+  assert.equal(expandWorld(state), true);
+  const added = Object.keys(state.specialSlots).filter(slot => !before[slot]);
+  assert.ok(added.length > 0);
+  for (const slot of added) assert.ok(!inBounds(8, ...slot.split(',').map(Number)));
+});

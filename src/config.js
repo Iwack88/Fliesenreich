@@ -6,6 +6,9 @@ export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;
 export const EXPANSION_COST = 30;
+// Spezial-Bauplätze: Anteil freier Felder und Mindestabstand zum Startbereich.
+export const SPECIAL_SLOT_SHARE = 0.08;
+export const SPECIAL_SLOT_CLEARANCE = 2;
 export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).

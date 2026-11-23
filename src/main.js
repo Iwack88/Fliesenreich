@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=23';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=28';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=24';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, isSpecialSlot, placementRarity } from './logic.js?v=29';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -239,7 +239,8 @@ function onTap(sx, sy) {
       }
       const res = placeHand(state, target.x, target.y);
       if (!res) { toast('Dieses Feld ist nicht frei'); return; }
-      if (res.cleared) toast(`${res.cleared} Banditencamps vertrieben`);
+      if (res.special) toast(`✨ Spezial-Bauplatz: ${TILES[res.tile.type].name} ist jetzt ${RARITY[res.tile.rarity].name}${res.cleared ? ` · ${res.cleared} Banditencamps vertrieben` : ''}`);
+      else if (res.cleared) toast(`${res.cleared} Banditencamps vertrieben`);
       flashPairs(res.pairs);
       placementPreview = null;
       placementBuffCache = null;
@@ -256,7 +257,7 @@ function onTap(sx, sy) {
 }
 
 function refreshTargets() {
-  targets = TILES[state.hand] ? placeCells(state).map(([x, y]) => ({ x, y })) : [];
+  targets = TILES[state.hand] ? placeCells(state).map(([x, y]) => ({ x, y, special: isSpecialSlot(state, x, y) })) : [];
   if (!TILES[state.hand] || (placementPreview && !targets.some(t => t.x === placementPreview.x && t.y === placementPreview.y))) {
     placementPreview = null;
   }
@@ -285,9 +286,20 @@ function displayPartners(tile) {
   return neighbors;
 }
 
+function previewCandidate() {
+  const { x, y } = placementPreview;
+  return { x, y, type: state.hand, rarity: placementRarity(state, state.hand, state.handRarity, x, y) };
+}
+
+function specialSlotText() {
+  if (!placementPreview?.special) return '';
+  const from = state.handRarity || baseRarity(state.hand), to = previewCandidate().rarity;
+  return from === to ? '<br>✨ Spezial-Bauplatz · bereits Epic, keine weitere Steigerung' : `<br>✨ Spezial-Bauplatz: ${RARITY[from].name} → ${RARITY[to].name}`;
+}
+
 function previewPartners() {
   if (!placementPreview || !TILES[state.hand]) return [];
-  const candidate = { ...placementPreview, type: state.hand, rarity: state.handRarity };
+  const candidate = previewCandidate();
   return Object.values(state.tiles).filter(tile => {
     const dx = Math.abs(tile.x - candidate.x), dy = Math.abs(tile.y - candidate.y);
     if (candidate.type === 'wachturm' && dx <= guardRadius(candidate) && dy <= guardRadius(candidate)) return true;
@@ -301,7 +313,7 @@ function previewPartners() {
 function previewBuffs() {
   if (!placementPreview || !TILES[state.hand]) return [];
   if (placementBuffCache) return placementBuffCache;
-  const candidate = { ...placementPreview, type: state.hand, rarity: state.handRarity };
+  const candidate = previewCandidate();
   const simulated = { ...state, tiles: { ...state.tiles, [`${candidate.x},${candidate.y}`]: candidate } };
   const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
   const buffs = [];
@@ -355,8 +367,8 @@ function updatePanel() {
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
       state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
-      placementPreview ? `Vorschau: ${previewPartners().length} relevante Tiles · erneut antippen zum Platzieren; anderes grünes Feld verschiebt sie<br>${previewBuffText()}` :
-      targets.length ? 'Grünes Feld antippen für Vorschau; erneut antippen zum Platzieren' :
+      placementPreview ? `Vorschau: ${previewPartners().length} relevante Tiles · erneut antippen zum Platzieren; anderes grünes Feld verschiebt sie${specialSlotText()}<br>${previewBuffText()}` :
+      targets.length ? `Grünes Feld antippen für Vorschau; erneut antippen zum Platzieren${targets.some(t => t.special) ? ' · ✨ Felder mit Plus erhöhen die Seltenheit' : ''}` :
       state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
     const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
     $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}${TILES[state.hand] ? ` · ${RARITY[state.handRarity || baseRarity(state.hand)].name}` : ''}</b><br>${message}${guardHint}`;
@@ -1486,7 +1498,7 @@ function draw() {
   }
 
   const visibleGuards = TILES[state.hand] ?
-    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [{ ...placementPreview, type: 'wachturm', rarity: state.handRarity }] : [])] :
+    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [previewCandidate()] : [])] :
     selected?.type === 'wachturm' && !state.hand ? [selected] : [];
   for (const guard of visibleGuards) {
     const radius = guardRadius(guard);
@@ -1501,23 +1513,40 @@ function draw() {
     ctx.strokeRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
   }
 
+  if (TILES[state.hand]) {
+    for (const slot of Object.keys(state.specialSlots || {})) {
+      const [sx, sy] = slot.split(',').map(Number);
+      if (tileAt(state, sx, sy) || targets.some(t => t.x === sx && t.y === sy)) continue;
+      ctx.strokeStyle = 'rgba(255,214,90,.75)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      ctx.strokeRect(sx * TILE + 6, sy * TILE + 6, TILE - 12, TILE - 12);
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,214,90,.85)';
+      ctx.font = `bold ${TILE * 0.3}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('+', sx * TILE + TILE / 2, sy * TILE + TILE / 2);
+    }
+  }
+
   for (const g of targets) {
     const x = g.x * TILE, y = g.y * TILE;
-    ctx.fillStyle = 'rgba(85,240,90,.8)';
+    ctx.fillStyle = g.special ? 'rgba(255,205,70,.88)' : 'rgba(85,240,90,.8)';
     ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    ctx.strokeStyle = '#15421c';
+    ctx.strokeStyle = g.special ? '#5a3d05' : '#15421c';
     ctx.lineWidth = 8;
     ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
-    ctx.strokeStyle = '#f3ffb8';
+    ctx.strokeStyle = g.special ? '#fff3c4' : '#f3ffb8';
     ctx.lineWidth = 4;
     ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
+    if (!g.special) continue;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x + TILE * 0.32, y + TILE / 2);
     ctx.lineTo(x + TILE * 0.68, y + TILE / 2);
     ctx.moveTo(x + TILE / 2, y + TILE * 0.32);
     ctx.lineTo(x + TILE / 2, y + TILE * 0.68);
-    ctx.strokeStyle = '#15421c';
+    ctx.strokeStyle = '#5a3d05';
     ctx.lineWidth = 12;
     ctx.stroke();
     ctx.strokeStyle = '#fff';
@@ -1528,7 +1557,7 @@ function draw() {
 
   if (placementPreview && TILES[state.hand]) {
     const x = placementPreview.x * TILE, y = placementPreview.y * TILE;
-    drawTile({ type: state.hand, rarity: state.handRarity }, x, y, 0.88);
+    drawTile(previewCandidate(), x, y, 0.88);
     ctx.strokeStyle = '#172d20';
     ctx.lineWidth = 8;
     ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
