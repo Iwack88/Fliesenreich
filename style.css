@@ -31,8 +31,7 @@ button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; back
 button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
 #panel.hidden { display: none; }
-#panel.has-idle-workshop, #panel.has-ready-packs { padding-right: 90px; }
-#panel.has-idle-workshop.has-ready-packs { padding-right: 170px; }
+#panel.has-ready-packs { padding-right: 90px; }
 #crafting-panel { position: fixed; top: 50%; right: 0; width: min(300px, calc(100vw - 48px)); transform: translate(100%, -50%); transition: transform .2s ease; z-index: 3; }
 #crafting-panel:not(.closed) { transform: translate(0, -50%); }
 #crafting-content { background: rgba(15,30,25,.96); border-radius: 10px 0 0 10px; padding: 12px; max-height: 65vh; overflow-y: auto; }
@@ -42,10 +41,9 @@ button:disabled { background: #555; color: #999; }
 #crafting-jobs .job-timer { font-size: 16px; }
 #crafting-toggle { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 40px; height: 48px; margin: 0; padding: 0; border-radius: 8px 0 0 8px; background: var(--button-green); }
 @media (min-width: 900px) { #crafting-toggle:not(:disabled):hover, #crafting-toggle:not(:disabled):active { transform: translateY(-50%); } }
-#idle-workshop, #ready-packs { position: fixed; bottom: 8px; min-width: 62px; min-height: 42px; margin: 0; padding: 6px 10px; background: #a76b27; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
-#idle-workshop { right: 10px; }
-#ready-packs { right: 82px; }
-#idle-workshop[hidden], #ready-packs[hidden] { display: none; }
+#ready-packs { position: fixed; bottom: 8px; min-width: 62px; min-height: 42px; margin: 0; padding: 6px 10px; background: #a76b27; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+#ready-packs { right: 10px; }
+#ready-packs[hidden] { display: none; }
 #toast { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 6px 14px; border-radius: 8px; opacity: 0; transition: opacity .3s; pointer-events: none; }
 #toast.show { opacity: 1; }
 #undo-move { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 5; margin: 0; padding: 6px 16px; border-radius: 18px; background: #6d4fa3; color: #fff; font-weight: bold; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
@@ -78,7 +76,7 @@ button:disabled { background: #555; color: #999; }
   #queue { top: calc(100% + 5px); right: 6px; width: 92px; padding: 5px; font-size: 10px; }
   #queue .card-art { width: 38px; height: 38px; margin: 3px auto; }
   #panel { bottom: 60px; padding: 6px 8px; font-size: 13px; }
-  #panel.has-ready-packs, #panel.has-idle-workshop, #panel.has-ready-packs.has-idle-workshop { padding-right: 8px; }
+  #panel.has-ready-packs { padding-right: 8px; }
   #panel-info { max-width: calc(100vw - 130px); }
   #panel-info .preview-buffs { display: block; margin-top: 3px; font-size: 11px; }
 }

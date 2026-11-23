@@ -1,60 +1,104 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TILES } from '../src/config.js';
-import { addTile, newState, migrateState, tileProduction, productionRates, updateProduction, startPack, forgeCount, workshopDuration, placeHand, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
+import { MAX_CRAFT_JOBS, PACKS, START_RESOURCES } from '../src/config.js';
+import { addTile, newState, migrateState, tileProduction, productionRates, updateProduction, startPack, canStartPack, maxStartablePacks, craftDuration, openPack, canStartRecovery, startRecovery, storageCapacity, useJoker } from '../src/logic.js';
+
+const ZERO = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
 
 test('suppliers produce nothing alone and activate producers from two neighbors, including diagonals', () => {
   const s = { tiles: {}, nextId: 1 };
   const forest = addTile(s, 'wald', 0, 0);
   const logger = addTile(s, 'holzfaeller', 1, 0);
-  assert.deepEqual(tileProduction(s, forest), { base: { holz: 0, korn: 0, gold: 0 }, bonus: { holz: 0, korn: 0, gold: 0 } });
+  assert.deepEqual(tileProduction(s, forest), { base: ZERO, bonus: ZERO });
   assert.deepEqual(tileProduction(s, logger).supply, { supplier: 'wald', count: 1, required: 2, active: false });
   assert.equal(tileProduction(s, logger).base.holz, 1);
   addTile(s, 'wald', 2, 1);
   assert.deepEqual(tileProduction(s, logger), {
-    base: { holz: 4, korn: 0, gold: 0 }, bonus: { holz: 0, korn: 0, gold: 0 },
+    base: { ...ZERO, holz: 4 }, bonus: ZERO,
     supply: { supplier: 'wald', count: 2, required: 2, active: true },
   });
   addTile(s, 'feld', 5, 5);
   const mill = addTile(s, 'windmuehle', 0, 5);
   assert.equal(tileProduction(s, mill).base.korn, 1);
-  assert.deepEqual(productionRates(s), { holz: 4, korn: 1, gold: 0 });
+  assert.deepEqual(productionRates(s), { ...ZERO, holz: 4, korn: 1 });
 });
 
-test('HumanCity is crafted with resources, gains forge speed and opens from inventory', (t) => {
+test('workshops need two neighboring forges and run in emergency mode otherwise', () => {
   const s = newState();
-  s.resources = { holz: 100, korn: 100 };
-  s.productionAt = 1000;
-  const workshop = s.tiles['0,0'];
+  const w = s.tiles['0,0'];
+  assert.equal(tileProduction(s, w).base.werkzeug, 1);
+  assert.deepEqual(tileProduction(s, w).supply, { supplier: 'werkzeugschmiede', count: 0, required: 2, active: false });
   addTile(s, 'werkzeugschmiede', 1, 1);
-  assert.equal(startPack(s, workshop, 'humancity', 1000), true);
-  assert.deepEqual(s.resources, { holz: 25, korn: 45 });
-  assert.equal(workshop.job.duration, 576000);
-  updateProduction(s, 577000);
-  assert.equal(s.packs.humancity, 1);
-  t.mock.method(Math, 'random', () => 0.75);
-  const cards = openPack(s, 'humancity');
-  assert.equal(cards.length, 4);
-  assert.ok(cards.includes('wachturm'));
-  assert.equal(s.packs.humancity, 0);
+  addTile(s, 'werkzeugschmiede', -1, 0, 'rare');
+  const { base, bonus, supply } = tileProduction(s, w);
+  assert.equal(supply.active, true);
+  assert.equal(base.werkzeug, 4);
+  assert.equal(bonus.werkzeug, 2);
+  w.rarity = 'uncommon';
+  assert.equal(tileProduction(s, w).base.werkzeug, 8);
 });
 
-test('Joker pack charges gold once, uses forge speed and delivers only jokers offline', () => {
+test('new games start with 30 tools, tools are produced over time and capped by capacity', () => {
+  const s = newState();
+  assert.equal(s.resources.werkzeug, START_RESOURCES.werkzeug);
+  assert.equal(START_RESOURCES.werkzeug, 30);
+  s.productionAt = 0;
+  updateProduction(s, 30000);
+  assert.equal(s.resources.werkzeug, 33);
+  s.resources.werkzeug = storageCapacity(s).werkzeug;
+  updateProduction(s, 60000);
+  assert.equal(s.resources.werkzeug, storageCapacity(s).werkzeug);
+});
+
+test('crafting orders cost tools and resources, run in parallel and deliver packs offline', (t) => {
+  const s = newState();
+  s.resources = { holz: 100, korn: 100, werkzeug: 100 };
+  s.productionAt = 1000;
+  assert.equal(PACKS.natur.cost.werkzeug, 30);
+  assert.equal(craftDuration('natur'), 240000);
+  assert.equal(maxStartablePacks(s, 'natur'), 3);
+  assert.equal(startPack(s, 'natur', 1000), true);
+  assert.equal(startPack(s, 'natur', 1000), true);
+  assert.deepEqual(s.resources, { holz: 40, korn: 50, werkzeug: 40 });
+  assert.equal(s.crafting.length, 2);
+  assert.equal(updateProduction(s, 240999), true);
+  assert.equal(s.packs.natur, undefined);
+  updateProduction(s, 241000);
+  assert.equal(s.packs.natur, 2);
+  assert.equal(s.crafting.length, 0);
+  t.mock.method(Math, 'random', () => 0);
+  assert.ok(openPack(s, 'natur'));
+  assert.equal(s.packs.natur, 1);
+});
+
+test('orders are refused without enough tools or when 30 orders are running', () => {
+  const s = newState();
+  s.resources = { holz: 9999, korn: 9999, werkzeug: 29 };
+  assert.equal(canStartPack(s, 'natur'), false);
+  assert.equal(startPack(s, 'natur', 0), false);
+  assert.equal(s.resources.werkzeug, 29);
+  s.resources.werkzeug = 99999;
+  s.crafting = Array.from({ length: MAX_CRAFT_JOBS - 1 }, () => ({ pack: 'natur', duration: 1, endsAt: 1e12 }));
+  assert.equal(maxStartablePacks(s, 'natur'), 1);
+  assert.equal(startPack(s, 'natur', 0), true);
+  assert.equal(startPack(s, 'natur', 0), false);
+  assert.equal(s.crafting.length, MAX_CRAFT_JOBS);
+});
+
+test('Joker pack charges gold and tools once and delivers only jokers', () => {
   const s = newState();
   s.productionAt = 1000;
+  s.resources.werkzeug = 100;
   s.gold = 349;
-  const workshop = s.tiles['0,0'];
-  addTile(s, 'werkzeugschmiede', 1, 1);
-  assert.equal(startPack(s, workshop, 'joker', 1000), false);
+  assert.equal(startPack(s, 'joker', 1000), false);
   assert.equal(s.gold, 349);
   s.gold = 350;
-  const resources = { ...s.resources };
-  assert.equal(startPack(s, workshop, 'joker', 1000), true);
+  const holz = s.resources.holz;
+  assert.equal(startPack(s, 'joker', 1000), true);
   assert.equal(s.gold, 0);
-  assert.deepEqual(s.resources, resources);
-  assert.equal(workshop.job.duration, 384000);
-  assert.equal(startPack(s, workshop, 'joker', 1000), false);
-  updateProduction(s, 385000);
+  assert.equal(s.resources.werkzeug, 0);
+  assert.equal(s.resources.holz, holz);
+  updateProduction(s, 1000 + craftDuration('joker') + 1);
   assert.equal(s.packs.joker, 1);
   const cards = openPack(s, 'joker');
   const jokers = cards.filter(id => id.startsWith('joker_')).length;
@@ -67,7 +111,7 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   const s = newState();
   s.tiles = {};
   s.productionAt = 1000;
-  s.resources = { holz: 98, korn: 0 };
+  s.resources = { holz: 98, korn: 0, werkzeug: 0 };
   s.gold = 0;
   addTile(s, 'wald', 0, 0);
   addTile(s, 'holzfaeller', 1, 1);
@@ -76,9 +120,9 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   addTile(s, 'haus', 0, 4);
   addTile(s, 'haus', 1, 4);
   addTile(s, 'taverne', 2, 4);
-  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3 });
+  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3, werkzeug: 0 });
   assert.equal(updateProduction(s, 30999), true);
-  assert.deepEqual(s.resources, { holz: 100, korn: 2 });
+  assert.deepEqual(s.resources, { holz: 100, korn: 2, werkzeug: 0 });
   assert.equal(s.gold, 6);
   assert.equal(s.productionAt, 21000);
   assert.equal(updateProduction(s, 30999), false);
@@ -86,106 +130,17 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   assert.equal(s.gold, 9);
 });
 
-test('workshops spend resources once, gain forge speed, and deliver packs offline', () => {
+test('migration moves per-workshop jobs into the shared queue and grants start tools once', () => {
   const s = newState();
-  s.resources = { holz: 100, korn: 100 };
-  s.productionAt = 1000;
-  const w = s.tiles['0,0'];
-  addTile(s, 'werkzeugschmiede', 1, 1);
-  assert.equal(workshopDuration(s, w, 'natur'), 192000);
-  assert.equal(startPack(s, w, 'natur', 1000), true);
-  assert.deepEqual(s.resources, { holz: 70, korn: 75 });
-  assert.equal(startPack(s, w, 'natur', 1000), false);
-  assert.equal(updateProduction(s, 192999), true);
-  assert.equal(s.packs.natur, undefined);
-  assert.equal(updateProduction(s, 193000), true);
-  assert.equal(s.packs.natur, 1);
-  assert.equal(w.job, undefined);
-  updateProduction(s, 203000);
-  assert.equal(s.packs.natur, 1);
-  const before = s.deck.length;
-  const opened = openPack(s, 'natur');
-  assert.ok(opened.length === 5 || opened.length === 6);
-  assert.equal(s.deck.length, before + opened.length);
-  assert.equal(openPack(s, 'natur'), null);
-});
-
-test('insufficient resources cannot start and forge speed has a limit', () => {
-  const s = newState();
-  const w = s.tiles['0,0'];
-  s.resources = { holz: 2, korn: 2 };
-  for (const [x, y] of [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0]]) addTile(s, 'werkzeugschmiede', x, y);
-  assert.equal(workshopDuration(s, w, 'natur'), 96000);
-  assert.equal(startPack(s, w, 'natur', 0), false);
-  assert.deepEqual(s.resources, { holz: 2, korn: 2 });
-  assert.equal(w.job, undefined);
-});
-
-test('adding and removing a forge adjusts only remaining production time, including after reload', () => {
-  let s = newState();
-  s.resources = { holz: 100, korn: 100 };
-  const w = s.tiles['0,0'];
-  s.tiles = { '0,0': w };
-  startPack(s, w, 'natur', 0);
-  s.hand = 'werkzeugschmiede';
-  assert.ok(placeHand(s, 1, 0, 120000));
-  assert.equal(forgeCount(s, w), 1);
-  assert.equal(w.job.endsAt, 216000);
-  assert.equal(w.job.duration, 192000);
-  s = JSON.parse(JSON.stringify(s));
-  s.hand = 'joker_loeschen';
-  assert.ok(useJoker(s, 1, 0, 168000));
-  assert.equal(forgeCount(s, s.tiles['0,0']), 0);
-  assert.equal(s.tiles['0,0'].job.endsAt, 228000);
-  assert.equal(updateProduction(s, 227999), true);
-  assert.equal(s.packs.natur, undefined);
-  updateProduction(s, 228000);
-  assert.equal(s.packs.natur, 1);
-});
-
-test('transforming a tile to or from a forge updates neighboring workshops', (t) => {
-  const s = newState();
-  s.resources = { holz: 100, korn: 100 };
-  const w = s.tiles['0,0'];
-  s.tiles = { '0,0': w };
-  addTile(s, 'gras', 1, 1);
-  startPack(s, w, 'natur', 0);
-  let index = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen').indexOf('werkzeugschmiede');
-  const poolSize = Object.keys(TILES).length - 2;
-  t.mock.method(Math, 'random', () => (index + 0.5) / poolSize);
-  s.hand = 'joker_verwandeln';
-  assert.ok(useJoker(s, 1, 1, 20000));
-  assert.equal(w.job.endsAt, 196000);
-  index = Object.keys(TILES).filter(type => type !== 'werkzeugschmiede' && type !== 'banditen').indexOf('gras');
-  s.hand = 'joker_verwandeln';
-  assert.ok(useJoker(s, 1, 1, 28000));
-  assert.equal(w.job.endsAt, 238000);
-});
-
-test('legacy jobs without a recorded duration keep working when a forge is added', () => {
-  const s = newState();
-  const w = s.tiles['0,0'];
-  s.tiles = { '0,0': w };
-  w.job = { pack: 'natur', endsAt: 30000 };
-  s.hand = 'werkzeugschmiede';
-  placeHand(s, 1, 0, 15000);
-  assert.equal(w.job.endsAt, 27000);
-  assert.equal(w.job.duration, undefined);
-});
-
-test('one forge accelerates every neighboring workshop, including starthilfe', () => {
-  const s = newState();
-  s.resources = { holz: 100, korn: 100 };
-  const first = s.tiles['0,0'];
-  s.tiles = { '0,0': first };
-  const second = addTile(s, 'workshop', 2, 0);
-  startPack(s, first, 'natur', 0);
-  second.job = { pack: 'starthilfe', duration: 30000, endsAt: 30000 };
-  s.hand = 'werkzeugschmiede';
-  placeHand(s, 1, 0, 15000);
-  assert.equal(first.job.endsAt, 195000);
-  assert.equal(second.job.endsAt, 27000);
-  assert.equal(workshopDuration(s, second, 'starthilfe'), 24000);
+  delete s.crafting;
+  delete s.resources.werkzeug;
+  s.tiles['0,0'].job = { pack: 'natur', duration: 24000, endsAt: 24000 };
+  assert.equal(migrateState(s, 1), true);
+  assert.deepEqual(s.crafting, [{ pack: 'natur', duration: 24000, endsAt: 24000 }]);
+  assert.equal(s.tiles['0,0'].job, undefined);
+  assert.equal(s.resources.werkzeug, 30);
+  assert.equal(migrateState(s, 2), false);
+  assert.equal(s.crafting.length, 1);
 });
 
 test('migration preserves old progress and provides a workshop card only once', () => {
@@ -195,13 +150,13 @@ test('migration preserves old progress and provides a workshop card only once', 
   assert.equal(s.gold, 13);
   assert.deepEqual(s.deck, ['wachturm', 'workshop', 'gras', 'banditen_niete']);
   assert.equal(s.productionAt, 123);
+  assert.equal(s.resources.werkzeug, 30);
   assert.equal(migrateState(s, 456), false);
   assert.equal(s.deck.filter(id => id === 'workshop').length, 1);
 });
 
-test('joker protects the last workshop and workshops with active production', () => {
+test('joker protects only the last workshop', () => {
   const s = newState();
-  s.resources = { holz: 100, korn: 100 };
   const first = s.tiles['0,0'];
   for (const joker of ['joker_loeschen', 'joker_verwandeln']) {
     s.hand = joker;
@@ -209,11 +164,6 @@ test('joker protects the last workshop and workshops with active production', ()
     assert.equal(s.hand, joker);
   }
   const second = addTile(s, 'workshop', 1, 0);
-  startPack(s, first, 'natur', 1000);
-  for (const joker of ['joker_loeschen', 'joker_verwandeln']) {
-    s.hand = joker;
-    assert.equal(useJoker(s, 0, 0), null);
-  }
   s.hand = 'joker_loeschen';
   assert.equal(useJoker(s, 1, 0).tile, second);
   assert.equal(s.tiles['0,0'], first);
@@ -223,41 +173,41 @@ test('starthilfe recovers a deadlocked game without granting infinite free packs
   const s = newState();
   const w = s.tiles['0,0'];
   s.tiles = { '0,0': w };
-  s.resources = { holz: 0, korn: 0 };
+  s.resources = { holz: 0, korn: 0, werkzeug: 100 };
   s.deck = [];
-  assert.equal(canStartRecovery(s, w), true);
-  assert.equal(startRecovery(s, w, 1000), true);
-  assert.equal(canStartRecovery(s, w), false);
+  assert.equal(canStartRecovery(s), true);
+  assert.equal(startRecovery(s, 1000), true);
+  assert.equal(canStartRecovery(s), false);
   updateProduction(s, 31000);
-  assert.equal(canStartRecovery(s, w), false);
+  assert.equal(canStartRecovery(s), false);
   assert.deepEqual(new Set(openPack(s, 'starthilfe')), new Set(['holzfaeller', 'windmuehle', 'wald', 'feld']));
-  assert.equal(canStartRecovery(s, w), false);
+  assert.equal(canStartRecovery(s), false);
 });
 
 test('starthilfe is unavailable when normal production or an affordable pack can recover', () => {
   const s = newState();
   const w = s.tiles['0,0'];
   s.deck = [];
-  s.resources = { holz: 0, korn: 0 };
+  s.resources = { holz: 0, korn: 0, werkzeug: 100 };
   addTile(s, 'wald', 1, 0);
   addTile(s, 'feld', -1, 0);
-  assert.equal(canStartRecovery(s, w), true);
+  assert.equal(canStartRecovery(s), true);
   addTile(s, 'holzfaeller', 1, 1);
   addTile(s, 'windmuehle', -1, 1);
-  assert.equal(canStartRecovery(s, w), false);
+  assert.equal(canStartRecovery(s), false);
   s.tiles = { '0,0': w };
-  s.resources = { holz: 30, korn: 25 };
-  assert.equal(canStartRecovery(s, w), false);
+  s.resources = { holz: 30, korn: 25, werkzeug: 30 };
+  assert.equal(canStartRecovery(s), false);
 });
 
 test('starthilfe remains available if only unusable jokers remain', () => {
   const s = newState();
   const w = s.tiles['0,0'];
   s.tiles = { '0,0': w };
-  s.resources = { holz: 0, korn: 0 };
+  s.resources = { holz: 0, korn: 0, werkzeug: 100 };
   s.hand = 'joker_loeschen';
   s.deck = ['joker_verwandeln'];
-  assert.equal(canStartRecovery(s, w), true);
+  assert.equal(canStartRecovery(s), true);
   s.deck.push('gras');
-  assert.equal(canStartRecovery(s, w), false);
+  assert.equal(canStartRecovery(s), false);
 });

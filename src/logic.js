@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER } from './config.js?v=26';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=27';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -42,7 +42,7 @@ function shuffled(arr) {
 }
 
 export function newState() {
-  const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, crafting: [], size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   s.deckRarities = s.deck.map(rollRarity);
   s.shop = { elapsed: 0, round: 0, offers: [] };
   refreshShop(s);
@@ -103,6 +103,19 @@ export function migrateState(s, now = Date.now()) {
     if (!Object.values(s.tiles).some(tile => tile.type === 'workshop') && s.hand !== 'workshop' && !s.deck.includes('workshop')) {
       s.deck.unshift('workshop');
     }
+    changed = true;
+  }
+  if (!Array.isArray(s.crafting)) {
+    s.crafting = [];
+    for (const tile of Object.values(s.tiles)) {
+      if (!tile.job) continue;
+      s.crafting.push(tile.job);
+      delete tile.job;
+    }
+    changed = true;
+  }
+  if (s.resources.werkzeug == null) {
+    s.resources.werkzeug = START_RESOURCES.werkzeug;
     changed = true;
   }
   if (s.banditElapsed == null) {
@@ -265,11 +278,9 @@ export function placeHand(s, x, y, now = Date.now()) {
   if (!TILES[s.hand] || s.hand === 'banditen') return null;
   const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
-  const affected = s.hand === 'werkzeugschmiede' ? affectedWorkshopJobs(s, x, y) : [];
   const special = isSpecialSlot(s, x, y);
   const tile = addTile(s, s.hand, x, y, placementRarity(s, s.hand, s.handRarity, x, y));
   if (special) delete s.specialSlots[key(x, y)];
-  adjustWorkshopJobs(s, affected, now);
   const cleared = tile.type === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
@@ -307,20 +318,15 @@ function clearGuardedBandits(s) {
 }
 
 function replaceWithBandits(s, cells, now) {
-  const affected = new Map();
   const lostStorage = new Set();
   for (const [x, y] of cells) {
     const type = tileAt(s, x, y)?.type;
     if (TILES[type]?.storage) lostStorage.add(TILES[type].storage);
-    if (type === 'werkzeugschmiede') {
-      for (const job of affectedWorkshopJobs(s, x, y)) affected.set(job.tile.id, job);
-    }
   }
   const results = cells.map(([x, y]) => {
     const previous = tileAt(s, x, y);
     return { previous, tile: addTile(s, 'banditen', x, y) };
   });
-  adjustWorkshopJobs(s, [...affected.values()].filter(({ tile }) => tileAt(s, tile.x, tile.y) === tile), now);
   if (results.length) results[0].losses = trimStorage(s, lostStorage);
   return results;
 }
@@ -424,13 +430,11 @@ export function useJoker(s, x, y, now = Date.now()) {
     return { kind: 'protected', tile, x, y };
   }
   if (!tile || tile.type === 'banditen') return null;
-  if (tile.type === 'workshop' && (tile.job || Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1)) return null;
+  if (tile.type === 'workshop' && Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1) return null;
   if (s.hand === 'joker_loeschen') {
     if (Object.keys(s.tiles).length <= 1) return null;
-    const affected = tile.type === 'werkzeugschmiede' ? affectedWorkshopJobs(s, x, y) : [];
     const lostStorage = TILES[tile.type].storage;
     delete s.tiles[key(x, y)];
-    adjustWorkshopJobs(s, affected, now);
     const losses = trimStorage(s, lostStorage ? [lostStorage] : []);
     planBandits(s);
     s.hand = null;
@@ -441,9 +445,7 @@ export function useJoker(s, x, y, now = Date.now()) {
   const types = Object.keys(TILES).filter(type => type !== tile.type && type !== 'banditen');
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
-  const affected = oldType === 'werkzeugschmiede' || newType === 'werkzeugschmiede' ? affectedWorkshopJobs(s, x, y) : [];
   tile.type = newType;
-  adjustWorkshopJobs(s, affected, now);
   const losses = trimStorage(s, TILES[oldType].storage ? [TILES[oldType].storage] : []);
   const cleared = newType === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
@@ -455,8 +457,8 @@ export function useJoker(s, x, y, now = Date.now()) {
 export const canAfford = (s, cost) => s.gold >= cost;
 
 export function tileProduction(s, tile) {
-  const base = { holz: 0, korn: 0, gold: 0 };
-  const bonus = { holz: 0, korn: 0, gold: 0 };
+  const base = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
+  const bonus = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
   const chain = SUPPLY_CHAINS[tile.type];
   if (chain) {
     const suppliers = NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o?.type === chain.supplier);
@@ -477,11 +479,12 @@ export function tileProduction(s, tile) {
 }
 
 export function productionRates(s) {
-  const rates = { holz: 0, korn: 0, gold: 0 };
+  const rates = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
   for (const tile of Object.values(s.tiles)) {
     const { base, bonus } = tileProduction(s, tile);
     rates.holz += base.holz + bonus.holz;
     rates.korn += base.korn + bonus.korn;
+    rates.werkzeug += base.werkzeug + bonus.werkzeug;
     // Gold belongs to a pair, which appears in both tiles' detail views.
     rates.gold += (base.gold + bonus.gold) / 2;
   }
@@ -520,35 +523,22 @@ export function updateProduction(s, now = Date.now()) {
   if (ticks > 0) {
     const rates = productionRates(s);
     const caps = storageCapacity(s);
-    for (const id of ['holz', 'korn']) s.resources[id] = Math.max(s.resources[id], Math.min(caps[id], s.resources[id] + rates[id] * ticks));
+    for (const id of ['holz', 'korn', 'werkzeug']) s.resources[id] = Math.max(s.resources[id], Math.min(caps[id], s.resources[id] + rates[id] * ticks));
     s.gold = Math.max(s.gold, Math.min(caps.gold, s.gold + rates.gold * ticks));
     s.productionAt += ticks * PRODUCTION_INTERVAL;
     changed = true;
   }
-  for (const tile of Object.values(s.tiles)) {
-    if (tile.type === 'workshop' && tile.job && tile.job.endsAt <= now) {
-      s.packs[tile.job.pack] = (s.packs[tile.job.pack] || 0) + 1;
-      delete tile.job;
-      changed = true;
-    }
+  const done = s.crafting.filter(job => job.endsAt <= now);
+  if (done.length) {
+    for (const job of done) s.packs[job.pack] = (s.packs[job.pack] || 0) + 1;
+    s.crafting = s.crafting.filter(job => job.endsAt > now);
+    changed = true;
   }
   return changed;
 }
 
-export function forgeCount(s, tile) {
-  return NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)).filter(t => t?.type === 'werkzeugschmiede').length;
-}
-
-export function forgeBonus(s, tile) {
-  return Math.min(60, NEIGHBORS.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
-    .filter(t => t?.type === 'werkzeugschmiede').reduce((sum, forge) => sum + tileStrength(forge) * 20, 0));
-}
-
-const workshopFactor = (s, tile) => (1 - forgeBonus(s, tile) / 100) * (1 - (tileStrength(tile) - 1) * 0.1);
-
-export function workshopDuration(s, tile, packId) {
-  const baseDuration = packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
-  return Math.round(baseDuration * workshopFactor(s, tile));
+export function craftDuration(packId) {
+  return packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
 }
 
 function components(keys) {
@@ -628,19 +618,13 @@ function refundMove(s, record) {
   else s.gold += record.cost;
 }
 
-function runningJobs(s) {
-  return Object.values(s.tiles).filter(tile => tile.type === 'workshop' && tile.job)
-    .map(tile => ({ tile, factor: workshopFactor(s, tile) }));
-}
-
 function relocate(s, tile, x, y) {
   tile.x = x;
   tile.y = y;
   s.tiles[key(x, y)] = tile;
 }
 
-function afterMove(s, jobs, now, moved) {
-  adjustWorkshopJobs(s, jobs, now);
+function afterMove(s, moved) {
   const cleared = moved.some(tile => tile.type === 'wachturm') ? clearGuardedBandits(s) : 0;
   planBandits(s);
   return cleared;
@@ -651,7 +635,6 @@ export function moveTile(s, tile, x, y, now = Date.now()) {
   if (!option) return null;
   const payment = payMove(s, option.cost);
   if (!payment) return null;
-  const jobs = runningJobs(s);
   const from = { x: tile.x, y: tile.y };
   const oldRarity = tile.rarity;
   delete s.tiles[key(from.x, from.y)];
@@ -660,7 +643,7 @@ export function moveTile(s, tile, x, y, now = Date.now()) {
     tile.rarity = upgradedRarity(tileRarity(tile));
     delete s.specialSlots[key(x, y)];
   }
-  const cleared = afterMove(s, jobs, now, [tile]);
+  const cleared = afterMove(s, [tile]);
   return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, path: option.path, ...payment, special: option.special, oldRarity, cleared,
     pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
@@ -669,11 +652,10 @@ export function swapTiles(s, tile, other, now = Date.now()) {
   if (!moveOptions(s, tile).swaps.some(swap => swap.tile === other)) return null;
   const payment = payMove(s, SWAP_COST);
   if (!payment) return null;
-  const jobs = runningJobs(s);
   const from = { x: tile.x, y: tile.y }, to = { x: other.x, y: other.y };
   relocate(s, tile, to.x, to.y);
   relocate(s, other, from.x, from.y);
-  const cleared = afterMove(s, jobs, now, [tile, other]);
+  const cleared = afterMove(s, [tile, other]);
   return { kind: 'swap', tile, other, from, to, ...payment, cleared,
     pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
@@ -684,7 +666,6 @@ export function undoMove(s, record, now = Date.now()) {
   const { from, to } = record;
   const tile = tileAt(s, to.x, to.y);
   if (tile?.id !== record.tile.id) return false;
-  const jobs = runningJobs(s);
   if (record.kind === 'swap') {
     const other = tileAt(s, from.x, from.y);
     if (other?.id !== record.other.id) return false;
@@ -701,56 +682,50 @@ export function undoMove(s, record, now = Date.now()) {
     }
   }
   refundMove(s, record);
-  adjustWorkshopJobs(s, jobs, now);
   planBandits(s);
   return true;
 }
 
-function affectedWorkshopJobs(s, x, y) {
-  return NEIGHBORS.map(([dx, dy]) => tileAt(s, x + dx, y + dy))
-    .filter(tile => tile?.type === 'workshop' && tile.job)
-    .map(tile => ({ tile, factor: workshopFactor(s, tile) }));
-}
+const hasCraftSlot = s => s.crafting.length < MAX_CRAFT_JOBS;
 
-function adjustWorkshopJobs(s, affected, now) {
-  for (const { tile, factor } of affected) {
-    if (tile.job.endsAt <= now) continue;
-    const ratio = workshopFactor(s, tile) / factor;
-    tile.job.endsAt = now + Math.round((tile.job.endsAt - now) * ratio);
-    if (tile.job.duration != null) tile.job.duration = Math.round(tile.job.duration * ratio);
-  }
-}
-
-export function canStartPack(s, tile, packId) {
+export function canStartPack(s, packId) {
   const pack = PACKS[packId];
-  return !!(pack && tile?.type === 'workshop' && s.tiles[key(tile.x, tile.y)] === tile && !tile.job &&
+  return !!(pack && hasCraftSlot(s) &&
     Object.entries(pack.cost).every(([id, amount]) => (id === 'gold' ? s.gold : s.resources[id]) >= amount));
 }
 
-export function startPack(s, tile, packId, now = Date.now()) {
-  if (!canStartPack(s, tile, packId)) return false;
+// Wie viele Aufträge dieses Packs sich gerade bezahlen und einreihen lassen.
+export function maxStartablePacks(s, packId) {
+  const pack = PACKS[packId];
+  if (!pack) return 0;
+  const affordable = Math.min(...Object.entries(pack.cost).map(([id, amount]) => Math.floor((id === 'gold' ? s.gold : s.resources[id]) / amount)));
+  return Math.max(0, Math.min(affordable, MAX_CRAFT_JOBS - s.crafting.length));
+}
+
+export function startPack(s, packId, now = Date.now()) {
+  if (!canStartPack(s, packId)) return false;
   for (const [id, amount] of Object.entries(PACKS[packId].cost)) {
     if (id === 'gold') s.gold -= amount;
     else s.resources[id] -= amount;
   }
-  const duration = workshopDuration(s, tile, packId);
-  tile.job = { pack: packId, duration, endsAt: now + duration };
+  const duration = craftDuration(packId);
+  s.crafting.push({ pack: packId, duration, endsAt: now + duration });
   return true;
 }
 
-export function canStartRecovery(s, tile) {
+export function canStartRecovery(s) {
   const rates = productionRates(s);
   const cost = PACKS.natur.cost;
-  return tile?.type === 'workshop' && s.tiles[key(tile.x, tile.y)] === tile && !tile.job &&
+  return Object.values(s.tiles).some(t => t.type === 'workshop') && hasCraftSlot(s) &&
     (!s.hand || JOKERS[s.hand] || HAZARDS[s.hand]) && s.deck.every(id => JOKERS[id] || HAZARDS[id]) && !Object.values(s.packs).some(Boolean) &&
-    !Object.values(s.tiles).some(t => t.job) &&
+    !s.crafting.length &&
     Object.entries(cost).some(([id, amount]) => s.resources[id] < amount && rates[id] === 0);
 }
 
-export function startRecovery(s, tile, now = Date.now()) {
-  if (!canStartRecovery(s, tile)) return false;
-  const duration = workshopDuration(s, tile, 'starthilfe');
-  tile.job = { pack: 'starthilfe', duration, endsAt: now + duration };
+export function startRecovery(s, now = Date.now()) {
+  if (!canStartRecovery(s)) return false;
+  const duration = craftDuration('starthilfe');
+  s.crafting.push({ pack: 'starthilfe', duration, endsAt: now + duration });
   return true;
 }
 

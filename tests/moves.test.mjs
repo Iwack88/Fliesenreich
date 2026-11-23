@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addTile, drawCard, moveOptions, moveTile, newState, startPack, swapTiles, undoMove } from '../src/logic.js';
+import { addTile, drawCard, moveOptions, moveTile, newState, swapTiles, undoMove } from '../src/logic.js';
 
 function world() {
   const s = newState();
@@ -75,18 +75,6 @@ test('swapping neighbours costs 50 gold, free moves are used first and banditen 
   assert.equal(undoMove(s, record), true);
   assert.equal(s.gold, 300);
   assert.equal(s.tiles['0,0'], a);
-});
-
-test('moving a forge away from a workshop slows its running job', () => {
-  const s = world();
-  s.resources = { holz: 100, korn: 100 };
-  const workshop = addTile(s, 'workshop', 0, 0);
-  const forge = addTile(s, 'werkzeugschmiede', 1, 0);
-  for (const x of [0, 1, 2]) addTile(s, 'gras', x, 1);
-  assert.equal(startPack(s, workshop, 'natur', 0), true);
-  assert.equal(workshop.job.endsAt, 192000);
-  assert.ok(moveTile(s, forge, 3, 1, 96000));
-  assert.equal(workshop.job.endsAt, 216000);
 });
 
 test('tiles only glide along free outer fields and never across occupied ones', () => {

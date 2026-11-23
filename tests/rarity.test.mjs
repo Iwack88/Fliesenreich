@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUARD_RADIUS, SHOP_INTERVAL, TILES } from '../src/config.js';
-import { addTile, advanceShop, buyShopCard, drawCard, forgeBonus, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, startPack, storageCapacity, tileProduction, useJoker, workshopDuration } from '../src/logic.js';
+import { addTile, advanceShop, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
 
 test('tile rarity rolls use the agreed thresholds and leave jokers unchanged', t => {
   let value = 0;
@@ -73,7 +73,7 @@ test('production and pair buffs use rarity without extending adjacency or double
   const house = addTile(s, 'haus', 0, 3, 'rare');
   const tavern = addTile(s, 'taverne', 1, 3, 'uncommon');
   assert.equal(pairValue(house, tavern), 6);
-  assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 6 });
+  assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 6, werkzeug: 0 });
 });
 
 test('rarity strengthens storage, workshops, forges and guards', () => {
@@ -82,13 +82,16 @@ test('rarity strengthens storage, workshops, forges and guards', () => {
   s.tiles = { '0,0': workshop };
   workshop.rarity = 'rare';
   s.resources = { holz: 100, korn: 100 };
-  assert.equal(workshopDuration(s, workshop, 'natur'), 192000);
-  assert.equal(startPack(s, workshop, 'natur', 0), true);
   s.hand = 'werkzeugschmiede';
   s.handRarity = 'uncommon';
   placeHand(s, 1, 0, 96000);
-  assert.equal(forgeBonus(s, workshop), 40);
-  assert.equal(workshop.job.endsAt, 153600);
+  assert.equal(tileProduction(s, workshop).base.werkzeug, 3, 'rare workshop in emergency mode');
+  s.hand = 'werkzeugschmiede';
+  s.handRarity = 'rare';
+  placeHand(s, -1, 0);
+  const { base, bonus } = tileProduction(s, workshop);
+  assert.equal(base.werkzeug, 2 * 3 * 2);
+  assert.equal(bonus.werkzeug, 1 + 2);
   const storage = addTile(s, 'lagerhalle', 2, 0, 'epic');
   assert.equal(storageCapacity(s).holz, 300);
   s.hand = 'joker_loeschen';
@@ -114,19 +117,17 @@ test('shop purchases roll once and preserve the resulting tile rarity', t => {
   assert.equal(buyShopCard(s, offer.card, s.shop.round), false);
 });
 
-test('transformation keeps rarity and rebalances active workshop jobs', t => {
+test('transformation keeps rarity', t => {
   const s = newState();
   const workshop = s.tiles['0,0'];
   s.tiles = { '0,0': workshop };
   s.resources = { holz: 100, korn: 100 };
   const tile = addTile(s, 'gras', 1, 0, 'uncommon');
-  startPack(s, workshop, 'natur', 0);
   const types = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (types.indexOf('werkzeugschmiede') + .5) / types.length);
   s.hand = 'joker_verwandeln';
   const result = useJoker(s, 1, 0, 90000);
   assert.equal(result.tile, tile);
   assert.equal(tile.rarity, 'uncommon');
-  assert.equal(forgeBonus(s, workshop), 40);
-  assert.equal(workshop.job.endsAt, 180000);
+  assert.equal(tileProduction(s, workshop).supply.count, 1);
 });

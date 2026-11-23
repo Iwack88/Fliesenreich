@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -16,6 +16,7 @@
     <button class="hud-resource" data-hud-resource="gold" aria-label="Gold im Warehouse anzeigen">🪙 <b id="r-gold">0</b></button>
     <button class="hud-resource" data-hud-resource="holz" aria-label="Holz im Warehouse anzeigen">🪵 <b id="r-holz">0</b></button>
     <button class="hud-resource" data-hud-resource="korn" aria-label="Korn im Warehouse anzeigen">🌾 <b id="r-korn">0</b></button>
+    <button class="hud-resource" data-hud-resource="werkzeug" aria-label="Werkzeuge im Warehouse anzeigen">🔨 <b id="r-werkzeug">0</b></button>
     <span title="Zeit bis zur nächsten Ausbreitung">🏴 <b id="r-banditen">5:00</b></span>
   </div>
   <div id="actions">
@@ -59,7 +60,6 @@
   <button id="crafting-toggle" aria-expanded="false" aria-controls="crafting-content" aria-label="Herstellungsübersicht öffnen">❯</button>
 </aside>
 
-<button id="idle-workshop" hidden aria-label="Untätige Workshops anzeigen" title="Untätige Workshops anzeigen">🛠️ <span id="idle-workshop-count"></span></button>
 <button id="ready-packs" hidden aria-label="Fertige Packs öffnen" title="Fertige Packs öffnen">📦 <span id="ready-packs-count"></span></button>
 
 <div id="tile-popup" class="hidden"></div>
@@ -70,6 +70,6 @@
 <button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=51"></script>
+<script type="module" src="src/main.js?v=52"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS } from './config.js?v=26';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=31';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS } from './config.js?v=27';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=32';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -241,7 +241,7 @@ function onTap(sx, sy) {
       const tile = tileAt(state, c.x, c.y);
       toast(tile?.type === 'banditen' ? 'Banditencamps sind gegen Joker geschützt' :
         state.hand === 'joker_schutz' ? (state.protectedFields[`${c.x},${c.y}`] ? 'Dieses Feld ist bereits dauerhaft geschützt' : 'Wähle ein Feld innerhalb des Spielfelds') :
-        tile?.type === 'workshop' ? 'Letzter oder beschäftigter Workshop ist geschützt' :
+        tile?.type === 'workshop' ? 'Der letzte Workshop ist geschützt' :
         Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
           ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
       return;
@@ -443,7 +443,7 @@ function previewBuffs() {
   const simulation = previewSimulation();
   if (!simulation) return [];
   const { sim, copies } = simulation;
-  const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
+  const resources = { holz: '🪵', korn: '🌾', gold: '🪙', werkzeug: '🔨' };
   const total = production => Object.fromEntries(Object.keys(resources).map(id => [id, production.base[id] + production.bonus[id]]));
   const buffs = [];
   for (const tile of Object.values(state.tiles)) {
@@ -458,13 +458,6 @@ function previewBuffs() {
       gain += Math.sign(delta);
       parts.push(`${delta > 0 ? '+' : '−'}${fmt(Math.abs(delta))} ${resources[id]}/Tick`);
     }
-    if (tile.type === 'workshop') {
-      const speed = forgeBonus(sim, after) - forgeBonus(state, tile);
-      if (speed) {
-        gain += Math.sign(speed);
-        parts.push(`Herstellung ${speed > 0 ? '−' : '+'}${Math.abs(speed)} %`);
-      }
-    }
     if (!parts.length) continue;
     const note = now.supply?.active && !before.supply?.active ? ' (aktiviert)' :
       before.supply?.active && !now.supply?.active ? ' (Notbetrieb)' : '';
@@ -476,7 +469,7 @@ function previewBuffs() {
 
 function previewBuffText() {
   const buffs = previewBuffs();
-  if (!buffs.length) return 'Keine Änderung an Produktion oder Workshops.';
+  if (!buffs.length) return 'Keine Änderung an der Produktion.';
   const shown = buffs.slice(0, 3).map(({ name, moved, text }) => `${name}${moved ? ' (bewegt)' : ''}: ${text}`);
   if (buffs.length > shown.length) shown.push(`und ${buffs.length - shown.length} weitere`);
   return `<span class="preview-buffs"><b>Auswirkung:</b> ${shown.join(' · ')}</span>`;
@@ -534,29 +527,29 @@ function updateTilePopup() {
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
     wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller; höhere Seltenheit erhöht deren Ertrag.',
-    holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Wälder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
+    holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Forste (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen; höhere Seltenheit erhöht deren Ertrag.',
     windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
     taverne: 'Erzeugt Gold mit benachbarten Häusern.',
-    workshop: 'Produziert Packs. Benachbarte Werkzeugschmieden beschleunigen die Herstellung.',
+    workshop: `Produziert Werkzeuge. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal), sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
-    werkzeugschmiede: `Beschleunigt benachbarte Workshops um ${tileStrength(selected) * 20} %, insgesamt bis zu 60 %.`,
+    werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops; höhere Seltenheit erhöht deren Ertrag.',
     wachturm: `Schützt einen Bereich von ${guardRadius(selected) * 2 + 1}×${guardRadius(selected) * 2 + 1} Feldern und entfernt dort Banditencamps.`,
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   const { base, bonus, supply } = tileProduction(state, selected);
-  const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold' };
+  const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold', werkzeug: '🔨 Werkzeuge' };
   if (supply) {
     const supplierName = TILES[supply.supplier].name;
     html += supply.active
       ? `<div>✅ Aktiv: <b>${supply.count} ${supplierName}-Nachbarn</b></div>`
       : `<div>⚠️ Notbetrieb: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b> · ${EMERGENCY_RATE * 100} % Leistung</div>`;
   }
-  for (const id of ['holz', 'korn', 'gold']) {
+  for (const id of ['holz', 'korn', 'gold', 'werkzeug']) {
     if (!base[id] && !bonus[id]) continue;
     const label = supply ? (supply.active ? `${base[id]} aus Nachbarn + ${bonus[id]} Seltenheit der Nachbarn` : 'Notbetrieb') : `${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus`;
     html += `<div>Aktueller Ertrag: <b>${fmt(base[id] + bonus[id])} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${label}</span></div>`;
@@ -566,13 +559,9 @@ function updateTilePopup() {
     html += '<div class="dim">Gold zählt gemeinsam pro Paar, nicht doppelt pro Gebäude.</div>';
   }
   if (selected.type === 'workshop') {
-    const count = forgeCount(state, selected);
-    html += `<div>⚒️ Werkzeugschmieden: ${count} · Schmiedebonus −${forgeBonus(state, selected)} % · Seltenheitsbonus −${(tileStrength(selected) - 1) * 10} %</div>`;
-    for (const [id, pack] of Object.entries(PACKS)) {
-      html += `<div>${pack.name}: <b>1 Pack / ${formatTime(workshopDuration(state, selected, id))}</b></div>`;
-    }
+    html += `<div class="dim">Aufträge laufen gemeinsam über alle Workshops; Packs startest du im Workshop-Menü.</div>`;
   } else if (selected.type === 'werkzeugschmiede') {
-    html += `<div>Beschleunigte Workshops: ${partners.length}</div>`;
+    html += `<div>Versorgte Workshops: ${partners.length}</div>`;
   } else if (def.storage) {
     html += `<div>Aktuelle Gesamtkapazität: ${storageCapacity(state)[def.storage]} ${resourceNames[def.storage]}</div>`;
   } else if (selected.type === 'banditen') {
@@ -623,6 +612,7 @@ function updateHud() {
   $('r-gold').textContent = `${state.gold}/${caps.gold}`;
   $('r-holz').textContent = `${state.resources.holz}/${caps.holz}`;
   $('r-korn').textContent = `${state.resources.korn}/${caps.korn}`;
+  $('r-werkzeug').textContent = `${Math.floor(state.resources.werkzeug)}/${caps.werkzeug}`;
   $('r-banditen').textContent = formatTime(BANDIT_INTERVAL - state.banditElapsed);
   const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
   $('btn-cards-label').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
@@ -636,11 +626,6 @@ function updateHud() {
   const sale = shopStatus(state);
   $('btn-shop-label').textContent = `Shop ${formatTime(sale.remaining)}`;
   $('btn-shop').setAttribute('aria-label', `Shop, neue Angebote in ${formatTime(sale.remaining)}`);
-  const idleWorkshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && !tile.job).length;
-  $('idle-workshop').hidden = !idleWorkshops;
-  $('idle-workshop-count').textContent = idleWorkshops;
-  $('idle-workshop').setAttribute('aria-label', `${idleWorkshops} untätige Workshops anzeigen`);
-  $('panel').classList.toggle('has-idle-workshop', idleWorkshops > 0);
   updateFilterControls();
   renderQueue();
 }
@@ -655,7 +640,7 @@ function toast(msg) {
 }
 
 function lossText(losses = {}) {
-  const names = { gold: 'Gold', holz: 'Holz', korn: 'Korn' };
+  const names = { gold: 'Gold', holz: 'Holz', korn: 'Korn', werkzeug: 'Werkzeuge' };
   const parts = Object.entries(losses).map(([id, amount]) => `${fmt(amount)} ${names[id]}`);
   return parts.length ? ` · Lagerverlust: ${parts.join(', ')}` : '';
 }
@@ -785,6 +770,7 @@ const WAREHOUSE_RESOURCES = [
   { id: 'gold', name: 'Gold', icon: '🪙' },
   { id: 'holz', name: 'Holz', icon: '🪵' },
   { id: 'korn', name: 'Korn', icon: '🌾' },
+  { id: 'werkzeug', name: 'Werkzeuge', icon: '🔨' },
 ];
 
 function filterName(filter) {
@@ -1045,12 +1031,12 @@ function updateJobIndicator(indicator, now = Date.now()) {
   }
 }
 
-function createJobStatus(tile) {
+function createJobStatus(job) {
   const status = document.createElement('div');
-  const name = tile.job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[tile.job.pack].name;
+  const name = job.pack === 'starthilfe' ? 'Starthilfe-Pack' : PACKS[job.pack].name;
   status.className = 'job-status';
-  status.dataset.endsAt = tile.job.endsAt;
-  if (tile.job.duration != null) status.dataset.duration = tile.job.duration;
+  status.dataset.endsAt = job.endsAt;
+  if (job.duration != null) status.dataset.duration = job.duration;
   const heading = document.createElement('div');
   heading.className = 'job-heading';
   const packName = document.createElement('b');
@@ -1060,7 +1046,7 @@ function createJobStatus(tile) {
   heading.append(packName, timer);
   const progress = document.createElement('progress');
   progress.max = 1;
-  progress.setAttribute('aria-label', `Fortschritt ${name} bei Workshop ${tile.x}, ${tile.y}`);
+  progress.setAttribute('aria-label', `Fortschritt ${name}`);
   status.append(heading, progress);
   updateJobIndicator(status);
   return status;
@@ -1069,8 +1055,8 @@ function createJobStatus(tile) {
 let craftingJobsKey = '';
 function updateCraftingPanel() {
   if ($('crafting-panel').classList.contains('closed')) return;
-  const jobs = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && tile.job);
-  const key = JSON.stringify(jobs.map(tile => [tile.id, tile.x, tile.y, tile.job.pack, tile.job.duration, tile.job.endsAt]));
+  const jobs = [...state.crafting].sort((a, b) => a.endsAt - b.endsAt);
+  const key = JSON.stringify(jobs.map(job => [job.pack, job.duration, job.endsAt]));
   if (key === craftingJobsKey) return;
   craftingJobsKey = key;
   const body = $('crafting-jobs');
@@ -1079,18 +1065,14 @@ function updateCraftingPanel() {
     body.textContent = 'Zurzeit keine laufenden Aufträge.';
     return;
   }
-  for (const tile of jobs) {
+  const count = document.createElement('div');
+  count.className = 'pack-chances';
+  count.textContent = `${jobs.length}/${MAX_CRAFT_JOBS} Aufträge`;
+  body.appendChild(count);
+  for (const job of jobs) {
     const section = document.createElement('div');
     section.className = 'workshop';
-    const title = document.createElement('b');
-    title.textContent = `Workshop (${tile.x}, ${tile.y})`;
-    section.append(title, createJobStatus(tile));
-    if (tile.job.duration == null) {
-      const notice = document.createElement('div');
-      notice.className = 'pack-chances';
-      notice.textContent = 'Fortschritt für diesen älteren Auftrag nicht verfügbar.';
-      section.appendChild(notice);
-    }
+    section.appendChild(createJobStatus(job));
     body.appendChild(section);
   }
 }
@@ -1111,130 +1093,119 @@ $('crafting-toggle').onclick = () => {
   }
 };
 
-let expandedWorkshopId = null;
+const COST_ICONS = { gold: '🪙', holz: '🪵', korn: '🌾', werkzeug: '🔨' };
 function showWorkshops() {
   const body = openOverlay('Workshops', 'workshops');
   body.innerHTML = '';
   const rates = productionRates(state);
+  const caps = storageCapacity(state);
   const summary = document.createElement('div');
   summary.className = 'pack-chances';
-  summary.textContent = `Produktion alle ${PRODUCTION_INTERVAL / 1000} Sek.: 🪵 ${rates.holz} · 🌾 ${rates.korn} · 🪙 ${rates.gold}. Lagerlimits siehe Warehouse.`;
+  summary.textContent = `🔨 Werkzeuge: ${Math.floor(state.resources.werkzeug)}/${caps.werkzeug} · +${fmt(rates.werkzeug)} alle ${PRODUCTION_INTERVAL / 1000} Sek. · Aufträge: ${state.crafting.length}/${MAX_CRAFT_JOBS}`;
   body.appendChild(summary);
   const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
-  if (!workshops.some(tile => tile.id === expandedWorkshopId)) expandedWorkshopId = null;
   if (!workshops.length) {
     const notice = document.createElement('p');
-    notice.textContent = 'Kein Workshop platziert. Ohne Workshop-Karte oder fertiges Pack ist ein neues Spiel nötig.';
+    notice.textContent = 'Kein Workshop platziert – es entstehen keine Werkzeuge. Ohne Workshop-Karte oder fertiges Pack ist ein neues Spiel nötig.';
     body.appendChild(notice);
   }
   for (const tile of workshops) {
+    const { supply, base, bonus } = tileProduction(state, tile);
     const section = document.createElement('div');
     section.className = 'workshop';
-    section.dataset.workshopId = tile.id;
     const head = document.createElement('div');
     head.className = 'workshop-head';
-    const expanded = tile.id === expandedWorkshopId;
-    const title = document.createElement('button');
-    title.className = 'workshop-toggle';
-    title.textContent = `🛠️ Workshop (${tile.x}, ${tile.y}) · ${tile.job ? 'Produziert' : 'Bereit'} ${expanded ? '▴' : '▾'}`;
-    title.setAttribute('aria-expanded', String(expanded));
-    title.onclick = () => {
-      expandedWorkshopId = expanded ? null : tile.id;
-      const scroll = $('overlay-box').scrollTop;
-      showWorkshops();
-      $('overlay-box').scrollTop = scroll;
-    };
+    const title = document.createElement('div');
+    title.textContent = `🛠️ Workshop (${tile.x}, ${tile.y}) · ${supply.active ? '✅' : '⚠️ Notbetrieb'} ${supply.count}/${supply.required} Schmieden · +${fmt(base.werkzeug + bonus.werkzeug)} 🔨`;
     const jump = document.createElement('button');
     jump.textContent = 'Anzeigen';
     jump.onclick = () => jumpTo(tile);
     head.append(title, jump);
     section.appendChild(head);
-    if (expanded) {
-      const forges = forgeCount(state, tile);
-      const bonus = document.createElement('div');
-      bonus.className = 'pack-chances';
-      bonus.textContent = `⚒️ ${forges} Werkzeugschmieden · Schmiedebonus −${forgeBonus(state, tile)} % · Seltenheitsbonus −${(tileStrength(tile) - 1) * 10} %`;
-      section.appendChild(bonus);
-    }
-    if (tile.job) {
-      section.appendChild(createJobStatus(tile));
-      if (tile.job.duration == null) {
-        const notice = document.createElement('div');
-        notice.className = 'pack-chances';
-        notice.textContent = 'Bei diesem älteren Auftrag ist der Fortschritt nicht verfügbar; die Restzeit bleibt erhalten.';
-        section.appendChild(notice);
-      }
-    } else if (expanded) {
-      for (const [id, pack] of Object.entries(PACKS)) {
-        const row = document.createElement('div');
-        row.className = 'pack pack-recipe';
-        const head = document.createElement('div');
-        head.className = 'pack-recipe-head';
-        const info = document.createElement('div');
-        const cost = Object.entries(pack.cost).map(([resource, amount]) => `${{ gold: '🪙', holz: '🪵', korn: '🌾' }[resource]} ${amount}`).join(' · ');
-        const pct = value => `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 }).format(value * 100)} %`;
-        const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarte';
-        info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.land} Landkarten + 1 ${valueLabel}, mit ${pct(pack.extraChance)} eine zweite.${pack.hazardChance ? ` Mit ${pct(pack.hazardChance)} ersetzt eine Banditen-Niete eine Landkarte.` : ''}</div>`;
-        const button = document.createElement('button');
-        button.textContent = 'Herstellen';
-        button.disabled = !canStartPack(state, tile, id);
-        button.onclick = () => {
-          syncBandits();
-          syncProduction();
-          if (!startPack(state, tile, id)) { toast('Herstellung nicht möglich'); return; }
-          save();
-          showWorkshops();
-        };
-        head.append(info, button);
-        row.appendChild(head);
-        const chances = packChances(pack);
-        for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`], ['land', 'Landkarten – Chance je Karte']]) {
-        const groupTitle = document.createElement('div');
-        groupTitle.className = 'pack-chances';
-        groupTitle.textContent = label;
-        row.appendChild(groupTitle);
-        const contents = document.createElement('div');
-        contents.className = 'pack-contents';
-        for (const [type, chance] of chances[group]) {
-          const card = CARDS[type];
-          const item = document.createElement('div');
-          item.className = 'pack-item';
-          const percent = `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`;
-          const icon = document.createElement('span');
-          icon.className = 'pack-item-icon';
-          icon.style.background = card.color;
-          icon.textContent = card.icon;
-          icon.setAttribute('aria-hidden', 'true');
-          const name = document.createElement('span');
-          name.textContent = card.name + (INSTANT_JOKERS.includes(type) ? ' (wirkt sofort)' : '');
-          const value = document.createElement('span');
-          value.className = 'pack-item-chance';
-          value.textContent = percent;
-          item.append(icon, name, value);
-          contents.appendChild(item);
-        }
-        row.appendChild(contents);
-        }
-        section.appendChild(row);
-      }
-      if (canStartRecovery(state, tile)) {
-        const row = document.createElement('div');
-        row.className = 'pack';
-        row.textContent = `Starthilfe-Pack: kostenlos, mit Holzfäller, Windmühle, Wäldern und Feldern · ${formatTime(workshopDuration(state, tile, 'starthilfe'))}`;
-        const button = document.createElement('button');
-        button.textContent = 'Herstellen';
-        button.onclick = () => {
-          syncBandits();
-          syncProduction();
-          if (!startRecovery(state, tile)) { toast('Starthilfe nicht verfügbar'); return; }
-          save();
-          showWorkshops();
-        };
-        row.appendChild(button);
-        section.appendChild(row);
-      }
-    }
     body.appendChild(section);
+  }
+  const pct = value => `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 }).format(value * 100)} %`;
+  const start = (id, times) => {
+    syncBandits();
+    syncProduction();
+    let started = 0;
+    for (let n = 0; n < times && startPack(state, id); n++) started++;
+    if (!started) toast('Herstellung nicht möglich');
+    else if (started > 1) toast(`${started} Aufträge gestartet`);
+    save();
+    const scroll = $('overlay-box').scrollTop;
+    showWorkshops();
+    $('overlay-box').scrollTop = scroll;
+  };
+  for (const [id, pack] of Object.entries(PACKS)) {
+    const row = document.createElement('div');
+    row.className = 'workshop pack pack-recipe';
+    const head = document.createElement('div');
+    head.className = 'pack-recipe-head';
+    const info = document.createElement('div');
+    const cost = Object.entries(pack.cost).map(([resource, amount]) => `${COST_ICONS[resource]} ${amount}`).join(' · ');
+    const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarte';
+    info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(craftDuration(id))}<div class="pack-chances">${pack.land} Landkarten + 1 ${valueLabel}, mit ${pct(pack.extraChance)} eine zweite.${pack.hazardChance ? ` Mit ${pct(pack.hazardChance)} ersetzt eine Banditen-Niete eine Landkarte.` : ''}</div>`;
+    const buttons = document.createElement('div');
+    const button = document.createElement('button');
+    button.textContent = 'Herstellen';
+    button.disabled = !canStartPack(state, id);
+    button.onclick = () => start(id, 1);
+    buttons.appendChild(button);
+    const max = maxStartablePacks(state, id);
+    if (max > 1) {
+      const all = document.createElement('button');
+      all.textContent = `Max (${max})`;
+      all.onclick = () => start(id, max);
+      buttons.appendChild(all);
+    }
+    head.append(info, buttons);
+    row.appendChild(head);
+    const chances = packChances(pack);
+    for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`], ['land', 'Landkarten – Chance je Karte']]) {
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'pack-chances';
+      groupTitle.textContent = label;
+      row.appendChild(groupTitle);
+      const contents = document.createElement('div');
+      contents.className = 'pack-contents';
+      for (const [type, chance] of chances[group]) {
+        const card = CARDS[type];
+        const item = document.createElement('div');
+        item.className = 'pack-item';
+        const percent = `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(chance)} %`;
+        const icon = document.createElement('span');
+        icon.className = 'pack-item-icon';
+        icon.style.background = card.color;
+        icon.textContent = card.icon;
+        icon.setAttribute('aria-hidden', 'true');
+        const name = document.createElement('span');
+        name.textContent = card.name + (INSTANT_JOKERS.includes(type) ? ' (wirkt sofort)' : '');
+        const value = document.createElement('span');
+        value.className = 'pack-item-chance';
+        value.textContent = percent;
+        item.append(icon, name, value);
+        contents.appendChild(item);
+      }
+      row.appendChild(contents);
+    }
+    body.appendChild(row);
+  }
+  if (canStartRecovery(state)) {
+    const row = document.createElement('div');
+    row.className = 'pack';
+    row.textContent = `Starthilfe-Pack: kostenlos, mit Holzfäller, Windmühle, Forsten und Feldern · ${formatTime(craftDuration('starthilfe'))}`;
+    const button = document.createElement('button');
+    button.textContent = 'Herstellen';
+    button.onclick = () => {
+      syncBandits();
+      syncProduction();
+      if (!startRecovery(state)) { toast('Starthilfe nicht verfügbar'); return; }
+      save();
+      showWorkshops();
+    };
+    row.appendChild(button);
+    body.appendChild(row);
   }
 }
 
@@ -1292,19 +1263,19 @@ const CARD_DESCRIPTIONS = {
   erde: landText,
   wasser: landText,
   berge: landText,
-  wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller, auch diagonal. Jede Seltenheitsstufe des Waldes über Common bringt dem Holzfäller +1 Holz pro 10 Sekunden.',
+  wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller, auch diagonal. Jede Seltenheitsstufe des Forsts über Common bringt dem Holzfäller +1 Holz pro 10 Sekunden.',
   feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen, auch diagonal. Jede Seltenheitsstufe des Feldes über Common bringt der Windmühle +1 Korn pro 10 Sekunden.',
-  holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Wälder (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Wald ${SUPPLIER_OUTPUT} Holz × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Wäldern läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Holz).`,
+  holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Forste (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Forst ${SUPPLIER_OUTPUT} Holz × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Forsten läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Holz).`,
   windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Aktiv erzeugt sie pro 10 Sekunden je Feld ${SUPPLIER_OUTPUT} Korn × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Feldern läuft sie im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Korn).`,
   haus: 'Erzeugt Gold mit benachbarten Gebäuden, auch diagonal: Haus + Haus 1 Gold, Haus + Taverne 2 Gold pro 10 Sekunden. Jedes Paar zählt einmal und wird mit der höheren Seltenheitsstufe der beiden multipliziert.',
   taverne: 'Erzeugt mit jedem benachbarten Haus 2 Gold pro 10 Sekunden, auch diagonal. Zwei Tavernen erzeugen zusammen nichts. Das Paar wird mit der höheren Seltenheitsstufe multipliziert.',
-  workshop: 'Stellt Packs aus Rohstoffen oder Gold her, ein Pack gleichzeitig. Jede Seltenheitsstufe über Common verkürzt die Herstellungszeit um 10 %. Benachbarte Werkzeugschmieden beschleunigen zusätzlich.',
+  workshop: `Produziert Werkzeuge 🔨, mit denen Packs hergestellt werden. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Schmiede ${SUPPLIER_OUTPUT} Werkzeuge × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Schmieden läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Werkzeug).`,
   lagerhalle: `Erhöht das Holzlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Holz über dem neuen Limit.`,
   kornlager: `Erhöht das Kornlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Korn über dem neuen Limit.`,
   goldlager: `Erhöht das Goldlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Gold über dem neuen Limit.`,
-  werkzeugschmiede: 'Beschleunigt alle benachbarten Workshops (auch diagonal) um 20 % je Seltenheitsstufe; insgesamt höchstens 60 % pro Workshop. Wirkt auch auf laufende Herstellungen.',
+  werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops, auch diagonal. Jede Seltenheitsstufe der Schmiede über Common bringt dem Workshop +1 Werkzeug pro 10 Sekunden.',
   wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Erscheinen oder Verschieben alle Banditencamps in diesem Bereich.',
-  joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile, dem letzten Workshop oder einem Workshop mit laufender Herstellung. Kann ans Deckende gelegt werden.',
+  joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile oder dem letzten Workshop. Kann ans Deckende gelegt werden.',
   joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ (nie in ein Banditencamp). Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
   joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
@@ -1385,16 +1356,7 @@ $('btn-archive').onclick = showArchive;
 $('btn-catalog').onclick = showCatalog;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('ready-packs').onclick = () => { syncBandits(); syncProduction(); showInventory(); };
-$('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
-$('idle-workshop').onclick = () => {
-  syncBandits();
-  syncProduction();
-  const tile = Object.values(state.tiles).find(tile => tile.type === 'workshop' && !tile.job);
-  if (!tile) { toast('Kein untätiger Workshop vorhanden'); return; }
-  expandedWorkshopId = tile.id;
-  showWorkshops();
-  document.querySelector(`[data-workshop-id="${tile.id}"]`).scrollIntoView({ block: 'nearest' });
-};
+$('btn-workshop').onclick = () => { syncBandits(); syncProduction(); showWorkshops(); };
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
 for (const button of document.querySelectorAll('[data-hud-resource]')) {
   button.onclick = () => { syncBandits(); syncProduction(); showWarehouse(button.dataset.hudResource); };
@@ -1703,7 +1665,7 @@ function draw() {
     }
     if (JOKERS[state.hand] && t.type !== 'banditen' &&
         (state.hand === 'joker_schutz' ? !state.protectedFields[`${t.x},${t.y}`] :
-          (state.hand !== 'joker_loeschen' || tiles.length > 1) && (t.type !== 'workshop' || (!t.job && workshopCount > 1)))) {
+          (state.hand !== 'joker_loeschen' || tiles.length > 1) && (t.type !== 'workshop' || workshopCount > 1))) {
       ctx.strokeStyle = '#d39cff';
       ctx.lineWidth = 4;
       ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);

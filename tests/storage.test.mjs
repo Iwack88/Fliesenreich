@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TILES } from '../src/config.js';
-import { addTile, migrateState, newState, placeHand, spawnBandit, spreadBandits, storageCapacity, updateProduction, useJoker, workshopDuration } from '../src/logic.js';
+import { addTile, migrateState, newState, placeHand, spawnBandit, spreadBandits, storageCapacity, updateProduction, useJoker } from '../src/logic.js';
 
 test('storage buildings add 50 only to their own resource and production respects each cap', () => {
   const s = newState();
@@ -17,10 +17,10 @@ test('storage buildings add 50 only to their own resource and production respect
   addTile(s, 'windmuehle', 1, 2);
   addTile(s, 'haus', 2, 2);
   addTile(s, 'haus', 3, 2);
-  assert.deepEqual(storageCapacity(s), { gold: 350, holz: 150, korn: 150 });
-  assert.equal(workshopDuration(s, workshop, 'natur'), 240000);
+  assert.deepEqual(storageCapacity(s), { gold: 350, holz: 150, korn: 150, werkzeug: 100 });
   updateProduction(s, 100000);
-  assert.deepEqual(s.resources, { holz: 150, korn: 150 });
+  assert.equal(s.resources.holz, 150);
+  assert.equal(s.resources.korn, 150);
   assert.equal(s.gold, 350);
 });
 
@@ -40,7 +40,7 @@ test('storage loss by delete and transform immediately discards only excess of a
   t.mock.method(Math, 'random', () => (pool.indexOf('goldlager') + 0.5) / pool.length);
   s.hand = 'joker_verwandeln';
   assert.deepEqual(useJoker(s, 1, 0).losses, { korn: 45 });
-  assert.deepEqual(storageCapacity(s), { gold: 400, holz: 100, korn: 100 });
+  assert.deepEqual(storageCapacity(s), { gold: 400, holz: 100, korn: 100, werkzeug: 100 });
   assert.equal(s.gold, 345);
   s.hand = 'joker_loeschen';
   assert.deepEqual(useJoker(s, 2, 0).losses, {});
@@ -75,12 +75,13 @@ test('old warehouses become wood storage and existing excess gold and active job
   s.tiles = { '0,0': workshop };
   addTile(s, 'lagerhalle', 1, 0);
   workshop.job = { pack: 'natur', duration: 24000, endsAt: 24000 };
+  delete s.crafting;
   s.gold = 450;
   s.productionAt = 0;
   const loaded = JSON.parse(JSON.stringify(s));
   migrateState(loaded, 1000);
   assert.equal(loaded.gold, 450);
-  assert.deepEqual(loaded.tiles['0,0'].job, { pack: 'natur', duration: 24000, endsAt: 24000 });
+  assert.deepEqual(loaded.crafting, [{ pack: 'natur', duration: 24000, endsAt: 24000 }]);
   assert.equal(storageCapacity(loaded).holz, 150);
   updateProduction(loaded, 10000);
   assert.equal(loaded.gold, 450);
@@ -89,15 +90,4 @@ test('old warehouses become wood storage and existing excess gold and active job
   addTile(loaded, 'haus', 3, 0);
   updateProduction(loaded, 20000);
   assert.equal(loaded.gold, 300);
-});
-
-test('new forges adjust old in-progress jobs proportionally without replacing their original duration', () => {
-  const s = newState();
-  const workshop = s.tiles['0,0'];
-  s.tiles = { '0,0': workshop };
-  workshop.job = { pack: 'natur', duration: 24000, endsAt: 24000 };
-  s.hand = 'werkzeugschmiede';
-  placeHand(s, 1, 0, 12000);
-  assert.equal(workshop.job.duration, 19200);
-  assert.equal(workshop.job.endsAt, 21600);
 });
