@@ -114,6 +114,9 @@ const toCell = (sx, sy) => {
 // ---------- Eingabe: Drag, Pinch, Tippen ----------
 const pointers = new Map();
 let dragMoved = 0, pinchDist = 0;
+const LONG_PRESS_MS = 500;
+let longPressTimer = null, longPressFired = false;
+const cancelLongPress = () => { clearTimeout(longPressTimer); longPressTimer = null; };
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
@@ -122,6 +125,21 @@ canvas.addEventListener('pointerdown', (e) => {
   dragButton = e.button;
   canvas.style.cursor = e.button === 2 || e.button === 1 ? 'grabbing' : 'grab';
   if (pointers.size === 2) pinchDist = pointerDistance();
+  cancelLongPress();
+  longPressFired = false;
+  if (pointers.size === 1 && e.button === 0 && !moveMode && !state.hand) {
+    const { clientX, clientY } = e;
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      if (dragMoved >= 10 || pointers.size !== 1) return;
+      const c = toCell(clientX, clientY);
+      const tile = tileAt(state, c.x, c.y);
+      if (!tile || tile.type === 'banditen') return;
+      longPressFired = true;
+      navigator.vibrate?.(30);
+      startMove(tile);
+    }, LONG_PRESS_MS);
+  }
 });
 canvas.addEventListener('pointermove', (e) => {
   const p = pointers.get(e.pointerId);
@@ -129,7 +147,8 @@ canvas.addEventListener('pointermove', (e) => {
   const dx = e.clientX - p.x, dy = e.clientY - p.y;
   p.x = e.clientX; p.y = e.clientY;
   dragMoved += Math.abs(dx) + Math.abs(dy);
-  if (pointers.size === 1) {
+  if (dragMoved >= 10) cancelLongPress();
+  if (pointers.size === 1 && !longPressFired) {
     cam.x -= dx / cam.zoom;
     cam.y -= dy / cam.zoom;
   } else if (pointers.size === 2) {
@@ -141,10 +160,12 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   const wasSingle = pointers.size === 1;
   pointers.delete(e.pointerId);
+  cancelLongPress();
+  if (longPressFired) { longPressFired = false; canvas.style.cursor = 'grab'; return; }
   if (wasSingle && dragMoved < 10 && e.button === 0) onTap(e.clientX, e.clientY);
   canvas.style.cursor = 'grab';
 });
-canvas.addEventListener('pointercancel', (e) => pointers.delete(e.pointerId));
+canvas.addEventListener('pointercancel', (e) => { pointers.delete(e.pointerId); cancelLongPress(); longPressFired = false; });
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const before = toWorld(e.clientX, e.clientY);
