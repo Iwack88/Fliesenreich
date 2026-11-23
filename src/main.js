@@ -1098,6 +1098,70 @@ function syncBandits() {
 
 let archiveFilter = 'all';
 
+const CATALOG_CATEGORIES = [
+  ['landschaft', '🌄 Landschaft'],
+  ['industrie', '🏭 Industrie'],
+  ['siedlung', '🏘️ Siedlung'],
+  ['verteidigung', '🛡️ Verteidigung'],
+  ['joker', '🃏 Joker'],
+  ['gefahr', '⚠️ Gefahren'],
+];
+const landText = 'Wird beim Ziehen automatisch auf ein zufälliges freies Feld neben einem bestehenden Tile gelegt; ohne freien Platz kommt die Karte ans Deckende. Hat derzeit keine Produktion.';
+const CARD_DESCRIPTIONS = {
+  gras: landText,
+  erde: landText,
+  wasser: landText,
+  berge: landText,
+  wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller, auch diagonal. Jede Seltenheitsstufe des Waldes über Common bringt dem Holzfäller +1 Holz pro 10 Sekunden.',
+  feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen, auch diagonal. Jede Seltenheitsstufe des Feldes über Common bringt der Windmühle +1 Korn pro 10 Sekunden.',
+  holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Wälder (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Wald ${SUPPLIER_OUTPUT} Holz × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Wäldern läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Holz).`,
+  windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Aktiv erzeugt sie pro 10 Sekunden je Feld ${SUPPLIER_OUTPUT} Korn × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Feldern läuft sie im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Korn).`,
+  haus: 'Erzeugt Gold mit benachbarten Gebäuden, auch diagonal: Haus + Haus 1 Gold, Haus + Taverne 2 Gold pro 10 Sekunden. Jedes Paar zählt einmal und wird mit der höheren Seltenheitsstufe der beiden multipliziert.',
+  taverne: 'Erzeugt mit jedem benachbarten Haus 2 Gold pro 10 Sekunden, auch diagonal. Zwei Tavernen erzeugen zusammen nichts. Das Paar wird mit der höheren Seltenheitsstufe multipliziert.',
+  workshop: 'Stellt Packs aus Rohstoffen oder Gold her, ein Pack gleichzeitig. Jede Seltenheitsstufe über Common verkürzt die Herstellungszeit um 10 %. Benachbarte Werkzeugschmieden beschleunigen zusätzlich.',
+  lagerhalle: `Erhöht das Holzlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Holz über dem neuen Limit.`,
+  kornlager: `Erhöht das Kornlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Korn über dem neuen Limit.`,
+  goldlager: `Erhöht das Goldlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Gold über dem neuen Limit.`,
+  werkzeugschmiede: 'Beschleunigt alle benachbarten Workshops (auch diagonal) um 20 % je Seltenheitsstufe; insgesamt höchstens 60 % pro Workshop. Wirkt auch auf laufende Herstellungen.',
+  wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Platzieren alle Banditencamps in diesem Bereich.',
+  joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile, dem letzten Workshop oder einem Workshop mit laufender Herstellung. Kann ans Deckende gelegt werden.',
+  joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ (nie in ein Banditencamp). Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
+  joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
+  joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
+  joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
+  banditen_niete: 'Erscheint beim Ziehen sofort als Banditencamp auf einem zufälligen ungeschützten freien Feld, sonst auf einem ungeschützten Tile. Camps breiten sich alle 10 Minuten aus und lassen sich nicht mit Jokern entfernen – nur ein Wachturm vertreibt sie.',
+};
+
+function catalogCategory(id) {
+  if (JOKERS[id]) return 'joker';
+  if (HAZARDS[id]) return 'gefahr';
+  return TILES[id].category;
+}
+
+function showCatalog() {
+  const body = openOverlay('Karten-Browser', 'catalog');
+  body.innerHTML = '<p class="catalog-intro">Alle Karten im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht.</p>';
+  const ids = Object.keys(CARDS).filter(id => id !== 'banditen');
+  for (const [category, label] of CATALOG_CATEGORIES) {
+    const cards = ids.filter(id => catalogCategory(id) === category);
+    if (!cards.length) continue;
+    const title = document.createElement('h3');
+    title.className = 'section-title';
+    title.textContent = label;
+    body.appendChild(title);
+    for (const id of cards) {
+      const card = CARDS[id];
+      const packs = Object.values(PACKS).filter(pack => pack.weights[id]).map(pack => pack.name);
+      const el = document.createElement('div');
+      el.className = 'card catalog-card';
+      el.innerHTML = `${cardArt(id)}<b class="card-name">${card.name}</b>` +
+        `<span class="card-description">${CARD_DESCRIPTIONS[id]}</span>` +
+        `<span class="card-meta">Vorkommen: ${packs.length ? packs.join(', ') : 'nur Start/Shop'}<br>Shop: ${Math.round(SHOP_PRICES[card.shopTier || card.rarity] * (1 - SHOP_DISCOUNT))} ${GOLD_ICON}</span>`;
+      body.appendChild(el);
+    }
+  }
+}
+
 function jumpTo(tile) {
   cam.x = (tile.x + 0.5) * TILE; cam.y = (tile.y + 0.5) * TILE;
   selected = tile;
@@ -1137,6 +1201,7 @@ function showArchive() {
 }
 
 $('btn-archive').onclick = showArchive;
+$('btn-catalog').onclick = showCatalog;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('ready-packs').onclick = () => { syncBandits(); syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncBandits(); syncProduction(); expandedWorkshopId = null; showWorkshops(); };
