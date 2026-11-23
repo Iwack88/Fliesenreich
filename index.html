@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -38,7 +38,10 @@
       <button id="btn-new-game" aria-label="Neues Spiel" title="Neues Spiel"><span class="action-icon" aria-hidden="true">🔄</span><span class="action-label">Neues Spiel</span></button>
       <button id="btn-shuffle" aria-label="Deck mischen" title="Deck mischen"><span class="action-icon" aria-hidden="true">🔀</span><span id="btn-shuffle-label" class="action-label">5🪙</span></button>
     </div>
-    <button id="queue" aria-label="Nächste Karte ziehen"></button>
+    <div id="queue-wrap">
+      <button id="queue" aria-label="Nächste Karte ziehen"></button>
+      <button id="btn-delete-card" aria-label="Nächste Karte löschen" title="Nächste Karte löschen">🗑️ Löschen · +10🪙</button>
+    </div>
   </div>
 </div>
 
@@ -67,6 +70,6 @@
 <button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=50"></script>
+<script type="module" src="src/main.js?v=51"></script>
 </body>
 </html>

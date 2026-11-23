@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS } from './config.js?v=25';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=30';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS } from './config.js?v=26';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=31';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -587,7 +587,7 @@ function updateTilePopup() {
   }
   html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
   el.innerHTML = html;
-  const top = Math.max($('hud').getBoundingClientRect().bottom, $('queue').getBoundingClientRect().bottom) + 8;
+  const top = Math.max($('hud').getBoundingClientRect().bottom, $('queue-wrap').getBoundingClientRect().bottom) + 8;
   el.style.top = `${top}px`;
   el.style.maxHeight = `calc(100vh - ${top + 8}px)`;
   el.classList.remove('hidden');
@@ -608,6 +608,7 @@ function cardArt(id) {
 function renderQueue() {
   const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
   $('queue').disabled = !!state.hand || !state.deck.length;
+  $('btn-delete-card').disabled = !canDeleteCard(state);
   if (key === queueKey) return;
   queueKey = key;
   const card = CARDS[state.deck[0]];
@@ -1413,6 +1414,13 @@ $('btn-follow').onclick = () => {
 $('btn-shields').onclick = () => {
   showShields = !showShields;
   $('btn-shields').setAttribute('aria-pressed', String(showShields));
+};
+$('btn-delete-card').onclick = () => {
+  const name = CARDS[state.deck[0]]?.name;
+  const card = deleteNextCard(state);
+  if (!card) { toast('Diese Karte kann nicht gelöscht werden'); return; }
+  toast(`${name} gelöscht · +${DELETE_CARD_REWARD} ${GOLD_ICON}`);
+  save();
 };
 $('btn-shuffle').onclick = () => {
   if (shuffleDeck(state)) { toast('Deck gemischt'); save(); } else toast(`Shuffle kostet ${SHUFFLE_COST} 🪙`);

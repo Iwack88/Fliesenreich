@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER } from './config.js?v=25';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER } from './config.js?v=26';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -237,6 +237,18 @@ export function returnHand(s) {
   s.hand = null;
   s.handRarity = null;
   return true;
+}
+
+export const canDeleteCard = s => !s.hand && s.deck.length > 0 && !UNDELETABLE_CARDS.includes(s.deck[0]);
+
+// Entfernt die oberste Deckkarte gegen Gold (begrenzt durch die Lagerkapazität).
+export function deleteNextCard(s) {
+  if (!canDeleteCard(s)) return null;
+  ensureDeckRarities(s);
+  const card = s.deck.shift();
+  s.deckRarities.shift();
+  s.gold = Math.max(s.gold, Math.min(s.gold + DELETE_CARD_REWARD, storageCapacity(s).gold));
+  return card;
 }
 
 export function shuffleDeck(s) {

@@ -2,6 +2,8 @@
 // Grafik: optional assets/tiles/<id>.png ablegen, sonst wird Farbe + Emoji genutzt.
 
 export const START_GOLD = 100;
+export const DELETE_CARD_REWARD = 10; // Gold fürs Löschen der nächsten Karte
+export const UNDELETABLE_CARDS = ['banditen', 'banditen_niete', 'berge', 'gras', 'wasser', 'erde'];
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;

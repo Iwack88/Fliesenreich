@@ -98,3 +98,19 @@ test('shop joker refreshes immediately, resets timer and invalidates prior offer
   assert.equal(buyShopCard(s, oldCard, round), false);
   assert.deepEqual(JSON.parse(JSON.stringify(s)).shop, s.shop);
 });
+
+test('deleting the next card pays gold, but landscape and hazard cards are protected', async () => {
+  const { newState, canDeleteCard, deleteNextCard, storageCapacity } = await import('../src/logic.js');
+  const s = newState();
+  s.deck = ['berge', 'holzfaeller', 'gras', 'banditen_niete'];
+  s.deckRarities = ['common', 'common', 'common', 'common'];
+  assert.equal(canDeleteCard(s), false);
+  assert.equal(deleteNextCard(s), null);
+  s.deck.shift(); s.deckRarities.shift();
+  const gold = s.gold;
+  assert.equal(deleteNextCard(s), 'holzfaeller');
+  assert.equal(s.gold, Math.min(gold + 10, Math.max(gold, storageCapacity(s).gold)));
+  assert.deepEqual(s.deck, ['gras', 'banditen_niete']);
+  assert.equal(s.deckRarities.length, 2);
+  assert.equal(canDeleteCard(s), false);
+});
