@@ -23,7 +23,6 @@ export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
 export const GUARD_RADIUS = 3;
 export const SHOP_INTERVAL = 5 * 60 * 1000;
-export const SHOP_DURATION = 60 * 1000;
 export const SHOP_OFFER_COUNT = 4;
 export const SHOP_DISCOUNT = 0.25;
 export const SHOP_PRICES = { common: 80, uncommon: 200, rare: 400 };
@@ -36,19 +35,19 @@ export const PACK_MIN_SPECIAL = 2;
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: { holz: 20, korn: 15 }, duration: 180000, cards: 5,
-    weights: { gras: 24, erde: 23, wasser: 23, berge: 6, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 24, erde: 23, wasser: 23, berge: 6, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
   },
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 35, korn: 25 }, duration: 360000, cards: 5,
-    weights: { gras: 18, erde: 22, wasser: 22, berge: 6, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 18, erde: 22, wasser: 22, berge: 6, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
   },
   humancity: {
     name: 'HumanCity-Pack', cost: { holz: 50, korn: 35 }, duration: 540000, cards: 5,
-    weights: { gras: 13, erde: 13, wasser: 13, berge: 6, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 13, erde: 13, wasser: 13, berge: 6, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
   },
   joker: {
     name: 'Joker-Pack', cost: { gold: 250 }, duration: 360000, cards: 5,
-    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
   },
 };
 
@@ -87,6 +86,7 @@ export const JOKERS = {
   joker_verwandeln: { name: 'Verwandlungs-Joker', icon: '✨', color: '#b88bdb', rarity: 'rare' },
   joker_schutz: { name: 'Schutz-Joker', icon: '🛡️', color: '#b88bdb', rarity: 'rare' },
   joker_banditenzeit: { name: 'Banditenzeit-Joker', icon: '⏳', color: '#b88bdb', rarity: 'rare' },
+  joker_shop: { name: 'Shop-Refresh-Joker', icon: '🔄', color: '#b88bdb', rarity: 'rare' },
 };
 
 export const HAZARDS = {

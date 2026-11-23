@@ -133,4 +133,10 @@
     <path d="M34 22c0 16 6 22 16 28-10 6-16 12-16 28h32c0-16-6-22-16-28 10-6 16-12 16-28z" fill="#d4e4d8" stroke="#796b5e" stroke-width="2.5"/>
     <path d="M39 31c1 10 6 14 11 17 5-3 10-7 11-17zM40 73c2-8 6-12 10-15 4 3 8 7 10 15z" fill="#d4b273"/>
   </symbol>
+  <symbol id="joker_shop" viewBox="0 0 100 100">
+    <path d="M22 43h56v34H22z" fill="#d7c6a5" stroke="#67594a" stroke-width="3"/>
+    <path d="M18 43 26 29h48l8 14z" fill="#8ca38b" stroke="#67594a" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M32 77V54h15v23m9-23h13v12H56z" fill="#a87b54" stroke="#67594a" stroke-width="2.5"/>
+    <path d="M37 20a20 20 0 0 1 32 2m-1-8 1 8 8-2" fill="none" stroke="#ad8b51" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
 </svg>

@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=20';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=25';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=21';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=26';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -42,7 +42,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=3');
+    const response = await fetch('assets/card-art.svg?v=4');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -423,7 +423,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=3#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=4#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
@@ -433,7 +433,7 @@ function renderQueue() {
   const card = CARDS[state.deck[0]];
   $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[state.deck[0]] ? `, ${RARITY[state.deckRarities[0]].name}` : ''} ziehen` : 'Deck leer');
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${state.deck[0] === 'joker_banditenzeit' ? '<span>Wirkt sofort</span>' : LAND_TYPES.includes(state.deck[0]) ? '<span>Wird automatisch platziert</span>' : ''}`
+    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${['joker_banditenzeit', 'joker_shop'].includes(state.deck[0]) ? '<span>Wirkt sofort</span>' : LAND_TYPES.includes(state.deck[0]) ? '<span>Wird automatisch platziert</span>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -453,8 +453,8 @@ function updateHud() {
   $('btn-shuffle-label').textContent = `${SHUFFLE_COST}🪙`;
   $('btn-shuffle').disabled = state.gold < SHUFFLE_COST || state.deck.length < 2;
   const sale = shopStatus(state);
-  $('btn-shop-label').textContent = sale.open ? `Shop SALE ${formatTime(sale.remaining)}` : `Shop ${formatTime(sale.remaining)}`;
-  $('btn-shop').setAttribute('aria-label', sale.open ? `Shop, Sale endet in ${formatTime(sale.remaining)}` : `Shop, Sale in ${formatTime(sale.remaining)}`);
+  $('btn-shop-label').textContent = `Shop ${formatTime(sale.remaining)}`;
+  $('btn-shop').setAttribute('aria-label', `Shop, neue Angebote in ${formatTime(sale.remaining)}`);
   const idleWorkshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop' && !tile.job).length;
   $('idle-workshop').hidden = !idleWorkshops;
   $('idle-workshop-count').textContent = idleWorkshops;
@@ -489,6 +489,14 @@ function drawNextCard() {
     refreshTargets();
     save();
     toast(`⏳ Banditen-Timer auf ${formatTime(BANDIT_INTERVAL)} zurückgesetzt`);
+    return;
+  }
+  if (card === 'joker_shop') {
+    selected = null;
+    refreshTargets();
+    save();
+    updateShopView();
+    toast('🔄 Shop-Angebot erneuert · nächster Wechsel in 5:00');
     return;
   }
   if (LAND_TYPES.includes(card)) {
@@ -752,7 +760,7 @@ function showInventory() {
     const rarity = state.deckRarities[i];
     const el = document.createElement('div');
     el.className = `card ${rarity}`;
-    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : LAND_TYPES.includes(id) ? '<span class="card-effect">Automatisch platziert</span>' : ''}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${['joker_banditenzeit', 'joker_shop'].includes(id) ? '<span class="card-effect">Wirkt sofort</span>' : LAND_TYPES.includes(id) ? '<span class="card-effect">Automatisch platziert</span>' : ''}`;
     body.appendChild(el);
   });
 }
@@ -773,13 +781,13 @@ function showShop() {
       const card = CARDS[offer.card];
       const row = document.createElement('div');
       row.className = 'pack';
-      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : ''}</span>`;
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : offer.card === 'joker_shop' ? '<br>Erneuert das Shop-Angebot beim Ziehen sofort.' : ''}</span>`;
       const button = document.createElement('button');
       button.dataset.shopCard = offer.card;
       button.onclick = () => {
         syncBandits();
         syncProduction();
-        if (!buyShopCard(state, offer.card, round)) { toast('Kauf nicht möglich: Sale beendet, ausverkauft oder zu wenig Gold'); updateShopView(); return; }
+        if (!buyShopCard(state, offer.card, round)) { toast('Kauf nicht möglich: Angebot erneuert, ausverkauft oder zu wenig Gold'); updateShopView(); return; }
         save();
         showShop();
         toast(`${card.name} gekauft – im Inventar am Deckende`);
@@ -822,9 +830,7 @@ function updateShopView() {
     $('overlay-box').scrollTop = scroll;
     return;
   }
-  $('shop-sale-status').textContent = sale.open
-    ? `SALE: ${SHOP_DISCOUNT * 100} % Rabatt · noch ${formatTime(sale.remaining)}. Jede Karte einmal verfügbar.`
-    : `Karten-Shop geschlossen · nächster Sale in ${formatTime(sale.remaining)} aktiver Spielzeit. Alle 5 Minuten, eine Minute lang, vier zufällige Karten inklusive Joker und Nieten.`;
+  $('shop-sale-status').textContent = `Shop dauerhaft geöffnet · neue Angebote in ${formatTime(sale.remaining)} aktiver Spielzeit. ${SHOP_DISCOUNT * 100} % Rabatt; jede Karte einmal verfügbar.`;
   for (const offer of state.shop.offers) {
     const button = document.querySelector(`[data-shop-card="${offer.card}"]`);
     if (!button) continue;
@@ -1001,7 +1007,7 @@ function showWorkshops() {
           icon.textContent = card.icon;
           icon.setAttribute('aria-hidden', 'true');
           const name = document.createElement('span');
-          name.textContent = card.name + (type === 'joker_banditenzeit' ? ' (wirkt sofort)' : '');
+          name.textContent = card.name + (['joker_banditenzeit', 'joker_shop'].includes(type) ? ' (wirkt sofort)' : '');
           const value = document.createElement('span');
           value.className = 'pack-item-chance';
           value.textContent = percent;

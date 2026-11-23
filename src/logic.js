@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=20';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=21';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -45,6 +45,7 @@ export function newState() {
   const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   s.deckRarities = s.deck.map(rollRarity);
   s.shop = { elapsed: 0, round: 0, offers: [] };
+  refreshShop(s);
   s.protectedFields = {};
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
@@ -59,6 +60,10 @@ export function migrateState(s, now = Date.now()) {
   }
   if (!s.shop) {
     s.shop = { elapsed: 0, round: 0, offers: [] };
+    changed = true;
+  }
+  if (!s.shop.offers.length) {
+    refreshShop(s, false);
     changed = true;
   }
   if (!s.resources) {
@@ -143,8 +148,16 @@ export function packChances(pack) {
 export const cardCount = (s) => s.deck.length;
 
 export function shopStatus(s) {
-  const open = s.shop.round > 0 && s.shop.elapsed < SHOP_DURATION;
-  return { open, remaining: (open ? SHOP_DURATION : SHOP_INTERVAL) - s.shop.elapsed };
+  return { open: true, remaining: SHOP_INTERVAL - s.shop.elapsed };
+}
+
+export function refreshShop(s, resetTimer = true) {
+  s.shop.round++;
+  if (resetTimer) s.shop.elapsed = 0;
+  s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
+    .slice(0, SHOP_OFFER_COUNT).map(card => ({
+      card, price: Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
+    }));
 }
 
 export function advanceShop(s, elapsedMs) {
@@ -153,11 +166,8 @@ export function advanceShop(s, elapsedMs) {
   const rounds = Math.floor(elapsed / SHOP_INTERVAL);
   s.shop.elapsed = elapsed % SHOP_INTERVAL;
   if (rounds) {
-    s.shop.round += rounds;
-    s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
-      .slice(0, SHOP_OFFER_COUNT).map(card => ({
-        card, price: Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
-      }));
+    s.shop.round += rounds - 1;
+    refreshShop(s, false);
   }
 }
 
@@ -177,6 +187,7 @@ export function drawCard(s) {
   const card = s.deck.shift();
   const rarity = s.deckRarities.shift();
   if (card === 'joker_banditenzeit') { s.banditElapsed = 0; s.handRarity = null; }
+  else if (card === 'joker_shop') { refreshShop(s); s.handRarity = null; }
   else { s.hand = card; s.handRarity = rarity; }
   return card;
 }

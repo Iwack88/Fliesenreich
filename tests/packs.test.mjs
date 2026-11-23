@@ -6,19 +6,20 @@ import { openPack, packChances } from '../src/logic.js';
 test('displayed probabilities include the guarantee and sum to 100%', () => {
   const nature = Object.fromEntries(packChances(PACKS.natur));
   const explorer = Object.fromEntries(packChances(PACKS.basis));
-  assert.ok(Math.abs(nature.gras - 100 * (3 * 24 / 106) / 5) < 1e-10);
-  assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 106 + 2 * 6 / 28) / 5) < 1e-10);
-  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 106 + 2 * 2 / 36) / 5) < 1e-10);
+  assert.ok(Math.abs(nature.gras - 100 * (3 * 24 / 107) / 5) < 1e-10);
+  assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 107 + 2 * 6 / 29) / 5) < 1e-10);
+  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 107 + 2 * 2 / 37) / 5) < 1e-10);
   assert.equal(explorer.windmuehle, explorer.taverne);
   assert.ok(explorer.joker_loeschen > 0);
   assert.equal(explorer.joker_loeschen, explorer.joker_verwandeln);
   assert.equal(nature.joker_loeschen, undefined);
-  assert.ok(Math.abs(nature.banditen_niete - 100 * 3 * 2 / 106 / 5) < 1e-10);
+  assert.ok(Math.abs(nature.banditen_niete - 100 * 3 * 2 / 107 / 5) < 1e-10);
   assert.equal(explorer.banditen_niete, nature.banditen_niete);
   for (const pack of Object.values(PACKS)) {
     const chances = packChances(pack);
     assert.ok(Object.fromEntries(chances).joker_schutz > 0);
     assert.ok(Object.fromEntries(chances).joker_banditenzeit > 0);
+    assert.ok(Object.fromEntries(chances).joker_shop > 0);
     if (pack !== PACKS.joker) for (const id of ['lagerhalle', 'kornlager', 'goldlager', 'werkzeugschmiede']) assert.ok(Object.fromEntries(chances)[id] > 0);
     assert.ok(Math.abs(chances.reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
   }
@@ -53,14 +54,14 @@ test('a missing pack does not change the deck', () => {
 
 test('HumanCity offers houses, taverns and guards with guarantee-adjusted chances', () => {
   const chances = Object.fromEntries(packChances(PACKS.humancity));
-  assert.ok(Math.abs(chances.wachturm - 100 * (3 * 8 / 108 + 2 * 8 / 58) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.haus - 100 * (3 * 30 / 108 + 2 * 30 / 58) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.taverne - 100 * (3 * 12 / 108 + 2 * 12 / 58) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.banditen_niete - 100 * 3 * 5 / 108 / 5) < 1e-10);
+  assert.ok(Math.abs(chances.wachturm - 100 * (3 * 8 / 109 + 2 * 8 / 59) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.haus - 100 * (3 * 30 / 109 + 2 * 30 / 59) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.taverne - 100 * (3 * 12 / 109 + 2 * 12 / 59) / 5) < 1e-10);
+  assert.ok(Math.abs(chances.banditen_niete - 100 * 3 * 5 / 109 / 5) < 1e-10);
 });
 
-test('Joker pack offers all four jokers at 25 percent each', () => {
+test('Joker pack offers all five jokers at 20 percent each', () => {
   const chances = Object.fromEntries(packChances(PACKS.joker));
   assert.deepEqual(Object.keys(chances).sort(), Object.keys(JOKERS).sort());
-  for (const chance of Object.values(chances)) assert.equal(chance, 25);
+  for (const chance of Object.values(chances)) assert.equal(chance, 20);
 });
