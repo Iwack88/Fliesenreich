@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=22';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=23';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -132,17 +132,20 @@ function pickWeighted(entries) {
   return entries[entries.length - 1][0];
 }
 
+// Prozentwerte innerhalb der Gruppen; wirft bei ungültiger Konfiguration.
 export function packChances(pack) {
-  const entries = Object.entries(pack.weights);
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  const specialTotal = entries.filter(([id]) => !PACK_FILLER_TYPES.includes(id)).reduce((sum, [, weight]) => sum + weight, 0);
-  if (!total || !specialTotal || pack.cards < PACK_MIN_SPECIAL || entries.some(([id, weight]) => !CARDS[id] || !Number.isFinite(weight) || weight <= 0)) {
-    throw new Error(`Ungültige Kartengewichte für ${pack.name}`);
+  const percent = weights => {
+    const entries = Object.entries(weights);
+    const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+    if (!total || entries.some(([id, weight]) => !CARDS[id] || !Number.isFinite(weight) || weight <= 0)) {
+      throw new Error(`Ungültige Kartengewichte für ${pack.name}`);
+    }
+    return entries.map(([id, weight]) => [id, 100 * weight / total]);
+  };
+  if (!Number.isInteger(pack.land) || pack.land < 1 || !(pack.extraChance >= 0 && pack.extraChance <= 1) || !(pack.hazardChance >= 0 && pack.hazardChance <= 1)) {
+    throw new Error(`Ungültiger Pack-Aufbau für ${pack.name}`);
   }
-  return entries.map(([id, weight]) => [id, 100 * (
-    (pack.cards - PACK_MIN_SPECIAL) * weight / total +
-    (PACK_FILLER_TYPES.includes(id) ? 0 : PACK_MIN_SPECIAL * weight / specialTotal)
-  ) / pack.cards]);
+  return { land: percent(PACK_LAND_WEIGHTS), value: percent(pack.weights) };
 }
 
 export const cardCount = (s) => s.deck.length;
@@ -556,14 +559,13 @@ export function openPack(s, packId) {
   const pack = PACKS[packId];
   if (!pack) throw new Error(`Unbekanntes Pack: ${packId}`);
   packChances(pack);
-  const pool = Object.entries(pack.weights);
-  const specialPool = pool.filter(([id]) => !PACK_FILLER_TYPES.includes(id));
+  const landPool = Object.entries(PACK_LAND_WEIGHTS);
+  const valuePool = Object.entries(pack.weights);
   s.packs[packId]--;
-  const drawn = [];
-  for (let i = 0; i < pack.cards; i++) {
-    const id = pickWeighted(i < PACK_MIN_SPECIAL ? specialPool : pool);
-    drawn.push(id);
-  }
+  const drawn = Array.from({ length: pack.land }, () => pickWeighted(landPool));
+  if (Math.random() < pack.hazardChance) drawn[0] = 'banditen_niete';
+  drawn.push(pickWeighted(valuePool));
+  if (Math.random() < pack.extraChance) drawn.push(pickWeighted(valuePool));
   const cards = shuffled(drawn);
   addCards(s, cards);
   return cards;

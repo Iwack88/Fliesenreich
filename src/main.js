@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=22';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=27';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=23';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=28';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -1000,8 +1000,9 @@ function showWorkshops() {
         head.className = 'pack-recipe-head';
         const info = document.createElement('div');
         const cost = Object.entries(pack.cost).map(([resource, amount]) => `${{ gold: '🪙', holz: '🪵', korn: '🌾' }[resource]} ${amount}`).join(' · ');
-        const guarantee = id === 'joker' ? 'nur Joker' : `mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser, Berge und Banditen-Niete`;
-        info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, ${guarantee}. Chance je zufälliger Karte:</div>`;
+        const pct = value => `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 }).format(value * 100)} %`;
+        const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarte';
+        info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.land} Landkarten + 1 ${valueLabel}, mit ${pct(pack.extraChance)} eine zweite.${pack.hazardChance ? ` Mit ${pct(pack.hazardChance)} ersetzt eine Banditen-Niete eine Landkarte.` : ''}</div>`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.disabled = !canStartPack(state, tile, id);
@@ -1014,9 +1015,15 @@ function showWorkshops() {
         };
         head.append(info, button);
         row.appendChild(head);
+        const chances = packChances(pack);
+        for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`], ['land', 'Landkarten – Chance je Karte']]) {
+        const groupTitle = document.createElement('div');
+        groupTitle.className = 'pack-chances';
+        groupTitle.textContent = label;
+        row.appendChild(groupTitle);
         const contents = document.createElement('div');
         contents.className = 'pack-contents';
-        for (const [type, chance] of packChances(pack)) {
+        for (const [type, chance] of chances[group]) {
           const card = CARDS[type];
           const item = document.createElement('div');
           item.className = 'pack-item';
@@ -1035,6 +1042,7 @@ function showWorkshops() {
           contents.appendChild(item);
         }
         row.appendChild(contents);
+        }
         section.appendChild(row);
       }
       if (canStartRecovery(state, tile)) {
@@ -1151,7 +1159,7 @@ function showCatalog() {
     body.appendChild(title);
     for (const id of cards) {
       const card = CARDS[id];
-      const packs = Object.values(PACKS).filter(pack => pack.weights[id]).map(pack => pack.name);
+      const packs = Object.values(PACKS).filter(pack => pack.weights[id] || (LAND_TYPES.includes(id) && pack.land) || (id === 'banditen_niete' && pack.hazardChance)).map(pack => pack.name);
       const el = document.createElement('div');
       el.className = 'card catalog-card';
       el.innerHTML = `${cardArt(id)}<b class="card-name">${card.name}</b>` +

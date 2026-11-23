@@ -28,13 +28,13 @@ test('HumanCity is crafted with resources, gains forge speed and opens from inve
   const workshop = s.tiles['0,0'];
   addTile(s, 'werkzeugschmiede', 1, 1);
   assert.equal(startPack(s, workshop, 'humancity', 1000), true);
-  assert.deepEqual(s.resources, { holz: 50, korn: 65 });
-  assert.equal(workshop.job.duration, 432000);
-  updateProduction(s, 433000);
+  assert.deepEqual(s.resources, { holz: 25, korn: 45 });
+  assert.equal(workshop.job.duration, 576000);
+  updateProduction(s, 577000);
   assert.equal(s.packs.humancity, 1);
-  t.mock.method(Math, 'random', () => 0.85);
+  t.mock.method(Math, 'random', () => 0.75);
   const cards = openPack(s, 'humancity');
-  assert.equal(cards.length, 5);
+  assert.equal(cards.length, 4);
   assert.ok(cards.includes('wachturm'));
   assert.equal(s.packs.humancity, 0);
 });
@@ -42,23 +42,25 @@ test('HumanCity is crafted with resources, gains forge speed and opens from inve
 test('Joker pack charges gold once, uses forge speed and delivers only jokers offline', () => {
   const s = newState();
   s.productionAt = 1000;
-  s.gold = 249;
+  s.gold = 349;
   const workshop = s.tiles['0,0'];
   addTile(s, 'werkzeugschmiede', 1, 1);
   assert.equal(startPack(s, workshop, 'joker', 1000), false);
-  assert.equal(s.gold, 249);
-  s.gold = 250;
+  assert.equal(s.gold, 349);
+  s.gold = 350;
   const resources = { ...s.resources };
   assert.equal(startPack(s, workshop, 'joker', 1000), true);
   assert.equal(s.gold, 0);
   assert.deepEqual(s.resources, resources);
-  assert.equal(workshop.job.duration, 288000);
+  assert.equal(workshop.job.duration, 384000);
   assert.equal(startPack(s, workshop, 'joker', 1000), false);
-  updateProduction(s, 289000);
+  updateProduction(s, 385000);
   assert.equal(s.packs.joker, 1);
   const cards = openPack(s, 'joker');
-  assert.equal(cards.length, 5);
-  assert.ok(cards.every(id => id.startsWith('joker_')));
+  const jokers = cards.filter(id => id.startsWith('joker_')).length;
+  assert.ok(jokers >= 1 && jokers <= 2);
+  assert.equal(cards.length, 3 + jokers);
+  assert.ok(!cards.includes('banditen_niete'));
 });
 
 test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
@@ -90,20 +92,21 @@ test('workshops spend resources once, gain forge speed, and deliver packs offlin
   s.productionAt = 1000;
   const w = s.tiles['0,0'];
   addTile(s, 'werkzeugschmiede', 1, 1);
-  assert.equal(workshopDuration(s, w, 'natur'), 144000);
+  assert.equal(workshopDuration(s, w, 'natur'), 192000);
   assert.equal(startPack(s, w, 'natur', 1000), true);
-  assert.deepEqual(s.resources, { holz: 80, korn: 85 });
+  assert.deepEqual(s.resources, { holz: 70, korn: 75 });
   assert.equal(startPack(s, w, 'natur', 1000), false);
-  assert.equal(updateProduction(s, 144999), true);
+  assert.equal(updateProduction(s, 192999), true);
   assert.equal(s.packs.natur, undefined);
-  assert.equal(updateProduction(s, 145000), true);
+  assert.equal(updateProduction(s, 193000), true);
   assert.equal(s.packs.natur, 1);
   assert.equal(w.job, undefined);
-  updateProduction(s, 155000);
+  updateProduction(s, 203000);
   assert.equal(s.packs.natur, 1);
   const before = s.deck.length;
-  assert.equal(openPack(s, 'natur').length, 5);
-  assert.equal(s.deck.length, before + 5);
+  const opened = openPack(s, 'natur');
+  assert.ok(opened.length === 5 || opened.length === 6);
+  assert.equal(s.deck.length, before + opened.length);
   assert.equal(openPack(s, 'natur'), null);
 });
 
@@ -112,7 +115,7 @@ test('insufficient resources cannot start and forge speed has a limit', () => {
   const w = s.tiles['0,0'];
   s.resources = { holz: 2, korn: 2 };
   for (const [x, y] of [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0]]) addTile(s, 'werkzeugschmiede', x, y);
-  assert.equal(workshopDuration(s, w, 'natur'), 72000);
+  assert.equal(workshopDuration(s, w, 'natur'), 96000);
   assert.equal(startPack(s, w, 'natur', 0), false);
   assert.deepEqual(s.resources, { holz: 2, korn: 2 });
   assert.equal(w.job, undefined);
@@ -125,18 +128,18 @@ test('adding and removing a forge adjusts only remaining production time, includ
   s.tiles = { '0,0': w };
   startPack(s, w, 'natur', 0);
   s.hand = 'werkzeugschmiede';
-  assert.ok(placeHand(s, 1, 0, 90000));
+  assert.ok(placeHand(s, 1, 0, 120000));
   assert.equal(forgeCount(s, w), 1);
-  assert.equal(w.job.endsAt, 162000);
-  assert.equal(w.job.duration, 144000);
+  assert.equal(w.job.endsAt, 216000);
+  assert.equal(w.job.duration, 192000);
   s = JSON.parse(JSON.stringify(s));
   s.hand = 'joker_loeschen';
-  assert.ok(useJoker(s, 1, 0, 126000));
+  assert.ok(useJoker(s, 1, 0, 168000));
   assert.equal(forgeCount(s, s.tiles['0,0']), 0);
-  assert.equal(s.tiles['0,0'].job.endsAt, 171000);
-  assert.equal(updateProduction(s, 170999), true);
+  assert.equal(s.tiles['0,0'].job.endsAt, 228000);
+  assert.equal(updateProduction(s, 227999), true);
   assert.equal(s.packs.natur, undefined);
-  updateProduction(s, 171000);
+  updateProduction(s, 228000);
   assert.equal(s.packs.natur, 1);
 });
 
@@ -151,12 +154,12 @@ test('transforming a tile to or from a forge updates neighboring workshops', (t)
   const poolSize = Object.keys(TILES).length - 2;
   t.mock.method(Math, 'random', () => (index + 0.5) / poolSize);
   s.hand = 'joker_verwandeln';
-  assert.ok(useJoker(s, 1, 1, 15000));
-  assert.equal(w.job.endsAt, 147000);
+  assert.ok(useJoker(s, 1, 1, 20000));
+  assert.equal(w.job.endsAt, 196000);
   index = Object.keys(TILES).filter(type => type !== 'werkzeugschmiede' && type !== 'banditen').indexOf('gras');
   s.hand = 'joker_verwandeln';
-  assert.ok(useJoker(s, 1, 1, 21000));
-  assert.equal(w.job.endsAt, 178500);
+  assert.ok(useJoker(s, 1, 1, 28000));
+  assert.equal(w.job.endsAt, 238000);
 });
 
 test('legacy jobs without a recorded duration keep working when a forge is added', () => {
@@ -180,7 +183,7 @@ test('one forge accelerates every neighboring workshop, including starthilfe', (
   second.job = { pack: 'starthilfe', duration: 30000, endsAt: 30000 };
   s.hand = 'werkzeugschmiede';
   placeHand(s, 1, 0, 15000);
-  assert.equal(first.job.endsAt, 147000);
+  assert.equal(first.job.endsAt, 195000);
   assert.equal(second.job.endsAt, 27000);
   assert.equal(workshopDuration(s, second, 'starthilfe'), 24000);
 });
@@ -243,7 +246,7 @@ test('starthilfe is unavailable when normal production or an affordable pack can
   addTile(s, 'windmuehle', -1, 1);
   assert.equal(canStartRecovery(s, w), false);
   s.tiles = { '0,0': w };
-  s.resources = { holz: 20, korn: 15 };
+  s.resources = { holz: 30, korn: 25 };
   assert.equal(canStartRecovery(s, w), false);
 });
 

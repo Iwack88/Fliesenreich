@@ -1,49 +1,36 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PACKS, PACK_FILLER_TYPES, JOKERS } from '../src/config.js';
+import { PACKS, PACK_LAND_WEIGHTS, LAND_TYPES, JOKERS } from '../src/config.js';
 import { openPack, packChances } from '../src/logic.js';
 
-test('displayed probabilities include the guarantee and sum to 100%', () => {
-  const nature = Object.fromEntries(packChances(PACKS.natur));
-  const explorer = Object.fromEntries(packChances(PACKS.basis));
-  assert.ok(Math.abs(nature.gras - 100 * (3 * 24 / 107) / 5) < 1e-10);
-  assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 107 + 2 * 6 / 29) / 5) < 1e-10);
-  assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 107 + 2 * 2 / 37) / 5) < 1e-10);
-  assert.equal(explorer.windmuehle, explorer.taverne);
-  assert.ok(explorer.joker_loeschen > 0);
-  assert.equal(explorer.joker_loeschen, explorer.joker_verwandeln);
-  assert.equal(nature.joker_loeschen, undefined);
-  assert.ok(Math.abs(nature.banditen_niete - 100 * 3 * 2 / 107 / 5) < 1e-10);
-  assert.equal(explorer.banditen_niete, nature.banditen_niete);
+const isLand = id => LAND_TYPES.includes(id);
+
+test('displayed chances are per group and sum to 100%', () => {
   for (const pack of Object.values(PACKS)) {
-    const chances = packChances(pack);
-    assert.ok(Object.fromEntries(chances).joker_schutz > 0);
-    assert.ok(Object.fromEntries(chances).joker_banditenzeit > 0);
-    assert.ok(Object.fromEntries(chances).joker_shop > 0);
-    if (pack !== PACKS.joker) for (const id of ['lagerhalle', 'kornlager', 'goldlager', 'werkzeugschmiede']) assert.ok(Object.fromEntries(chances)[id] > 0);
-    assert.ok(Math.abs(chances.reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
+    const { land, value } = packChances(pack);
+    for (const group of [land, value]) assert.ok(Math.abs(group.reduce((sum, [, chance]) => sum + chance, 0) - 100) < 1e-10);
+    assert.deepEqual(land.map(([id]) => id), Object.keys(PACK_LAND_WEIGHTS));
+    assert.ok(value.every(([id]) => !isLand(id) && id !== 'banditen_niete'));
   }
+  assert.deepEqual(Object.fromEntries(packChances(PACKS.natur).land), { gras: 30, erde: 30, wasser: 30, berge: 10 });
 });
 
-test('all packs always contain at least two non-filler cards even with worst-case randomness', (t) => {
-  t.mock.method(Math, 'random', () => 0);
-  for (const id of Object.keys(PACKS)) {
-    const state = { packs: { [id]: 1 }, deck: ['wasser'] };
-    const cards = openPack(state, id);
-    assert.equal(cards.length, 5);
-    assert.ok(cards.filter(card => !PACK_FILLER_TYPES.includes(card)).length >= 2);
-    if (id === 'joker') assert.ok(cards.every(card => JOKERS[card]));
-    else assert.equal(cards.filter(card => !PACK_FILLER_TYPES.includes(card)).length, 2);
-    assert.deepEqual(state.deck, ['wasser', ...cards]);
-    assert.equal(state.packs[id], 0);
+test('packs contain their fixed land cards and one or two value cards', (t) => {
+  for (const [id, pack] of Object.entries(PACKS)) {
+    for (const [roll, extra, hazard] of [[0.99, false, false], [0, true, pack.hazardChance > 0]]) {
+      t.mock.method(Math, 'random', () => roll);
+      const state = { packs: { [id]: 1 }, deck: ['wasser'] };
+      const cards = openPack(state, id);
+      t.mock.restoreAll();
+      const values = cards.filter(card => !isLand(card) && card !== 'banditen_niete');
+      assert.equal(values.length, extra ? 2 : 1);
+      assert.ok(values.every(card => pack.weights[card]));
+      assert.equal(cards.filter(card => card === 'banditen_niete').length, hazard ? 1 : 0);
+      assert.equal(cards.filter(isLand).length + (hazard ? 1 : 0), pack.land);
+      assert.deepEqual(state.deck, ['wasser', ...cards]);
+      assert.equal(state.packs[id], 0);
+    }
   }
-});
-
-test('the guaranteed cards are shuffled with the rest of the pack', (t) => {
-  t.mock.method(Math, 'random', () => 0);
-  const cards = openPack({ packs: { natur: 1 }, deck: [] }, 'natur');
-  assert.ok(PACK_FILLER_TYPES.includes(cards[1]));
-  assert.ok(!PACK_FILLER_TYPES.includes(cards[4]));
 });
 
 test('a missing pack does not change the deck', () => {
@@ -52,16 +39,11 @@ test('a missing pack does not change the deck', () => {
   assert.deepEqual(state, { packs: {}, deck: ['wald'] });
 });
 
-test('HumanCity offers houses, taverns and guards with guarantee-adjusted chances', () => {
-  const chances = Object.fromEntries(packChances(PACKS.humancity));
-  assert.ok(Math.abs(chances.wachturm - 100 * (3 * 8 / 109 + 2 * 8 / 59) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.haus - 100 * (3 * 30 / 109 + 2 * 30 / 59) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.taverne - 100 * (3 * 12 / 109 + 2 * 12 / 59) / 5) < 1e-10);
-  assert.ok(Math.abs(chances.banditen_niete - 100 * 3 * 5 / 109 / 5) < 1e-10);
-});
-
-test('Joker pack offers all five jokers at 20 percent each', () => {
-  const chances = Object.fromEntries(packChances(PACKS.joker));
-  assert.deepEqual(Object.keys(chances).sort(), Object.keys(JOKERS).sort());
-  for (const chance of Object.values(chances)) assert.equal(chance, 20);
+test('pack tiers cost more and take longer as their value cards improve', () => {
+  const { natur, basis, humancity, joker } = PACKS;
+  assert.ok(natur.cost.holz < basis.cost.holz && basis.cost.holz < humancity.cost.holz);
+  assert.ok(natur.duration < basis.duration && basis.duration < humancity.duration);
+  assert.ok(Object.keys(humancity.weights).includes('wachturm'));
+  assert.deepEqual(Object.keys(joker.weights).sort(), Object.keys(JOKERS).sort());
+  assert.equal(joker.hazardChance, 0);
 });

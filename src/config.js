@@ -35,26 +35,28 @@ export const SHOP_OFFER_COUNT = 4;
 export const SHOP_DISCOUNT = 0.25;
 export const SHOP_PRICES = { common: 80, uncommon: 200, rare: 400 };
 
-// Zwei Karten pro Pack sind garantiert keine Grundkarten oder Nieten.
-export const PACK_FILLER_TYPES = [...LAND_TYPES, 'banditen_niete'];
-export const PACK_MIN_SPECIAL = 2;
-
-// Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
+// Jedes Pack enthält feste Landkarten, eine garantierte Wertkarte und mit extraChance eine zweite.
+// Mit hazardChance ersetzt eine Banditen-Niete eine der Landkarten.
+export const PACK_LAND_WEIGHTS = { gras: 3, erde: 3, wasser: 3, berge: 1 };
 export const PACKS = {
   natur: {
-    name: 'Landschafts-Pack', cost: { holz: 20, korn: 15 }, duration: 180000, cards: 5,
-    weights: { gras: 24, erde: 23, wasser: 23, berge: 6, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
+    name: 'Landschafts-Pack', cost: { holz: 30, korn: 25 }, duration: 4 * 60000,
+    land: 4, extraChance: 0.4, hazardChance: 0.1,
+    weights: { wald: 32, feld: 32, haus: 14, lagerhalle: 6, kornlager: 6, goldlager: 3, werkzeugschmiede: 3, joker_schutz: 2, joker_banditenzeit: 1, joker_shop: 1 },
   },
   basis: {
-    name: 'Entdecker-Pack', cost: { holz: 35, korn: 25 }, duration: 360000, cards: 5,
-    weights: { gras: 18, erde: 22, wasser: 22, berge: 6, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
+    name: 'Entdecker-Pack', cost: { holz: 55, korn: 45 }, duration: 8 * 60000,
+    land: 3, extraChance: 0.4, hazardChance: 0.1,
+    weights: { holzfaeller: 18, windmuehle: 18, wald: 10, feld: 10, werkzeugschmiede: 8, workshop: 7, lagerhalle: 7, kornlager: 7, taverne: 5, joker_loeschen: 4, joker_verwandeln: 4, joker_schutz: 2 },
   },
   humancity: {
-    name: 'HumanCity-Pack', cost: { holz: 50, korn: 35 }, duration: 540000, cards: 5,
-    weights: { gras: 13, erde: 13, wasser: 13, berge: 6, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
+    name: 'HumanCity-Pack', cost: { holz: 75, korn: 55 }, duration: 12 * 60000,
+    land: 3, extraChance: 0.4, hazardChance: 0.15,
+    weights: { haus: 45, taverne: 22, wachturm: 15, goldlager: 10, joker_schutz: 4, joker_banditenzeit: 4 },
   },
   joker: {
-    name: 'Joker-Pack', cost: { gold: 250 }, duration: 360000, cards: 5,
+    name: 'Joker-Pack', cost: { gold: 350 }, duration: 8 * 60000,
+    land: 3, extraChance: 0.4, hazardChance: 0,
     weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
   },
 };

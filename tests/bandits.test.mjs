@@ -267,10 +267,10 @@ test('capturing a forge updates active workshop timers and can capture a worksho
   addTile(s, 'werkzeugschmiede', 1, 0);
   addTile(s, 'banditen', 2, 0);
   startPack(s, workshop, 'natur', 0);
-  assert.equal(workshop.job.endsAt, 144000);
-  assert.equal(spreadBandits(s, 72000)[0].previous.type, 'werkzeugschmiede');
-  assert.equal(workshop.job.endsAt, 162000);
-  assert.equal(spreadBandits(s, 73000)[0].previous.type, 'workshop');
+  assert.equal(workshop.job.endsAt, 192000);
+  assert.equal(spreadBandits(s, 96000)[0].previous.type, 'werkzeugschmiede');
+  assert.equal(workshop.job.endsAt, 216000);
+  assert.equal(spreadBandits(s, 97000)[0].previous.type, 'workshop');
   assert.equal(s.tiles['0,0'].type, 'banditen');
   assert.equal(s.packs.natur, undefined);
 });

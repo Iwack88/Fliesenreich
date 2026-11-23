@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAND_TYPES, START_DECK, PACKS } from '../src/config.js';
+import { LAND_TYPES, START_DECK, PACKS, PACK_LAND_WEIGHTS } from '../src/config.js';
 import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomLand, expandWorld, returnHand } from '../src/logic.js';
 
 test('new worlds contain only the workshop and guard, with no randomly generated tiles', () => {
@@ -80,5 +80,6 @@ test('a land card with no available neighboring cell can return to the deck unch
 
 test('mountain cards are available from the start and landscape packs', () => {
   assert.ok(START_DECK.berge > 0);
-  for (const id of ['natur', 'basis', 'humancity']) assert.ok(PACKS[id].weights.berge > 0);
+  assert.ok(PACK_LAND_WEIGHTS.berge > 0);
+  for (const pack of Object.values(PACKS)) assert.ok(pack.land > 0);
 });

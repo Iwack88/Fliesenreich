@@ -82,13 +82,13 @@ test('rarity strengthens storage, workshops, forges and guards', () => {
   s.tiles = { '0,0': workshop };
   workshop.rarity = 'rare';
   s.resources = { holz: 100, korn: 100 };
-  assert.equal(workshopDuration(s, workshop, 'natur'), 144000);
+  assert.equal(workshopDuration(s, workshop, 'natur'), 192000);
   assert.equal(startPack(s, workshop, 'natur', 0), true);
   s.hand = 'werkzeugschmiede';
   s.handRarity = 'uncommon';
-  placeHand(s, 1, 0, 72000);
+  placeHand(s, 1, 0, 96000);
   assert.equal(forgeBonus(s, workshop), 40);
-  assert.equal(workshop.job.endsAt, 115200);
+  assert.equal(workshop.job.endsAt, 153600);
   const storage = addTile(s, 'lagerhalle', 2, 0, 'epic');
   assert.equal(storageCapacity(s).holz, 300);
   s.hand = 'joker_loeschen';
@@ -128,5 +128,5 @@ test('transformation keeps rarity and rebalances active workshop jobs', t => {
   assert.equal(result.tile, tile);
   assert.equal(tile.rarity, 'uncommon');
   assert.equal(forgeBonus(s, workshop), 40);
-  assert.equal(workshop.job.endsAt, 144000);
+  assert.equal(workshop.job.endsAt, 180000);
 });

@@ -18,7 +18,7 @@ test('storage buildings add 50 only to their own resource and production respect
   addTile(s, 'haus', 2, 2);
   addTile(s, 'haus', 3, 2);
   assert.deepEqual(storageCapacity(s), { gold: 350, holz: 150, korn: 150 });
-  assert.equal(workshopDuration(s, workshop, 'natur'), 180000);
+  assert.equal(workshopDuration(s, workshop, 'natur'), 240000);
   updateProduction(s, 100000);
   assert.deepEqual(s.resources, { holz: 150, korn: 150 });
   assert.equal(s.gold, 350);
