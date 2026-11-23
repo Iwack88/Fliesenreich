@@ -345,9 +345,9 @@ const movePath = (from, to) => [{ x: from.x, y: from.y }, { x: to.x, y: from.y }
 
 function startMoveAnimation(result) {
   const start = performance.now();
-  const steps = Math.abs(result.to.x - result.from.x) + Math.abs(result.to.y - result.from.y);
+  const steps = result.path ? result.path.length - 1 : Math.abs(result.to.x - result.from.x) + Math.abs(result.to.y - result.from.y);
   const duration = Math.min(800, 220 + steps * 90);
-  moveAnims = [{ tile: result.tile, path: movePath(result.from, result.to), start, duration }];
+  moveAnims = [{ tile: result.tile, path: result.path || movePath(result.from, result.to), start, duration }];
   if (result.kind === 'swap') moveAnims.push({ tile: result.other, path: [result.to, result.from], start, duration });
 }
 
@@ -387,7 +387,7 @@ $('undo-move').onclick = () => {
   const record = lastMove.record;
   lastMove = null;
   if (undoMove(state, record)) {
-    startMoveAnimation({ ...record, from: record.to, to: record.from });
+    startMoveAnimation({ ...record, from: record.to, to: record.from, path: record.path && [...record.path].reverse() });
     selected = tileAt(state, record.from.x, record.from.y) || null;
     toast(`Rückgängig · ${record.free ? '🧭 Freizug' : `${record.cost} ${GOLD_ICON}`} erstattet`);
     save();
@@ -1788,7 +1788,7 @@ function draw() {
 
     const simulation = previewSimulation();
     if (simulation) {
-      const points = movePreview.kind === 'swap' ? [tile, movePreview] : movePath(tile, movePreview);
+      const points = movePreview.kind === 'swap' ? [tile, movePreview] : movePreview.path || movePath(tile, movePreview);
       drawMovePath(points, movePreview.kind === 'swap');
       if (movePreview.kind === 'move') {
         ctx.fillStyle = 'rgba(20,30,25,.45)';

@@ -561,6 +561,24 @@ function components(keys) {
 export const moveStepCost = tile => MOVE_STEP_COST[tileRarity(tile)];
 export const canPayMove = (s, cost) => (s.freeMoves || 0) > 0 || s.gold >= cost;
 
+// Kürzeste Wege über freie Felder entlang der Außenkante: Jedes Wegfeld muss (auch diagonal) an ein anderes Tile grenzen.
+function freePaths(s, others, tile, half) {
+  const start = { x: tile.x, y: tile.y };
+  const paths = new Map([[key(start.x, start.y), [start]]]);
+  const queue = [start];
+  const hugs = (x, y) => NEIGHBORS.some(([dx, dy]) => others.has(key(x + dx, y + dy)));
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    for (const [dx, dy] of DIRS4) {
+      const x = cur.x + dx, y = cur.y + dy, k = key(x, y);
+      if (paths.has(k) || others.has(k) || x < -half || x >= half || y < -half || y >= half || !hugs(x, y)) continue;
+      paths.set(k, [...paths.get(key(cur.x, cur.y)), { x, y }]);
+      queue.push({ x, y });
+    }
+  }
+  return paths;
+}
+
 // Ziele für ein Tile: freie Felder neben anderen Tiles, ohne die Karte in mehr Inseln zu zerteilen.
 export function moveOptions(s, tile) {
   if (!tile || tile.type === 'banditen' || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
@@ -570,13 +588,15 @@ export function moveOptions(s, tile) {
   const { labels, count } = components(all);
   const half = s.size / 2;
   const step = moveStepCost(tile);
+  const paths = freePaths(s, all, tile, half);
   const moves = [];
-  for (let x = -half; x < half; x++) for (let y = -half; y < half; y++) {
-    if (s.tiles[key(x, y)]) continue;
+  for (const [cell, path] of paths) {
+    const [x, y] = cell.split(',').map(Number);
+    if (x === tile.x && y === tile.y) continue;
     const joined = new Set(DIRS4.map(([dx, dy]) => labels.get(key(x + dx, y + dy))).filter(label => label !== undefined));
     if (!joined.size || count - joined.size + 1 > before) continue;
-    const distance = Math.abs(x - tile.x) + Math.abs(y - tile.y);
-    moves.push({ kind: 'move', x, y, distance, cost: distance * step, special: isSpecialSlot(s, x, y) });
+    const distance = path.length - 1;
+    moves.push({ kind: 'move', x, y, distance, path, cost: distance * step, special: isSpecialSlot(s, x, y) });
   }
   const swaps = DIRS4.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
     .filter(other => other && other.type !== 'banditen')
@@ -629,7 +649,7 @@ export function moveTile(s, tile, x, y, now = Date.now()) {
     delete s.specialSlots[key(x, y)];
   }
   const cleared = afterMove(s, jobs, now, [tile]);
-  return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, ...payment, special: option.special, oldRarity, cleared,
+  return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, path: option.path, ...payment, special: option.special, oldRarity, cleared,
     pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 

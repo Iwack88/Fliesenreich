@@ -17,13 +17,13 @@ test('move targets stay adjacent, keep the map connected and cost per field by r
   addTile(s, 'feld', 2, 0);
   const { moves, swaps } = moveOptions(s, a);
   assert.ok(moves.every(m => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => s.tiles[`${m.x + dx},${m.y + dy}`] && s.tiles[`${m.x + dx},${m.y + dy}`] !== a)));
-  assert.equal(moves.find(m => m.x === 3 && m.y === 0).cost, 30);
+  assert.equal(moves.find(m => m.x === 3 && m.y === 0).cost, 50);
   assert.equal(moves.find(m => m.x === 2 && m.y === 1).cost, 30);
   assert.deepEqual(swaps.map(swap => swap.tile.x), [1]);
   const middle = s.tiles['1,0'];
   assert.ok(!moveOptions(s, middle).moves.some(m => m.x === 1 && m.y === 1), 'moving the bridge must not split the map');
   a.rarity = 'epic';
-  assert.equal(moveOptions(s, a).moves.find(m => m.x === 3 && m.y === 0).cost, 90);
+  assert.equal(moveOptions(s, a).moves.find(m => m.x === 3 && m.y === 0).cost, 150);
 });
 
 test('moving pays gold, uses special slots once and can be undone with a refund', () => {
@@ -33,8 +33,8 @@ test('moving pays gold, uses special slots once and can be undone with a refund'
   s.specialSlots = { '2,0': true };
   assert.equal(moveTile(s, a, 5, 5), null);
   const record = moveTile(s, a, 2, 0);
-  assert.equal(record.cost, 30);
-  assert.equal(s.gold, 270);
+  assert.equal(record.cost, 60);
+  assert.equal(s.gold, 240);
   assert.equal(a.rarity, 'rare');
   assert.equal(s.tiles['2,0'], a);
   assert.equal(s.tiles['0,0'], undefined);
@@ -87,4 +87,17 @@ test('moving a forge away from a workshop slows its running job', () => {
   assert.equal(workshop.job.endsAt, 192000);
   assert.ok(moveTile(s, forge, 3, 1, 96000));
   assert.equal(workshop.job.endsAt, 216000);
+});
+
+test('tiles only glide along free outer fields and never across occupied ones', () => {
+  const s = world();
+  const a = addTile(s, 'windmuehle', 0, 0);
+  addTile(s, 'feld', 1, 0);
+  addTile(s, 'feld', 2, 0);
+  const { moves } = moveOptions(s, a);
+  const around = moves.find(m => m.x === 3 && m.y === 0);
+  assert.equal(around.distance, 5, 'detour around the row instead of jumping over it');
+  assert.ok(around.path.every(p => !s.tiles[`${p.x},${p.y}`] || s.tiles[`${p.x},${p.y}`] === a));
+  assert.equal(moves.find(m => m.x === 2 && m.y === 1).distance, 3);
+  assert.equal(moveTile(s, a, 3, 0).cost, 50);
 });

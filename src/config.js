@@ -9,7 +9,7 @@ export const EXPANSION_COST = 30;
 // Spezial-Bauplätze: Anteil freier Felder und Mindestabstand zum Startbereich.
 export const SPECIAL_SLOT_SHARE = 0.08;
 export const SPECIAL_SLOT_CLEARANCE = 2;
-// Verschieben: Gold pro Feld (Manhattan-Distanz) je Seltenheit, Tausch mit Nachbarn pauschal.
+// Verschieben: Gold pro Feld (Weglänge entlang der Außenkante) je Seltenheit, Tausch mit Nachbarn pauschal.
 export const MOVE_STEP_COST = { common: 10, uncommon: 15, rare: 20, epic: 30 };
 export const SWAP_COST = 50;
 export const FREE_MOVE_JOKER = 5;
