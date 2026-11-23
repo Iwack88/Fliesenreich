@@ -30,6 +30,13 @@ let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 let showShields = false;
 let showGrid = false;
+const FOLLOW_KEY = 'fliesenreich-follow-new-tiles';
+let followNewTiles = localStorage.getItem(FOLLOW_KEY) === 'true';
+function focusNewTile(tile) {
+  if (!followNewTiles) return;
+  cam.x = (tile.x + 0.5) * TILE;
+  cam.y = (tile.y + 0.5) * TILE;
+}
 let activeFilter = null;
 
 const images = {};
@@ -237,6 +244,7 @@ function onTap(sx, sy) {
       placementPreview = null;
       placementBuffCache = null;
       selected = res?.tile || null;
+      focusNewTile(res.tile);
       refreshTargets();
       save();
     } else toast('Wähle ein freies, grün markiertes Feld');
@@ -516,8 +524,7 @@ function drawNextCard() {
     const result = placeRandomLand(state);
     if (result) {
       selected = null;
-      cam.x = (result.tile.x + 0.5) * TILE;
-      cam.y = (result.tile.y + 0.5) * TILE;
+      focusNewTile(result.tile);
       toast(`${TILES[card].name} bei (${result.tile.x}, ${result.tile.y}) automatisch platziert`);
     } else {
       returnHand(state);
@@ -1150,6 +1157,13 @@ $('btn-shop').onclick = () => { syncBandits(); syncProduction(); showShop(); };
 $('btn-grid').onclick = () => {
   showGrid = !showGrid;
   $('btn-grid').setAttribute('aria-pressed', String(showGrid));
+};
+$('btn-follow').setAttribute('aria-pressed', String(followNewTiles));
+$('btn-follow').onclick = () => {
+  followNewTiles = !followNewTiles;
+  localStorage.setItem(FOLLOW_KEY, String(followNewTiles));
+  $('btn-follow').setAttribute('aria-pressed', String(followNewTiles));
+  toast(followNewTiles ? '🎯 Kamera springt zu neuen Tiles' : 'Kamera bleibt beim Erstellen stehen');
 };
 $('btn-shields').onclick = () => {
   showShields = !showShields;
