@@ -6,7 +6,7 @@ import { addTile, drawCard, newState, placeHand, useJoker } from '../src/logic.j
 test('new games have one of each joker and drawing preserves them', () => {
   const state = newState();
   assert.equal(state.gold, 100);
-  assert.equal(state.deck.length, 12);
+  assert.equal(state.deck.length, 13);
   for (const id of ['joker_loeschen', 'joker_verwandeln']) {
     assert.equal(START_DECK[id], 1);
     assert.equal(state.deck.filter(card => card === id).length, 1);
@@ -18,7 +18,8 @@ test('new games have one of each joker and drawing preserves them', () => {
 
 test('bandit timer joker is consumed immediately and resets the timer without changing camp targets', () => {
   const s = newState();
-  const camp = Object.values(s.tiles).find(tile => tile.type === 'banditen');
+  const camp = addTile(s, 'banditen', -4, -4);
+  camp.target = { x: -3, y: -4 };
   const target = JSON.stringify(camp.target);
   s.deck = ['joker_banditenzeit', 'gras'];
   s.banditElapsed = BANDIT_INTERVAL - 1;

@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=19';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=24';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=20';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=25';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -42,7 +42,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=2');
+    const response = await fetch('assets/card-art.svg?v=3');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -173,10 +173,9 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
 });
 
-const mobileMenu = matchMedia('(max-width: 899px)');
 let mobileMenuOpen = false;
 function updateMobileMenu() {
-  const collapsed = mobileMenu.matches && !mobileMenuOpen;
+  const collapsed = !mobileMenuOpen;
   $('primary-actions').classList.toggle('menu-collapsed', collapsed);
   $('primary-actions').inert = collapsed;
   $('primary-toggle').setAttribute('aria-expanded', String(mobileMenuOpen));
@@ -188,7 +187,6 @@ $('primary-toggle').onclick = () => {
   mobileMenuOpen = !mobileMenuOpen;
   updateMobileMenu();
 };
-mobileMenu.addEventListener('change', updateMobileMenu);
 updateMobileMenu();
 
 function pointerDistance() {
@@ -425,7 +423,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=2#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=3#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
@@ -435,7 +433,7 @@ function renderQueue() {
   const card = CARDS[state.deck[0]];
   $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[state.deck[0]] ? `, ${RARITY[state.deckRarities[0]].name}` : ''} ziehen` : 'Deck leer');
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${state.deck[0] === 'joker_banditenzeit' ? '<span>Wirkt sofort</span>' : ''}`
+    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${state.deck[0] === 'joker_banditenzeit' ? '<span>Wirkt sofort</span>' : LAND_TYPES.includes(state.deck[0]) ? '<span>Wird automatisch platziert</span>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -491,6 +489,22 @@ function drawNextCard() {
     refreshTargets();
     save();
     toast(`⏳ Banditen-Timer auf ${formatTime(BANDIT_INTERVAL)} zurückgesetzt`);
+    return;
+  }
+  if (LAND_TYPES.includes(card)) {
+    const result = placeRandomLand(state);
+    if (result) {
+      selected = null;
+      cam.x = (result.tile.x + 0.5) * TILE;
+      cam.y = (result.tile.y + 0.5) * TILE;
+      toast(`${TILES[card].name} bei (${result.tile.x}, ${result.tile.y}) automatisch platziert`);
+    } else {
+      returnHand(state);
+      selected = null;
+      toast('Kein freies Nachbarfeld – Landkarte ans Deckende gelegt');
+    }
+    refreshTargets();
+    save();
     return;
   }
   if (HAZARDS[card]) {
@@ -738,7 +752,7 @@ function showInventory() {
     const rarity = state.deckRarities[i];
     const el = document.createElement('div');
     el.className = `card ${rarity}`;
-    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : ''}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${id === 'joker_banditenzeit' ? '<span class="card-effect">Wirkt sofort</span>' : LAND_TYPES.includes(id) ? '<span class="card-effect">Automatisch platziert</span>' : ''}`;
     body.appendChild(el);
   });
 }
@@ -960,7 +974,7 @@ function showWorkshops() {
         head.className = 'pack-recipe-head';
         const info = document.createElement('div');
         const cost = Object.entries(pack.cost).map(([resource, amount]) => `${{ gold: '🪙', holz: '🪵', korn: '🌾' }[resource]} ${amount}`).join(' · ');
-        const guarantee = id === 'joker' ? 'nur Joker' : `mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser und Banditen-Niete`;
+        const guarantee = id === 'joker' ? 'nur Joker' : `mindestens ${PACK_MIN_SPECIAL} außer Gras, Erde, Wasser, Berge und Banditen-Niete`;
         info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(workshopDuration(state, tile, id))}<div class="pack-chances">${pack.cards} Karten, ${guarantee}. Chance je zufälliger Karte:</div>`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
@@ -1131,6 +1145,7 @@ const TILE_GROUND = {
   gras: '#9caf73',
   erde: '#ba9b72',
   wasser: '#8eb8ad',
+  berge: '#a5a9a0',
   feld: '#c9b57d',
   banditen: '#a7967c',
 };
@@ -1181,6 +1196,20 @@ function drawTerrain(type, x, y) {
       ctx.quadraticCurveTo(px + 4, py + 4, px + 8, py);
     }
     ctx.stroke();
+  } else if (type === 'berge') {
+    ctx.fillStyle = '#747e7d';
+    ctx.beginPath();
+    ctx.moveTo(2, 70); ctx.lineTo(27, 24); ctx.lineTo(45, 50);
+    ctx.lineTo(63, 12); ctx.lineTo(94, 70); ctx.lineTo(94, 94); ctx.lineTo(2, 94);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#e2e5d9';
+    ctx.beginPath();
+    ctx.moveTo(19, 39); ctx.lineTo(27, 24); ctx.lineTo(36, 37); ctx.lineTo(30, 34); ctx.lineTo(26, 39);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(53, 33); ctx.lineTo(63, 12); ctx.lineTo(74, 33); ctx.lineTo(67, 29); ctx.lineTo(62, 34);
+    ctx.closePath(); ctx.fill();
   }
   ctx.restore();
 }
@@ -1197,7 +1226,7 @@ function drawTile(tile, x, y, alpha = 1) {
   } else {
     ctx.fillStyle = TILE_GROUND[tile.type] || DEFAULT_GROUND;
     ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    if (tile.type === 'gras' || tile.type === 'erde' || tile.type === 'wasser') {
+    if (LAND_TYPES.includes(tile.type)) {
       drawTerrain(tile.type, x, y);
     } else if (tileArt[tile.type]) {
       ctx.drawImage(tileArt[tile.type], x + 7, y + 7, TILE - 14, TILE - 14);

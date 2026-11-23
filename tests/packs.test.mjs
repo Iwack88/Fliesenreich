@@ -6,7 +6,7 @@ import { openPack, packChances } from '../src/logic.js';
 test('displayed probabilities include the guarantee and sum to 100%', () => {
   const nature = Object.fromEntries(packChances(PACKS.natur));
   const explorer = Object.fromEntries(packChances(PACKS.basis));
-  assert.ok(Math.abs(nature.gras - 100 * (3 * 26 / 106) / 5) < 1e-10);
+  assert.ok(Math.abs(nature.gras - 100 * (3 * 24 / 106) / 5) < 1e-10);
   assert.ok(Math.abs(nature.haus - 100 * (3 * 6 / 106 + 2 * 6 / 28) / 5) < 1e-10);
   assert.ok(Math.abs(explorer.windmuehle - 100 * (3 * 2 / 106 + 2 * 2 / 36) / 5) < 1e-10);
   assert.equal(explorer.windmuehle, explorer.taverne);

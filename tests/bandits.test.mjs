@@ -1,21 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { START_BANDITS, GUARD_RADIUS, TILES } from '../src/config.js';
+import { GUARD_RADIUS, TILES } from '../src/config.js';
 import { addTile, advanceBandits, drawCard, isProtected, migrateState, newState, placeHand, planBandits, spawnBandit, spreadBandits, startPack, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
 }
 
-test('new games have a guarded workshop and camps outside the protected area', () => {
+test('new games have a guarded workshop and no automatically spawned camps', () => {
   for (let i = 0; i < 50; i++) {
     const s = newState();
     assert.equal(s.tiles['0,0'].type, 'workshop');
     assert.equal(s.tiles['1,0'].type, 'wachturm');
     assert.equal(isProtected(s, 0, 0), true);
     const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');
-    assert.equal(camps.length, START_BANDITS);
-    assert.ok(camps.every(tile => !isProtected(s, tile.x, tile.y)));
+    assert.equal(camps.length, 0);
   }
 });
 

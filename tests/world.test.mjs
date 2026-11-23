@@ -1,47 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newState, addTile, drawCard, inBounds, placeCells, placeHand, expandWorld } from '../src/logic.js';
+import { LAND_TYPES, START_DECK, PACKS } from '../src/config.js';
+import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomLand, expandWorld, returnHand } from '../src/logic.js';
 
-const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-const key = (x, y) => `${x},${y}`;
-
-function assertFreeConnected(state, oldSize = 0) {
-  const cells = new Set();
-  for (let x = -state.size / 2; x < state.size / 2; x++) {
-    for (let y = -state.size / 2; y < state.size / 2; y++) {
-      if ((!oldSize || !inBounds(oldSize, x, y)) && !state.tiles[key(x, y)]) cells.add(key(x, y));
-    }
-  }
-  const queue = [cells.values().next().value];
-  const seen = new Set(queue);
-  for (let i = 0; i < queue.length; i++) {
-    const [x, y] = queue[i].split(',').map(Number);
-    for (const [dx, dy] of dirs) {
-      const neighbor = key(x + dx, y + dy);
-      if (cells.has(neighbor) && !seen.has(neighbor)) {
-        seen.add(neighbor);
-        queue.push(neighbor);
-      }
-    }
-  }
-  assert.equal(seen.size, cells.size);
-}
-
-test('new worlds contain a workshop, guard, camps and 12 obstacles with connected free space', () => {
-  for (let i = 0; i < 30; i++) {
-    const state = newState();
-    assert.equal(state.size, 8);
-    assert.equal(Object.keys(state.tiles).length, 16);
-    assert.equal(state.tiles['0,0'].type, 'workshop');
-    assert.equal(state.tiles['1,0'].type, 'wachturm');
-    for (const [dx, dy] of dirs.filter(([dx, dy]) => dx !== 1 || dy !== 0)) assert.equal(state.tiles[key(dx, dy)], undefined);
-    assert.equal(Object.values(state.tiles).filter(t => t.type === 'banditen').length, 2);
-    for (const tile of Object.values(state.tiles)) {
-      assert.ok(inBounds(8, tile.x, tile.y));
-      assert.ok(['gras', 'erde', 'wasser', 'workshop', 'wachturm', 'banditen'].includes(tile.type));
-    }
-    assertFreeConnected(state);
-  }
+test('new worlds contain only the workshop and guard, with no randomly generated tiles', () => {
+  const state = newState();
+  assert.equal(state.size, 8);
+  assert.deepEqual(Object.values(state.tiles).map(tile => tile.type), ['workshop', 'wachturm']);
+  assert.equal(state.tiles['0,0'].type, 'workshop');
+  assert.equal(state.tiles['1,0'].type, 'wachturm');
 });
 
 test('free placement only allows unoccupied neighboring cells within the world', () => {
@@ -57,32 +24,61 @@ test('free placement only allows unoccupied neighboring cells within the world',
   const gold = state.gold;
   assert.equal(placeHand(state, 2, 0).pairs.length, 1);
   assert.equal(state.gold, gold);
-  assert.equal(placeHand(state, 2, 0), null);
 });
 
-test('expansion costs gold once and adds 36 obstacles and two camps in new area', () => {
-  for (let i = 0; i < 20; i++) {
-    const state = newState();
-    const original = JSON.stringify(state.tiles);
-    state.gold = 29;
-    assert.equal(expandWorld(state), false);
-    assert.equal(JSON.stringify(state.tiles), original);
-    state.gold = 30;
-    state.hand = 'wald';
-    assert.equal(expandWorld(state), true);
-    assert.equal(state.gold, 0);
-    assert.equal(state.size, 16);
-    assert.equal(state.hand, 'wald');
-    const oldTiles = Object.fromEntries(Object.entries(state.tiles).filter(([, t]) => inBounds(8, t.x, t.y)));
-    for (const [pos, tile] of Object.entries(JSON.parse(original))) {
-      const { target: oldTarget, ...before } = tile;
-      const { target: newTarget, ...after } = oldTiles[pos];
-      assert.deepEqual(after, before);
-    }
-    assert.equal(Object.keys(state.tiles).length, 54);
-    assert.equal(Object.values(state.tiles).filter(t => t.type === 'banditen' && !inBounds(8, t.x, t.y)).length, 2);
-    assertFreeConnected(state, 8);
-    assert.equal(expandWorld(state), false);
-    assert.equal(JSON.stringify(JSON.parse(JSON.stringify(state))), JSON.stringify(state));
+test('expansion costs gold once and preserves every existing tile without generating new ones', () => {
+  const state = newState();
+  const camp = addTile(state, 'banditen', -3, -3);
+  camp.target = { x: -3, y: -2 };
+  const original = JSON.stringify(state.tiles);
+  state.gold = 29;
+  assert.equal(expandWorld(state), false);
+  state.gold = 30;
+  state.hand = 'wald';
+  assert.equal(expandWorld(state), true);
+  assert.equal(state.gold, 0);
+  assert.equal(state.size, 16);
+  assert.equal(state.hand, 'wald');
+  assert.equal(JSON.stringify(state.tiles), original);
+  assert.equal(expandWorld(state), false);
+});
+
+test('land cards are placed at a valid random neighboring cell with their rarity', t => {
+  const state = newState();
+  state.tiles = {};
+  addTile(state, 'workshop', 3, 0);
+  t.mock.method(Math, 'random', () => 0.99);
+  for (const type of LAND_TYPES) {
+    state.hand = type;
+    state.handRarity = 'epic';
+    const valid = placeCells(state).map(cell => cell.join(','));
+    const result = placeRandomLand(state);
+    assert.ok(valid.includes(`${result.tile.x},${result.tile.y}`));
+    assert.ok(inBounds(state.size, result.tile.x, result.tile.y));
+    assert.equal(result.tile.type, type);
+    assert.equal(result.tile.rarity, 'epic');
+    assert.equal(state.hand, null);
   }
+  state.hand = 'wald';
+  assert.equal(placeRandomLand(state), null);
+  assert.equal(state.hand, 'wald');
+});
+
+test('a land card with no available neighboring cell can return to the deck unchanged', () => {
+  const state = newState();
+  state.size = 2;
+  state.tiles = {};
+  for (const x of [-1, 0]) for (const y of [-1, 0]) addTile(state, 'gras', x, y);
+  state.deck = ['gras'];
+  state.deckRarities = ['rare'];
+  assert.equal(drawCard(state), 'gras');
+  assert.equal(placeRandomLand(state), null);
+  assert.equal(returnHand(state), true);
+  assert.deepEqual(state.deck, ['gras']);
+  assert.deepEqual(state.deckRarities, ['rare']);
+});
+
+test('mountain cards are available from the start and landscape packs', () => {
+  assert.ok(START_DECK.berge > 0);
+  for (const id of ['natur', 'basis', 'humancity']) assert.ok(PACKS[id].weights.berge > 0);
 });

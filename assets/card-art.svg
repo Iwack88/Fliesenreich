@@ -36,6 +36,11 @@
     <path d="M50 17c-5 9-12 17-12 25a12 12 0 0 0 24 0c0-8-7-16-12-25z" fill="#acd9d1" stroke="#699f9e" stroke-width="2.5"/>
     <path d="M44 42c0 3 1 5 4 6" fill="none" stroke="#eff5dc" stroke-width="3" stroke-linecap="round"/>
   </symbol>
+  <symbol id="berge" viewBox="0 0 100 100">
+    <path d="M8 78 31 32l14 20 17-35 30 61z" fill="#798582" stroke="#586461" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m23 47 8-15 9 13-7-3-3 5zm29-10 10-20 11 20-7-4-4 5-4-5z" fill="#e4e6d9"/>
+    <path d="M9 78h82" stroke="#586461" stroke-width="3" stroke-linecap="round"/>
+  </symbol>
   <symbol id="wald" viewBox="0 0 100 100">
     <use href="#tree" transform="translate(-13 16) scale(.72)"/>
     <use href="#tree" transform="translate(22 3) scale(.91)"/>

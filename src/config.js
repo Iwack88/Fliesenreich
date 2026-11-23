@@ -5,13 +5,11 @@ export const START_GOLD = 100;
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;
-export const START_OBSTACLES = 12;
-export const EXPANSION_OBSTACLES = 36;
 export const EXPANSION_COST = 30;
-export const OBSTACLE_TYPES = ['gras', 'erde', 'wasser'];
+export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
-export const START_DECK = { gras: 1, erde: 1, wasser: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
+export const START_DECK = { gras: 1, erde: 1, wasser: 1, berge: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
 export const BASE_CAPACITY = { gold: 300, holz: 100, korn: 100 };
 export const RESOURCE_CHAINS = {
@@ -23,8 +21,6 @@ export const STORAGE_BONUS = 50;
 export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
-export const START_BANDITS = 2;
-export const EXPANSION_BANDITS = 2;
 export const GUARD_RADIUS = 3;
 export const SHOP_INTERVAL = 5 * 60 * 1000;
 export const SHOP_DURATION = 60 * 1000;
@@ -33,22 +29,22 @@ export const SHOP_DISCOUNT = 0.25;
 export const SHOP_PRICES = { common: 80, uncommon: 200, rare: 400 };
 
 // Zwei Karten pro Pack sind garantiert keine Grundkarten oder Nieten.
-export const PACK_FILLER_TYPES = ['gras', 'erde', 'wasser', 'banditen_niete'];
+export const PACK_FILLER_TYPES = [...LAND_TYPES, 'banditen_niete'];
 export const PACK_MIN_SPECIAL = 2;
 
 // Gewichte bestimmen die Ziehungen innerhalb des jeweiligen Kartenpools.
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: { holz: 20, korn: 15 }, duration: 180000, cards: 5,
-    weights: { gras: 26, erde: 25, wasser: 25, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 24, erde: 23, wasser: 23, berge: 6, feld: 7, wald: 7, haus: 6, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
   },
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 35, korn: 25 }, duration: 360000, cards: 5,
-    weights: { gras: 20, erde: 24, wasser: 24, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 18, erde: 22, wasser: 22, berge: 6, feld: 6, wald: 6, haus: 6, windmuehle: 2, holzfaeller: 2, taverne: 2, joker_loeschen: 1, joker_verwandeln: 1, workshop: 2, lagerhalle: 2, kornlager: 1, goldlager: 1, werkzeugschmiede: 2, banditen_niete: 2, joker_schutz: 1, joker_banditenzeit: 1 },
   },
   humancity: {
     name: 'HumanCity-Pack', cost: { holz: 50, korn: 35 }, duration: 540000, cards: 5,
-    weights: { gras: 15, erde: 15, wasser: 15, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1, joker_banditenzeit: 1 },
+    weights: { gras: 13, erde: 13, wasser: 13, berge: 6, banditen_niete: 5, haus: 30, taverne: 12, wachturm: 8, lagerhalle: 1, kornlager: 1, goldlager: 2, werkzeugschmiede: 2, joker_schutz: 1, joker_banditenzeit: 1 },
   },
   joker: {
     name: 'Joker-Pack', cost: { gold: 250 }, duration: 360000, cards: 5,
@@ -70,6 +66,7 @@ export const TILES = {
   gras:         { name: 'Gras',        color: '#6bbf59', icon: '',   rarity: 'common',   category: 'landschaft' },
   erde:         { name: 'Erde',        color: '#8a6a47', icon: '',   rarity: 'common',   category: 'landschaft' },
   wasser:       { name: 'Wasser',      color: '#4a90d9', icon: '💧', rarity: 'common',   category: 'landschaft' },
+  berge:        { name: 'Berge',       color: '#8b9090', icon: '⛰️', rarity: 'common',   category: 'landschaft' },
   wald:         { name: 'Wald',        color: '#2e7d32', icon: '🌲', rarity: 'common',   category: 'landschaft' },
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft' },
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { wald: 1 } },

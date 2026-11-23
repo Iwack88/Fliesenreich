@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, START_BANDITS, EXPANSION_BANDITS, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, START_OBSTACLES, EXPANSION_OBSTACLES, EXPANSION_COST, OBSTACLE_TYPES, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=19';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_DURATION, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=20';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -48,9 +48,6 @@ export function newState() {
   s.protectedFields = {};
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
-  addObstacles(s, 0, START_OBSTACLES);
-  addWorldBandits(s, 0, START_BANDITS);
-  planBandits(s);
   return s;
 }
 
@@ -105,65 +102,9 @@ export function inBounds(size, x, y) {
   return x >= -half && x < half && y >= -half && y < half;
 }
 
-function connected(cells) {
-  if (!cells.size) return true;
-  const seen = new Set();
-  const queue = [cells.values().next().value];
-  seen.add(key(...queue[0]));
-  for (let i = 0; i < queue.length; i++) {
-    const [x, y] = queue[i];
-    for (const [dx, dy] of DIRS4) {
-      const k = key(x + dx, y + dy);
-      if (cells.has(k) && !seen.has(k)) {
-        seen.add(k);
-        queue.push(cells.get(k));
-      }
-    }
-  }
-  return seen.size === cells.size;
-}
-
-function addWorldBandits(s, oldSize, count) {
-  const cells = new Map();
-  for (let x = -s.size / 2; x < s.size / 2; x++) for (let y = -s.size / 2; y < s.size / 2; y++) {
-    if ((!oldSize || !inBounds(oldSize, x, y)) && !tileAt(s, x, y)) cells.set(key(x, y), [x, y]);
-  }
-  for (const [x, y] of shuffled([...cells.values()])) {
-    if (isProtected(s, x, y)) continue;
-    cells.delete(key(x, y));
-    if (!connected(cells)) { cells.set(key(x, y), [x, y]); continue; }
-    addTile(s, 'banditen', x, y);
-    if (!--count) return;
-  }
-  throw new Error('Nicht genügend freie Felder für die Banditencamps');
-}
-
-function addObstacles(s, oldSize, count) {
-  const cells = new Map();
-  for (let x = -s.size / 2; x < s.size / 2; x++) {
-    for (let y = -s.size / 2; y < s.size / 2; y++) {
-      if ((!oldSize || !inBounds(oldSize, x, y)) && !tileAt(s, x, y)) cells.set(key(x, y), [x, y]);
-    }
-  }
-  for (const [x, y] of shuffled([...cells.values()])) {
-    if (!count) break;
-    if (!oldSize && Math.abs(x) + Math.abs(y) <= 1) continue;
-    cells.delete(key(x, y));
-    if (!connected(cells)) {
-      cells.set(key(x, y), [x, y]);
-      continue;
-    }
-    addTile(s, OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)], x, y);
-    count--;
-  }
-  if (count) throw new Error('Nicht genügend freie Felder für die Weltgenerierung');
-}
-
 export function expandWorld(s) {
   if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
   s.size = EXPANDED_SIZE;
-  addObstacles(s, START_SIZE, EXPANSION_OBSTACLES);
-  addWorldBandits(s, START_SIZE, EXPANSION_BANDITS);
   planBandits(s);
   s.gold -= EXPANSION_COST;
   return true;
@@ -272,6 +213,14 @@ export function placeHand(s, x, y, now = Date.now()) {
   s.hand = null;
   s.handRarity = null;
   return { tile, cleared, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+}
+
+export function placeRandomLand(s) {
+  if (!LAND_TYPES.includes(s.hand)) return null;
+  const cells = placeCells(s);
+  if (!cells.length) return null;
+  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
+  return placeHand(s, x, y);
 }
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
