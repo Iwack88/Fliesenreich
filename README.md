@@ -4,13 +4,13 @@ Bau-/Management-Spiel mit Tiles. Die Inselgrafik `assets/game-background.jpg` bi
 
 ## Spielfeld
 
-Ein neues Spielfeld startet mit 8×8 Feldern, einem Workshop und einem benachbarten Wachturm; es werden keine weiteren Tiles oder Banditencamps erzeugt. Bestehende Spielstände bleiben unverändert. Im Baumodus markieren hellgrüne Felder mit einem weißen Plus freie Plätze, die seitlich an ein vorhandenes Tile grenzen. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
+Ein neues Spielfeld startet mit 8×8 Feldern, einem Workshop und einem benachbarten Wachturm; es werden keine weiteren Tiles oder Banditencamps erzeugt. Bestehende Spielstände bleiben unverändert. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
 Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen keine neuen Tiles oder Banditencamps.
 
-Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Platzieren; mit **▦ Grid** lässt es sich auch außerhalb des Baumodus ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
+Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Verschieben; mit **▦ Grid** lässt es sich jederzeit ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
 
-Die anklickbare Kartenvorschau oben rechts zieht die nächste Karte aus dem Deck; einen separaten Next-Button gibt es nicht. Landkarten (Gras, Erde, Wasser und Berge) werden beim Ziehen automatisch auf einem zufälligen freien, seitlich an ein bestehendes Tile angrenzenden Feld platziert. Ist kein solches Feld frei, wird die Karte unverändert ans Deckende gelegt. Mit **🎯 Folgen** in der Werkzeugleiste springt die Kamera nach dem Erstellen eines Tiles automatisch zu ihm; die Option ist standardmäßig aus und bleibt im Browser gespeichert. Andere platzierbare Karten werden weiterhin manuell gesetzt: Der erste Klick auf ein grünes Feld zeigt die Vorschau und markiert beeinflusste Tiles; ein zweiter Klick platziert sie. Das Inventar zeigt Karten in Ziehreihenfolge mit Illustration und Seltenheit.
+Die anklickbare Kartenvorschau oben rechts zieht die nächste Karte aus dem Deck; einen separaten Next-Button gibt es nicht. Jede Tile-Karte (Land und Gebäude) wird beim Ziehen automatisch auf einem zufälligen freien, seitlich an ein bestehendes Tile angrenzenden Feld platziert. Ist kein solches Feld frei, wird die Karte unverändert ans Deckende gelegt. Mit **🎯 Folgen** in der Werkzeugleiste springt die Kamera nach dem Erstellen eines Tiles automatisch zu ihm; die Option ist standardmäßig aus und bleibt im Browser gespeichert. Neue Gebäude werden direkt ausgewählt, damit man sie sofort verschieben kann. Das Inventar zeigt Karten in Ziehreihenfolge mit Illustration und Seltenheit.
 
 Auf Mobilgeräten und im Browser zeigt die obere Leiste nur die Ressourcen und den Banditen-Timer. Häufige Ansichten liegen in einer einklappbaren Icon-Leiste links; der Pfeil öffnet und schließt sie. Raster, Schutz, Shop, neues Spiel und Mischen sind als kompakte Aktionsleiste unten links angeordnet. Fertige Packs und untätige Workshops sitzen unten rechts nebeneinander; die Herstellungsübersicht öffnet sich vom rechten Bildschirmrand.
 
@@ -26,7 +26,11 @@ Alle baubaren Tiles haben zunächst Common als Basis. Beim Erhalt einer Karte wi
 
 Die vier Stufen haben die Stärke 1 bis 4. Sie erhöhen die Leistung von Holzfällern und Windmühlen sowie den Lagerplatz entsprechend. Wälder und Felder verbessern mit ihrer Seltenheit stattdessen den Ertrag des benachbarten Gebäudes. Für Gold-Paare zählt die höhere Seltenheit des Paars; der Radius bleibt unverändert. Gras, Erde, Wasser und Berge erhalten vorerst keine Funktion. Eine Werkzeugschmiede beschleunigt je Stufe um 20 Prozentpunkte, insgesamt maximal 60 %. Workshops verkürzen ihre Herstellungszeit zusätzlich je Stufe über Common um 10 % der Zeit nach dem Schmiedebonus. Wachtürme erhöhen ihren Schutzradius je Stufe über Common um ein Feld.
 
-**✨ Spezial-Bauplätze:** Etwa 8 % der freien Felder sind zufällig Spezial-Bauplätze; direkt um den Startbereich liegen keine. Beim Erweitern der Welt kommen im neuen Bereich weitere hinzu. Während eine Karte manuell platziert wird, tragen nur diese Felder ein Plus: erreichbare werden golden markiert, noch nicht erreichbare gestrichelt. Ein dort gebautes Tile steigt eine Seltenheitsstufe auf (Epic bleibt Epic), die Vorschau zeigt die Steigerung. Danach ist der Bauplatz verbraucht. Automatisch gelegte Landkarten meiden Spezial-Bauplätze, solange ein anderes Feld frei ist.
+**✨ Spezial-Bauplätze:** Etwa 8 % der freien Felder sind zufällig Spezial-Bauplätze; direkt um den Startbereich liegen keine. Beim Erweitern der Welt kommen im neuen Bereich weitere hinzu. Im Verschiebe-Modus sind sie golden (erreichbar) bzw. gestrichelt markiert. Ein dorthin verschobenes Tile steigt eine Seltenheitsstufe auf (Epic bleibt Epic), die Vorschau zeigt die Steigerung. Danach ist der Bauplatz verbraucht. Zufällig erscheinende Tiles meiden Spezial-Bauplätze, solange ein anderes Feld frei ist.
+
+## Verschieben und Tauschen
+
+Jedes Tile außer Banditencamps lässt sich jederzeit über **↔ Verschieben** im Tile-Info versetzen. Freie Ziele zeigen ihren Preis direkt auf dem Feld: Manhattan-Distanz × Preis pro Feld (Common 10, Uncommon 15, Rare 20, Epic 30 Gold); unbezahlbare Ziele sind ausgegraut. Ein Ziel muss frei sein, an ein anderes Tile grenzen und darf die Karte nicht in mehr Inseln zerteilen. Direkt benachbarte Tiles lassen sich für 50 Gold tauschen (🔁). Das erste Antippen eines Ziels zeigt Pfad, Kosten, Seltenheits-Upgrade und alle Auswirkungen auf Produktion und Workshops (grün = Gewinn, rot = Verlust); erneutes Antippen bestätigt, das Tile gleitet dann ans Ziel. Etwa sechs Sekunden lang kann der Zug mit **↩ Rückgängig** voll erstattet werden, sofern dabei keine Camps vertrieben wurden. Laufende Workshop-Aufträge übernehmen neue Schmiede-Boni anteilig.
 
 ## Produktion und Workshops
 
@@ -51,9 +55,9 @@ Ein Pack-Symbol links unten zeigt die Anzahl fertiger Packs und öffnet das Inve
 Jedes Pack enthält eine feste Anzahl Landkarten (Gras, Erde, Wasser je 30 %, Berge 10 %), eine garantierte Wertkarte und mit 40 % Chance eine zweite. Bei Landschafts- und Entdecker-Pack ersetzt mit 10 % Chance, beim HumanCity-Pack mit 15 % eine Banditen-Niete eine Landkarte. Gezielte Anschaffungen laufen über den Shop.
 
 - **Landschafts-Pack:** 4 Landkarten + 1–2 Wertkarten, vor allem Wald (32 %) und Feld (32 %), dazu Haus 14 %, Holz- und Kornlager je 6 %, Goldlager und Werkzeugschmiede je 3 %, Schutz-Joker 2 %, Banditenzeit- und Shop-Refresh-Joker je 1 %.
-- **Entdecker-Pack:** 3 Landkarten + 1–2 Wertkarten: Holzfäller und Windmühle je 18 %, Wald und Feld je 10 %, Werkzeugschmiede 8 %, Workshop, Holz- und Kornlager je 7 %, Taverne 5 %, Lösch- und Verwandlungs-Joker je 4 %, Schutz-Joker 2 %.
+- **Entdecker-Pack:** 3 Landkarten + 1–2 Wertkarten: Holzfäller und Windmühle je 18 %, Wald und Feld je 8 %, Werkzeugschmiede 8 %, Workshop, Holz- und Kornlager je 7 %, Taverne 5 %, Lösch-, Verwandlungs- und Freizug-Joker je 4 %, Schutz-Joker 2 %.
 - **HumanCity-Pack:** 3 Landkarten + 1–2 Wertkarten: Haus 45 %, Taverne 22 %, Wachturm 15 %, Goldlager 10 %, Schutz- und Banditenzeit-Joker je 4 %.
-- **Joker-Pack:** 3 Landkarten + 1–2 Joker, alle fünf Joker je 20 %, ohne Banditen-Nieten.
+- **Joker-Pack:** 3 Landkarten + 1–2 Joker, alle sechs Joker je ca. 17 %, ohne Banditen-Nieten.
 
 Die Workshop-Übersicht zeigt diese Chancen getrennt für Wert- und Landkarten. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet ein freier Workshop ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle sowie je zwei Wäldern und Feldern an.
 
@@ -61,7 +65,7 @@ Der **Karten-Shop** ist dauerhaft offen und bietet sofort vier verschiedene zuf�
 
 ## Banditen und Wachtürme
 
-Ein Common-Wachturm schützt ein Quadrat von 7×7 Feldern um sich, Uncommon 9×9, Rare 11×11 und Epic 13×13. Er vertreibt vorhandene Camps in diesem Bereich beim Platzieren. Der Schutzbereich erscheint beim Antippen des Turms und beim Platzieren einer Karte. Mit **🛡️ Schutz** lassen sich Schildsymbole auf allen geschützten Tiles ein- und ausblenden. Neue Spiele beginnen ohne Camps; Banditen-Nieten können später weiterhin Camps erzeugen.
+Ein Common-Wachturm schützt ein Quadrat von 7×7 Feldern um sich, Uncommon 9×9, Rare 11×11 und Epic 13×13. Er vertreibt vorhandene Camps in diesem Bereich beim Erscheinen und nach jedem Verschieben. Der Schutzbereich erscheint beim Antippen des Turms und im Verschiebe-Modus. Mit **🛡️ Schutz** lassen sich Schildsymbole auf allen geschützten Tiles ein- und ausblenden. Neue Spiele beginnen ohne Camps; Banditen-Nieten können später weiterhin Camps erzeugen.
 
 Alle zehn Minuten aktiver Spielzeit versucht jedes vorhandene Camp gleichzeitig, ein zufälliges benachbartes ungeschütztes Feld zu übernehmen; auch diagonale Nachbarn zählen. Bei der Zielwahl werden belegte Tiles bevorzugt, ansonsten wird ein freies Feld gewählt. Der Pfeil zeigt das Ziel vorab; beim Antippen des Camps wird das Zielfeld rot hervorgehoben. Wird auf einem freien Zielfeld vor dem Angriff gebaut, wird das neue Tile übernommen. Ist kein Ziel verfügbar, erscheint kein Pfeil. Wenn ein Ziel geschützt oder zum Camp wird, wählt das Camp ein neues. Camps greifen nicht gleichzeitig dasselbe Feld an. Auf dem Ziel entsteht ein neues Camp, das erst beim nächsten Durchgang selbst angreift. Übernommene Gebäude produzieren nicht mehr; laufende Workshop-Aufträge gehen verloren. Der gemeinsame Countdown steht oben im Spiel und pausiert, wenn das Spiel geschlossen oder der Tab ausgeblendet ist. Rohstoffproduktion und Workshop-Aufträge laufen weiterhin offline.
 
@@ -76,3 +80,5 @@ Der **Schutz-Joker** schützt ein angetipptes freies oder belegtes Feld dauerhaf
 Der **Banditenzeit-Joker** wird sofort beim Ziehen verbraucht und setzt den globalen Banditen-Countdown auf zehn Minuten zurück. Bereits angekündigte Ziele bleiben erhalten; ein bereits ausgelöster Angriff wird nicht rückgängig gemacht. Die Kartenvorschau weist auf die sofortige Wirkung hin.
 
 Der **Shop-Refresh-Joker** wird sofort beim Ziehen verbraucht, erneuert die vier Angebote und setzt den Shop-Timer auf fünf Minuten zurück.
+
+Der **Freizug-Joker** wird sofort beim Ziehen verbraucht und gibt 5 Freizüge. Jeder Zug oder Tausch – egal wie weit – verbraucht dann zuerst einen Freizug statt Gold.

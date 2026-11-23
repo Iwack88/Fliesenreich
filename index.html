@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -45,6 +45,7 @@
 <div id="panel" class="hidden">
   <div id="panel-info"></div>
   <button id="btn-return-card" hidden>Ans Deckende</button>
+  <button id="btn-cancel-move" hidden>Abbrechen</button>
 </div>
 
 <aside id="crafting-panel" class="closed" aria-label="Laufende Herstellungsaufträge">
@@ -63,8 +64,9 @@
 <div id="overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="overlay-title"><div id="overlay-box"><div id="overlay-head"><b id="overlay-title"></b><button id="overlay-close" aria-label="Fenster schließen">✕</button></div><div id="overlay-body"></div></div></div>
 
 <div id="toast"></div>
+<button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=48"></script>
+<script type="module" src="src/main.js?v=50"></script>
 </body>
 </html>

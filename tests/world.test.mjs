@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LAND_TYPES, START_DECK, PACKS, PACK_LAND_WEIGHTS } from '../src/config.js';
-import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomLand, expandWorld, returnHand } from '../src/logic.js';
+import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomTile, expandWorld, returnHand } from '../src/logic.js';
 
 test('new worlds contain only the workshop and guard, with no randomly generated tiles', () => {
   const state = newState();
@@ -52,16 +52,19 @@ test('land cards are placed at a valid random neighboring cell with their rarity
     state.hand = type;
     state.handRarity = 'epic';
     const valid = placeCells(state).map(cell => cell.join(','));
-    const result = placeRandomLand(state);
+    const result = placeRandomTile(state);
     assert.ok(valid.includes(`${result.tile.x},${result.tile.y}`));
     assert.ok(inBounds(state.size, result.tile.x, result.tile.y));
     assert.equal(result.tile.type, type);
     assert.equal(result.tile.rarity, 'epic');
     assert.equal(state.hand, null);
   }
-  state.hand = 'wald';
-  assert.equal(placeRandomLand(state), null);
-  assert.equal(state.hand, 'wald');
+  state.hand = 'joker_schutz';
+  assert.equal(placeRandomTile(state), null);
+  assert.equal(state.hand, 'joker_schutz');
+  state.hand = 'windmuehle';
+  state.handRarity = 'common';
+  assert.equal(placeRandomTile(state).tile.type, 'windmuehle');
 });
 
 test('a land card with no available neighboring cell can return to the deck unchanged', () => {
@@ -72,7 +75,7 @@ test('a land card with no available neighboring cell can return to the deck unch
   state.deck = ['gras'];
   state.deckRarities = ['rare'];
   assert.equal(drawCard(state), 'gras');
-  assert.equal(placeRandomLand(state), null);
+  assert.equal(placeRandomTile(state), null);
   assert.equal(returnHand(state), true);
   assert.deepEqual(state.deck, ['gras']);
   assert.deepEqual(state.deckRarities, ['rare']);
@@ -107,7 +110,7 @@ test('special slots avoid the start area, raise rarity once and are skipped by l
     addTile(state, 'gras', 3, 0);
     state.hand = 'erde';
     state.handRarity = 'common';
-    const { tile } = placeRandomLand(state);
+    const { tile } = placeRandomTile(state);
     assert.notEqual(`${tile.x},${tile.y}`, '2,0');
   }
   assert.ok(state.specialSlots['2,0']);

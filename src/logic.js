@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE } from './config.js?v=24';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER } from './config.js?v=25';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -224,6 +224,7 @@ export function drawCard(s) {
   const rarity = s.deckRarities.shift();
   if (card === 'joker_banditenzeit') { s.banditElapsed = 0; s.handRarity = null; }
   else if (card === 'joker_shop') { refreshShop(s); s.handRarity = null; }
+  else if (card === 'joker_freizug') { s.freeMoves = (s.freeMoves || 0) + FREE_MOVE_JOKER; s.handRarity = null; }
   else { s.hand = card; s.handRarity = rarity; }
   return card;
 }
@@ -264,8 +265,9 @@ export function placeHand(s, x, y, now = Date.now()) {
   return { tile, cleared, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
-export function placeRandomLand(s) {
-  if (!LAND_TYPES.includes(s.hand)) return null;
+// Platziert die Tile-Karte auf der Hand zufällig neben einem bestehenden Tile.
+export function placeRandomTile(s) {
+  if (!TILES[s.hand] || s.hand === 'banditen') return null;
   const all = placeCells(s);
   if (!all.length) return null;
   const plain = all.filter(([x, y]) => !isSpecialSlot(s, x, y));
@@ -535,6 +537,141 @@ const workshopFactor = (s, tile) => (1 - forgeBonus(s, tile) / 100) * (1 - (tile
 export function workshopDuration(s, tile, packId) {
   const baseDuration = packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
   return Math.round(baseDuration * workshopFactor(s, tile));
+}
+
+function components(keys) {
+  const labels = new Map();
+  let count = 0;
+  for (const start of keys) {
+    if (labels.has(start)) continue;
+    const queue = [start];
+    labels.set(start, count);
+    while (queue.length) {
+      const [x, y] = queue.pop().split(',').map(Number);
+      for (const [dx, dy] of DIRS4) {
+        const next = key(x + dx, y + dy);
+        if (keys.has(next) && !labels.has(next)) { labels.set(next, count); queue.push(next); }
+      }
+    }
+    count++;
+  }
+  return { labels, count };
+}
+
+export const moveStepCost = tile => MOVE_STEP_COST[tileRarity(tile)];
+export const canPayMove = (s, cost) => (s.freeMoves || 0) > 0 || s.gold >= cost;
+
+// Ziele für ein Tile: freie Felder neben anderen Tiles, ohne die Karte in mehr Inseln zu zerteilen.
+export function moveOptions(s, tile) {
+  if (!tile || tile.type === 'banditen' || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
+  const all = new Set(Object.keys(s.tiles));
+  const before = components(all).count;
+  all.delete(key(tile.x, tile.y));
+  const { labels, count } = components(all);
+  const half = s.size / 2;
+  const step = moveStepCost(tile);
+  const moves = [];
+  for (let x = -half; x < half; x++) for (let y = -half; y < half; y++) {
+    if (s.tiles[key(x, y)]) continue;
+    const joined = new Set(DIRS4.map(([dx, dy]) => labels.get(key(x + dx, y + dy))).filter(label => label !== undefined));
+    if (!joined.size || count - joined.size + 1 > before) continue;
+    const distance = Math.abs(x - tile.x) + Math.abs(y - tile.y);
+    moves.push({ kind: 'move', x, y, distance, cost: distance * step, special: isSpecialSlot(s, x, y) });
+  }
+  const swaps = DIRS4.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
+    .filter(other => other && other.type !== 'banditen')
+    .map(other => ({ kind: 'swap', x: other.x, y: other.y, tile: other, cost: SWAP_COST }));
+  return { moves, swaps };
+}
+
+function payMove(s, cost) {
+  if ((s.freeMoves || 0) > 0) { s.freeMoves--; return { free: true, cost: 0 }; }
+  if (s.gold < cost) return null;
+  s.gold -= cost;
+  return { free: false, cost };
+}
+
+function refundMove(s, record) {
+  if (record.free) s.freeMoves = (s.freeMoves || 0) + 1;
+  else s.gold += record.cost;
+}
+
+function runningJobs(s) {
+  return Object.values(s.tiles).filter(tile => tile.type === 'workshop' && tile.job)
+    .map(tile => ({ tile, factor: workshopFactor(s, tile) }));
+}
+
+function relocate(s, tile, x, y) {
+  tile.x = x;
+  tile.y = y;
+  s.tiles[key(x, y)] = tile;
+}
+
+function afterMove(s, jobs, now, moved) {
+  adjustWorkshopJobs(s, jobs, now);
+  const cleared = moved.some(tile => tile.type === 'wachturm') ? clearGuardedBandits(s) : 0;
+  planBandits(s);
+  return cleared;
+}
+
+export function moveTile(s, tile, x, y, now = Date.now()) {
+  const option = moveOptions(s, tile).moves.find(move => move.x === x && move.y === y);
+  if (!option) return null;
+  const payment = payMove(s, option.cost);
+  if (!payment) return null;
+  const jobs = runningJobs(s);
+  const from = { x: tile.x, y: tile.y };
+  const oldRarity = tile.rarity;
+  delete s.tiles[key(from.x, from.y)];
+  relocate(s, tile, x, y);
+  if (option.special) {
+    tile.rarity = upgradedRarity(tileRarity(tile));
+    delete s.specialSlots[key(x, y)];
+  }
+  const cleared = afterMove(s, jobs, now, [tile]);
+  return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, ...payment, special: option.special, oldRarity, cleared,
+    pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+}
+
+export function swapTiles(s, tile, other, now = Date.now()) {
+  if (!moveOptions(s, tile).swaps.some(swap => swap.tile === other)) return null;
+  const payment = payMove(s, SWAP_COST);
+  if (!payment) return null;
+  const jobs = runningJobs(s);
+  const from = { x: tile.x, y: tile.y }, to = { x: other.x, y: other.y };
+  relocate(s, tile, to.x, to.y);
+  relocate(s, other, from.x, from.y);
+  const cleared = afterMove(s, jobs, now, [tile, other]);
+  return { kind: 'swap', tile, other, from, to, ...payment, cleared,
+    pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+}
+
+// Macht einen Zug rückgängig, solange beide Positionen unverändert sind und keine Camps vertrieben wurden.
+export function undoMove(s, record, now = Date.now()) {
+  if (!record || record.cleared) return false;
+  const { from, to } = record;
+  const tile = tileAt(s, to.x, to.y);
+  if (tile?.id !== record.tile.id) return false;
+  const jobs = runningJobs(s);
+  if (record.kind === 'swap') {
+    const other = tileAt(s, from.x, from.y);
+    if (other?.id !== record.other.id) return false;
+    relocate(s, tile, from.x, from.y);
+    relocate(s, other, to.x, to.y);
+  } else {
+    if (tileAt(s, from.x, from.y)) return false;
+    delete s.tiles[key(to.x, to.y)];
+    relocate(s, tile, from.x, from.y);
+    if (record.special) {
+      if (record.oldRarity === undefined) delete tile.rarity;
+      else tile.rarity = record.oldRarity;
+      s.specialSlots[key(to.x, to.y)] = true;
+    }
+  }
+  refundMove(s, record);
+  adjustWorkshopJobs(s, jobs, now);
+  planBandits(s);
+  return true;
 }
 
 function affectedWorkshopJobs(s, x, y) {

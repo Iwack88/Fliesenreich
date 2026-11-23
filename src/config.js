@@ -9,6 +9,11 @@ export const EXPANSION_COST = 30;
 // Spezial-Bauplätze: Anteil freier Felder und Mindestabstand zum Startbereich.
 export const SPECIAL_SLOT_SHARE = 0.08;
 export const SPECIAL_SLOT_CLEARANCE = 2;
+// Verschieben: Gold pro Feld (Manhattan-Distanz) je Seltenheit, Tausch mit Nachbarn pauschal.
+export const MOVE_STEP_COST = { common: 10, uncommon: 15, rare: 20, epic: 30 };
+export const SWAP_COST = 50;
+export const FREE_MOVE_JOKER = 5;
+export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_shop', 'joker_freizug'];
 export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
@@ -50,7 +55,7 @@ export const PACKS = {
   basis: {
     name: 'Entdecker-Pack', cost: { holz: 55, korn: 45 }, duration: 8 * 60000,
     land: 3, extraChance: 0.4, hazardChance: 0.1,
-    weights: { holzfaeller: 18, windmuehle: 18, wald: 10, feld: 10, werkzeugschmiede: 8, workshop: 7, lagerhalle: 7, kornlager: 7, taverne: 5, joker_loeschen: 4, joker_verwandeln: 4, joker_schutz: 2 },
+    weights: { holzfaeller: 18, windmuehle: 18, wald: 8, feld: 8, werkzeugschmiede: 8, workshop: 7, lagerhalle: 7, kornlager: 7, taverne: 5, joker_loeschen: 4, joker_verwandeln: 4, joker_schutz: 2, joker_freizug: 4 },
   },
   humancity: {
     name: 'HumanCity-Pack', cost: { holz: 75, korn: 55 }, duration: 12 * 60000,
@@ -60,7 +65,7 @@ export const PACKS = {
   joker: {
     name: 'Joker-Pack', cost: { gold: 350 }, duration: 8 * 60000,
     land: 3, extraChance: 0.4, hazardChance: 0,
-    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1 },
+    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1, joker_freizug: 1 },
   },
 };
 
@@ -100,6 +105,7 @@ export const JOKERS = {
   joker_schutz: { name: 'Schutz-Joker', icon: '🛡️', color: '#b88bdb', rarity: 'rare' },
   joker_banditenzeit: { name: 'Banditenzeit-Joker', icon: '⏳', color: '#b88bdb', rarity: 'rare' },
   joker_shop: { name: 'Shop-Refresh-Joker', icon: '🔄', color: '#b88bdb', rarity: 'rare' },
+  joker_freizug: { name: 'Freizug-Joker', icon: '🧭', color: '#b88bdb', rarity: 'rare' },
 };
 
 export const HAZARDS = {

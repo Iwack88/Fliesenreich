@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=24';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, isSpecialSlot, placementRarity } from './logic.js?v=29';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS } from './config.js?v=25';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=30';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -14,15 +14,22 @@ backgroundImage.src = 'assets/game-background.jpg';
 const loadedState = load();
 let state = loadedState || newState();
 if (loadedState && migrateState(state)) save();
+if (TILES[state.hand] && state.hand !== 'banditen') {
+  if (!placeRandomTile(state)) returnHand(state);
+  save();
+}
 if (updateProduction(state)) save();
 function initialCamera() {
   return { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
 }
 let cam = initialCamera();
 let selected = null;   // angetipptes Tile (nur Info)
-let targets = [];      // freie Felder neben Tiles, solange eine Karte auf der Hand ist
-let placementPreview = null;
-let placementBuffCache = null;
+let moveMode = null;    // { tile, moves, swaps } während ein Tile verschoben wird
+let movePreview = null; // gewähltes Ziel, zweites Antippen bestätigt
+let previewBuffCache = null;
+let moveAnims = [];
+const UNDO_MS = 6000;
+let lastMove = null;
 let dpr = 1;
 const flashes = [];     // kurze Aufleucht-Effekte für Bonus-Quellen
 const FLASH_MS = 900;
@@ -49,7 +56,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=4');
+    const response = await fetch('assets/card-art.svg?v=5');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -174,6 +181,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key.toLowerCase() === 'a') showArchive();
   else if (e.key.toLowerCase() === 's') showShop();
   else if (e.key === 'Escape') {
+    if (moveMode) { cancelMove(); e.preventDefault(); return; }
     closeOverlay();
     if (selected) { selected = null; updatePanel(); }
   } else return;
@@ -227,43 +235,146 @@ function onTap(sx, sy) {
     save();
     return;
   }
-  if (state.hand) {
-    const target = targets.find(t => t.x === c.x && t.y === c.y);
-    if (target) {
-      if (!placementPreview || placementPreview.x !== target.x || placementPreview.y !== target.y) {
-        placementPreview = target;
-        placementBuffCache = null;
-        selected = null;
-        updatePanel();
-        return;
-      }
-      const res = placeHand(state, target.x, target.y);
-      if (!res) { toast('Dieses Feld ist nicht frei'); return; }
-      if (res.special) toast(`✨ Spezial-Bauplatz: ${TILES[res.tile.type].name} ist jetzt ${RARITY[res.tile.rarity].name}${res.cleared ? ` · ${res.cleared} Banditencamps vertrieben` : ''}`);
-      else if (res.cleared) toast(`${res.cleared} Banditencamps vertrieben`);
-      flashPairs(res.pairs);
-      placementPreview = null;
-      placementBuffCache = null;
-      selected = res?.tile || null;
-      focusNewTile(res.tile);
-      refreshTargets();
-      save();
-    } else toast('Wähle ein freies, grün markiertes Feld');
-    return;
-  }
+  if (moveMode) { handleMoveTap(c); return; }
   selected = tileAt(state, c.x, c.y) || null;
   refreshTargets();
   updatePanel();
 }
 
+// Hält Verschiebe-Ziele aktuell, z. B. nach Produktion, Banditen oder Goldänderungen.
 function refreshTargets() {
-  targets = TILES[state.hand] ? placeCells(state).map(([x, y]) => ({ x, y, special: isSpecialSlot(state, x, y) })) : [];
-  if (!TILES[state.hand] || (placementPreview && !targets.some(t => t.x === placementPreview.x && t.y === placementPreview.y))) {
-    placementPreview = null;
+  if (moveMode) {
+    const tile = moveMode.tile;
+    if (state.hand || tileAt(state, tile.x, tile.y) !== tile || tile.type === 'banditen') {
+      moveMode = null;
+      movePreview = null;
+    } else {
+      moveMode = { tile, ...moveOptions(state, tile) };
+      if (movePreview) movePreview = [...moveMode.moves, ...moveMode.swaps].find(o => o.x === movePreview.x && o.y === movePreview.y) || null;
+    }
   }
-  placementBuffCache = null;
+  previewBuffCache = null;
   updatePanel();
 }
+
+function startMove(tile) {
+  if (state.hand || !tile || tile.type === 'banditen') return;
+  syncBandits();
+  syncProduction();
+  moveMode = { tile, ...moveOptions(state, tile) };
+  movePreview = null;
+  previewBuffCache = null;
+  selected = null;
+  if (!moveMode.moves.length && !moveMode.swaps.length) toast('Für dieses Tile gibt es gerade kein Ziel');
+  updatePanel();
+}
+
+function cancelMove() {
+  const tile = moveMode?.tile;
+  moveMode = null;
+  movePreview = null;
+  previewBuffCache = null;
+  selected = tile && tileAt(state, tile.x, tile.y) === tile ? tile : null;
+  updatePanel();
+}
+
+function handleMoveTap(c) {
+  const tile = moveMode.tile;
+  const option = [...moveMode.moves, ...moveMode.swaps].find(o => o.x === c.x && o.y === c.y);
+  if (!option) {
+    if (c.x === tile.x && c.y === tile.y) {
+      movePreview = null;
+      previewBuffCache = null;
+      updatePanel();
+      return;
+    }
+    moveMode = null;
+    movePreview = null;
+    previewBuffCache = null;
+    selected = tileAt(state, c.x, c.y) || null;
+    updatePanel();
+    return;
+  }
+  if (movePreview !== option) {
+    movePreview = option;
+    previewBuffCache = null;
+    updatePanel();
+    return;
+  }
+  if (!canPayMove(state, option.cost)) { toast(`Nicht genug Gold – ${option.cost} ${GOLD_ICON} nötig`); return; }
+  const result = option.kind === 'swap' ? swapTiles(state, tile, option.tile) : moveTile(state, tile, option.x, option.y);
+  if (!result) { toast('Dieser Zug ist nicht mehr möglich'); refreshTargets(); return; }
+  startMoveAnimation(result);
+  const price = result.free ? '🧭 Freizug' : `−${result.cost} ${GOLD_ICON}`;
+  const upgrade = result.special ? ` · ✨ jetzt ${RARITY[tileRarity(result.tile)].name}` : '';
+  const label = result.kind === 'swap' ? `${TILES[tile.type].name} 🔁 ${TILES[result.other.type].name}` : `${TILES[tile.type].name} verschoben`;
+  toast(`${label} · ${price}${upgrade}${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}`);
+  flashPairs(result.pairs);
+  lastMove = result.cleared ? null : { record: result, until: performance.now() + UNDO_MS };
+  moveMode = null;
+  movePreview = null;
+  previewBuffCache = null;
+  selected = tile;
+  updateUndo();
+  save();
+  updatePanel();
+}
+
+const movePath = (from, to) => [{ x: from.x, y: from.y }, { x: to.x, y: from.y }, { x: to.x, y: to.y }];
+
+function startMoveAnimation(result) {
+  const start = performance.now();
+  const steps = Math.abs(result.to.x - result.from.x) + Math.abs(result.to.y - result.from.y);
+  const duration = Math.min(800, 220 + steps * 90);
+  moveAnims = [{ tile: result.tile, path: movePath(result.from, result.to), start, duration }];
+  if (result.kind === 'swap') moveAnims.push({ tile: result.other, path: [result.to, result.from], start, duration });
+}
+
+function animatedPosition(tile, now) {
+  const anim = moveAnims.find(a => a.tile === tile);
+  if (!anim) return null;
+  const p = (now - anim.start) / anim.duration;
+  if (p >= 1) return null;
+  const lengths = anim.path.slice(1).map((point, i) => Math.abs(point.x - anim.path[i].x) + Math.abs(point.y - anim.path[i].y));
+  let left = (1 - (1 - p) ** 3) * lengths.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < lengths.length; i++) {
+    if (left <= lengths[i] || i === lengths.length - 1) {
+      const a = anim.path[i], b = anim.path[i + 1], f = lengths[i] ? Math.min(1, left / lengths[i]) : 1;
+      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+    }
+    left -= lengths[i];
+  }
+  return null;
+}
+
+function updateUndo() {
+  const btn = $('undo-move');
+  const left = lastMove ? Math.ceil((lastMove.until - performance.now()) / 1000) : 0;
+  if (left <= 0) {
+    lastMove = null;
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  btn.textContent = `↩ Rückgängig (${left})`;
+}
+
+$('undo-move').onclick = () => {
+  if (!lastMove) return;
+  syncBandits();
+  syncProduction();
+  const record = lastMove.record;
+  lastMove = null;
+  if (undoMove(state, record)) {
+    startMoveAnimation({ ...record, from: record.to, to: record.from });
+    selected = tileAt(state, record.from.x, record.from.y) || null;
+    toast(`Rückgängig · ${record.free ? '🧭 Freizug' : `${record.cost} ${GOLD_ICON}`} erstattet`);
+    save();
+    refreshTargets();
+  } else toast('Rückgängig ist nicht mehr möglich');
+  updateUndo();
+};
+$('btn-cancel-move').onclick = cancelMove;
 
 function flashPairs(pairs) {
   const now = performance.now();
@@ -286,79 +397,74 @@ function displayPartners(tile) {
   return neighbors;
 }
 
-function previewCandidate() {
-  const { x, y } = placementPreview;
-  return { x, y, type: state.hand, rarity: placementRarity(state, state.hand, state.handRarity, x, y) };
-}
-
-function specialSlotText() {
-  if (!placementPreview?.special) return '';
-  const from = state.handRarity || baseRarity(state.hand), to = previewCandidate().rarity;
-  return from === to ? '<br>✨ Spezial-Bauplatz · bereits Epic, keine weitere Steigerung' : `<br>✨ Spezial-Bauplatz: ${RARITY[from].name} → ${RARITY[to].name}`;
-}
-
-function previewPartners() {
-  if (!placementPreview || !TILES[state.hand]) return [];
-  const candidate = previewCandidate();
-  return Object.values(state.tiles).filter(tile => {
-    const dx = Math.abs(tile.x - candidate.x), dy = Math.abs(tile.y - candidate.y);
-    if (candidate.type === 'wachturm' && dx <= guardRadius(candidate) && dy <= guardRadius(candidate)) return true;
-    if (dx > 1 || dy > 1) return false;
-    if ((candidate.type === 'workshop' && tile.type === 'werkzeugschmiede') ||
-        (candidate.type === 'werkzeugschmiede' && tile.type === 'workshop')) return true;
-    return pairValue(candidate, tile) > 0;
-  });
+// Simuliert den gewählten Zug, um Auswirkungen vor dem Bestätigen anzuzeigen.
+function previewSimulation() {
+  if (!moveMode || !movePreview) return null;
+  const tile = moveMode.tile;
+  const tiles = { ...state.tiles };
+  const cell = t => `${t.x},${t.y}`;
+  if (movePreview.kind === 'swap') {
+    const other = movePreview.tile;
+    const moved = { ...tile, x: other.x, y: other.y }, swapped = { ...other, x: tile.x, y: tile.y };
+    tiles[cell(moved)] = moved;
+    tiles[cell(swapped)] = swapped;
+    return { sim: { ...state, tiles }, copies: new Map([[tile, moved], [other, swapped]]) };
+  }
+  delete tiles[cell(tile)];
+  const rarity = movePreview.special ? upgradedRarity(tileRarity(tile)) : tileRarity(tile);
+  const moved = { ...tile, x: movePreview.x, y: movePreview.y, rarity };
+  tiles[cell(moved)] = moved;
+  return { sim: { ...state, tiles }, copies: new Map([[tile, moved]]) };
 }
 
 function previewBuffs() {
-  if (!placementPreview || !TILES[state.hand]) return [];
-  if (placementBuffCache) return placementBuffCache;
-  const candidate = previewCandidate();
-  const simulated = { ...state, tiles: { ...state.tiles, [`${candidate.x},${candidate.y}`]: candidate } };
+  if (previewBuffCache) return previewBuffCache;
+  const simulation = previewSimulation();
+  if (!simulation) return [];
+  const { sim, copies } = simulation;
   const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
-  const buffs = [];
   const total = production => Object.fromEntries(Object.keys(resources).map(id => [id, production.base[id] + production.bonus[id]]));
-  const formatBonus = (before, after) => Object.keys(resources)
-    .filter(resource => after[resource] > before[resource])
-    .map(resource => `+${fmt(after[resource] - before[resource])} ${resources[resource]}/Tick`)
-    .join(', ');
-  const supplyNote = (before, after) => after?.active && !before?.active ? ' (aktiviert)' : '';
-
+  const buffs = [];
   for (const tile of Object.values(state.tiles)) {
-    const before = tileProduction(state, tile), after = tileProduction(simulated, tile);
-    const change = formatBonus(total(before), total(after));
-    if (change) buffs.push({ tile, text: change + supplyNote(before.supply, after.supply) });
-  }
-  const own = tileProduction(simulated, candidate);
-  const ownBonus = formatBonus({ holz: 0, korn: 0, gold: 0 }, total(own));
-  if (ownBonus) buffs.push({ tile: candidate, text: ownBonus + (own.supply ? own.supply.active ? ' (aktiv)' : ` (Notbetrieb ${own.supply.count}/${own.supply.required})` : ''), candidate: true });
-
-  if (candidate.type === 'werkzeugschmiede') {
-    for (const tile of Object.values(state.tiles).filter(tile => tile.type === 'workshop')) {
-      const speed = forgeBonus(simulated, tile) - forgeBonus(state, tile);
-      if (speed) buffs.push({ tile, text: `Herstellung −${speed}%` });
+    const after = copies.get(tile) || tile;
+    const before = tileProduction(state, tile), now = tileProduction(sim, after);
+    const a = total(before), b = total(now);
+    const parts = [];
+    let gain = 0;
+    for (const id of Object.keys(resources)) {
+      const delta = b[id] - a[id];
+      if (Math.abs(delta) < 1e-9) continue;
+      gain += Math.sign(delta);
+      parts.push(`${delta > 0 ? '+' : '−'}${fmt(Math.abs(delta))} ${resources[id]}/Tick`);
     }
-  } else if (candidate.type === 'workshop') {
-    const speed = forgeBonus(simulated, candidate);
-    if (speed) buffs.push({ tile: candidate, text: `Herstellung −${speed}%`, candidate: true });
+    if (tile.type === 'workshop') {
+      const speed = forgeBonus(sim, after) - forgeBonus(state, tile);
+      if (speed) {
+        gain += Math.sign(speed);
+        parts.push(`Herstellung ${speed > 0 ? '−' : '+'}${Math.abs(speed)} %`);
+      }
+    }
+    if (!parts.length) continue;
+    const note = now.supply?.active && !before.supply?.active ? ' (aktiviert)' :
+      before.supply?.active && !now.supply?.active ? ' (Notbetrieb)' : '';
+    buffs.push({ tile: after, name: TILES[tile.type].name, moved: copies.has(tile), gain: gain >= 0, text: parts.join(', ') + note });
   }
-  placementBuffCache = buffs;
-  return placementBuffCache;
+  previewBuffCache = buffs;
+  return buffs;
 }
 
 function previewBuffText() {
-  if (state.hand === 'wachturm') return `Schützt ${previewPartners().length} Tiles im Wirkungsbereich.`;
   const buffs = previewBuffs();
-  if (!buffs.length) return 'Keine Produktions- oder Workshop-Buffs an dieser Position.';
-  const shown = buffs.slice(0, 3).map(({ tile, text, candidate }) =>
-    `${candidate ? 'Neues Tile' : TILES[tile.type].name}: ${text}`);
+  if (!buffs.length) return 'Keine Änderung an Produktion oder Workshops.';
+  const shown = buffs.slice(0, 3).map(({ name, moved, text }) => `${name}${moved ? ' (bewegt)' : ''}: ${text}`);
   if (buffs.length > shown.length) shown.push(`und ${buffs.length - shown.length} weitere`);
-  return `<span class="preview-buffs"><b>Gebuffte Tiles:</b> ${shown.join(' · ')}</span>`;
+  return `<span class="preview-buffs"><b>Auswirkung:</b> ${shown.join(' · ')}</span>`;
 }
 
 function updatePanel() {
   const panel = $('panel');
   const hand = state.hand && CARDS[state.hand];
+  $('btn-cancel-move').hidden = !moveMode;
   if (hand) {
     panel.classList.remove('hidden');
     const blockedDelete = state.hand === 'joker_loeschen' && Object.keys(state.tiles).length <= 1;
@@ -366,12 +472,27 @@ function updatePanel() {
     const message = blockedDelete ? 'Das letzte Tile kann nicht gelöscht werden.' :
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
-      state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
-      placementPreview ? `Vorschau: ${previewPartners().length} relevante Tiles · erneut antippen zum Platzieren; anderes grünes Feld verschiebt sie${specialSlotText()}<br>${previewBuffText()}` :
-      targets.length ? `Grünes Feld antippen für Vorschau; erneut antippen zum Platzieren${targets.some(t => t.special) ? ' · ✨ Felder mit Plus erhöhen die Seltenheit' : ''}` :
-      state.size === START_SIZE ? 'Spielfeld voll – im Shop erweitern' : 'Spielfeld voll';
-    const guardHint = TILES[state.hand] && Object.values(state.tiles).some(t => t.type === 'wachturm') ? ' · Blau: Wachturm-Schutz' : '';
-    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}${TILES[state.hand] ? ` · ${RARITY[state.handRarity || baseRarity(state.hand)].name}` : ''}</b><br>${message}${guardHint}`;
+      state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' : '';
+    $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}`;
+  } else if (moveMode) {
+    panel.classList.remove('hidden');
+    $('btn-return-card').hidden = true;
+    const tile = moveMode.tile, def = TILES[tile.type];
+    const free = state.freeMoves || 0;
+    const head = `<b>↔ ${def.icon} ${def.name} verschieben</b> · ${moveStepCost(tile)} ${GOLD_ICON}/Feld · Tausch ${SWAP_COST} ${GOLD_ICON}${free ? ` · 🧭 ${free} Freizüge` : ''}`;
+    let message;
+    if (movePreview) {
+      const price = free ? '🧭 Freizug' : `${movePreview.cost} ${GOLD_ICON}`;
+      const target = movePreview.kind === 'swap' ? `Tausch mit ${TILES[movePreview.tile.type].name}` : `Nach (${movePreview.x}, ${movePreview.y}) · ${movePreview.distance} ${movePreview.distance === 1 ? 'Feld' : 'Felder'}`;
+      const from = tileRarity(tile), to = upgradedRarity(from);
+      const special = !movePreview.special ? '' : from === to ? '<br>✨ Spezial-Bauplatz · bereits Epic' : `<br>✨ Spezial-Bauplatz: ${RARITY[from].name} → ${RARITY[to].name}`;
+      message = `${target} · <b>${price}</b> · ${canPayMove(state, movePreview.cost) ? 'erneut antippen zum Bestätigen' : 'nicht genug Gold'}${special}<br>${previewBuffText()}`;
+    } else {
+      message = moveMode.moves.length || moveMode.swaps.length
+        ? 'Ziel antippen – der Preis steht auf dem Feld · 🔁 tauscht mit dem Nachbarn · ✨ erhöht die Seltenheit'
+        : 'Kein Ziel verfügbar';
+    }
+    $('panel-info').innerHTML = `${head}<br>${message}`;
   } else {
     panel.classList.add('hidden');
   }
@@ -380,11 +501,15 @@ function updatePanel() {
 
 function updateTilePopup() {
   const el = $('tile-popup');
-  if (!selected || state.hand) { el.classList.add('hidden'); return; }
+  if (!selected || state.hand || moveMode) { el.classList.add('hidden'); return; }
   const def = TILES[selected.type];
   const partners = displayPartners(selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[tileRarity(selected)].name} · Position ${selected.x}, ${selected.y}</div>`;
+  if (selected.type !== 'banditen') {
+    const free = state.freeMoves || 0;
+    html += `<button id="tile-move" class="tile-move">↔ Verschieben · ${free ? `🧭 ${free} frei` : `${moveStepCost(selected)} ${GOLD_ICON}/Feld`}</button>`;
+  }
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
     wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller; höhere Seltenheit erhöht deren Ertrag.',
@@ -446,6 +571,7 @@ function updateTilePopup() {
   el.style.maxHeight = `calc(100vh - ${top + 8}px)`;
   el.classList.remove('hidden');
   $('tile-close').onclick = () => { selected = null; updatePanel(); };
+  if ($('tile-move')) $('tile-move').onclick = () => startMove(selected);
 }
 
 let queueKey = '';
@@ -456,7 +582,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=4#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=5#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
@@ -466,7 +592,7 @@ function renderQueue() {
   const card = CARDS[state.deck[0]];
   $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[state.deck[0]] ? `, ${RARITY[state.deckRarities[0]].name}` : ''} ziehen` : 'Deck leer');
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${['joker_banditenzeit', 'joker_shop'].includes(state.deck[0]) ? '<span>Wirkt sofort</span>' : LAND_TYPES.includes(state.deck[0]) ? '<span>Wird automatisch platziert</span>' : ''}`
+    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${INSTANT_JOKERS.includes(state.deck[0]) ? '<span>Wirkt sofort</span>' : TILES[state.deck[0]] ? '<span>Erscheint zufällig</span>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -517,6 +643,8 @@ function drawNextCard() {
   syncProduction();
   const card = drawCard(state);
   if (!card) { toast(state.hand ? 'Erst die Karte einsetzen' : 'Keine Karten – stelle ein Pack her'); return; }
+  moveMode = null;
+  movePreview = null;
   if (card === 'joker_banditenzeit') {
     selected = null;
     refreshTargets();
@@ -532,16 +660,25 @@ function drawNextCard() {
     toast('🔄 Shop-Angebot erneuert · nächster Wechsel in 5:00');
     return;
   }
-  if (LAND_TYPES.includes(card)) {
-    const result = placeRandomLand(state);
+  if (card === 'joker_freizug') {
+    selected = null;
+    refreshTargets();
+    save();
+    toast(`🧭 ${state.freeMoves} Freizüge verfügbar – der nächste Zug kostet kein Gold`);
+    return;
+  }
+  if (TILES[card] && !HAZARDS[card]) {
+    const result = placeRandomTile(state);
     if (result) {
-      selected = null;
+      const land = LAND_TYPES.includes(card);
+      selected = land ? null : result.tile;
+      flashPairs(result.pairs);
       focusNewTile(result.tile);
-      toast(`${TILES[card].name} bei (${result.tile.x}, ${result.tile.y}) automatisch platziert`);
+      toast(`${TILES[card].name} bei (${result.tile.x}, ${result.tile.y}) erschienen${land ? '' : ' · ↔ Verschieben im Tile-Info'}`);
     } else {
       returnHand(state);
       selected = null;
-      toast('Kein freies Nachbarfeld – Landkarte ans Deckende gelegt');
+      toast('Kein freies Nachbarfeld – Karte ans Deckende gelegt');
     }
     refreshTargets();
     save();
@@ -572,8 +709,6 @@ $('queue').onclick = drawNextCard;
 $('btn-return-card').onclick = () => {
   if (!JOKERS[state.hand]) return;
   returnHand(state);
-  placementPreview = null;
-  placementBuffCache = null;
   refreshTargets();
   save();
   toast('Joker ans Deckende gelegt');
@@ -609,8 +744,11 @@ $('btn-new-game').onclick = () => {
     activeSince = document.visibilityState === 'visible' ? performance.now() : null;
     cam = initialCamera();
     selected = null;
-    placementPreview = null;
-    placementBuffCache = null;
+    moveMode = null;
+    movePreview = null;
+    previewBuffCache = null;
+    lastMove = null;
+    moveAnims = [];
     flashes.length = 0;
     closeOverlay();
     refreshTargets();
@@ -792,7 +930,7 @@ function showInventory() {
     const rarity = state.deckRarities[i];
     const el = document.createElement('div');
     el.className = `card ${rarity}`;
-    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${['joker_banditenzeit', 'joker_shop'].includes(id) ? '<span class="card-effect">Wirkt sofort</span>' : LAND_TYPES.includes(id) ? '<span class="card-effect">Automatisch platziert</span>' : ''}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${INSTANT_JOKERS.includes(id) ? '<span class="card-effect">Wirkt sofort</span>' : TILES[id] ? '<span class="card-effect">Erscheint zufällig</span>' : ''}`;
     body.appendChild(el);
   });
 }
@@ -813,7 +951,7 @@ function showShop() {
       const card = CARDS[offer.card];
       const row = document.createElement('div');
       row.className = 'pack';
-      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : offer.card === 'joker_shop' ? '<br>Erneuert das Shop-Angebot beim Ziehen sofort.' : ''}</span>`;
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : offer.card === 'joker_shop' ? '<br>Erneuert das Shop-Angebot beim Ziehen sofort.' : offer.card === 'joker_freizug' ? '<br>Gibt beim Ziehen sofort 5 kostenlose Züge.' : ''}</span>`;
       const button = document.createElement('button');
       button.dataset.shopCard = offer.card;
       button.onclick = () => {
@@ -1046,7 +1184,7 @@ function showWorkshops() {
           icon.textContent = card.icon;
           icon.setAttribute('aria-hidden', 'true');
           const name = document.createElement('span');
-          name.textContent = card.name + (['joker_banditenzeit', 'joker_shop'].includes(type) ? ' (wirkt sofort)' : '');
+          name.textContent = card.name + (INSTANT_JOKERS.includes(type) ? ' (wirkt sofort)' : '');
           const value = document.createElement('span');
           value.className = 'pack-item-chance';
           value.textContent = percent;
@@ -1126,7 +1264,7 @@ const CATALOG_CATEGORIES = [
   ['joker', '🃏 Joker'],
   ['gefahr', '⚠️ Gefahren'],
 ];
-const landText = 'Wird beim Ziehen automatisch auf ein zufälliges freies Feld neben einem bestehenden Tile gelegt; ohne freien Platz kommt die Karte ans Deckende. Hat derzeit keine Produktion.';
+const landText = 'Hat derzeit keine Produktion und füllt Lücken im Reich.';
 const CARD_DESCRIPTIONS = {
   gras: landText,
   erde: landText,
@@ -1143,12 +1281,13 @@ const CARD_DESCRIPTIONS = {
   kornlager: `Erhöht das Kornlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Korn über dem neuen Limit.`,
   goldlager: `Erhöht das Goldlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Gold über dem neuen Limit.`,
   werkzeugschmiede: 'Beschleunigt alle benachbarten Workshops (auch diagonal) um 20 % je Seltenheitsstufe; insgesamt höchstens 60 % pro Workshop. Wirkt auch auf laufende Herstellungen.',
-  wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Platzieren alle Banditencamps in diesem Bereich.',
+  wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Erscheinen oder Verschieben alle Banditencamps in diesem Bereich.',
   joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile, dem letzten Workshop oder einem Workshop mit laufender Herstellung. Kann ans Deckende gelegt werden.',
   joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ (nie in ein Banditencamp). Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
   joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
   joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
+  joker_freizug: 'Wirkt sofort beim Ziehen: Gibt 5 Freizüge. Jeder Zug – egal wie weit – oder jeder Tausch verbraucht dann einen Freizug statt Gold.',
   banditen_niete: 'Erscheint beim Ziehen sofort als Banditencamp auf einem zufälligen ungeschützten freien Feld, sonst auf einem ungeschützten Tile. Camps breiten sich alle 10 Minuten aus und lassen sich nicht mit Jokern entfernen – nur ein Wachturm vertreibt sie.',
 };
 
@@ -1160,7 +1299,7 @@ function catalogCategory(id) {
 
 function showCatalog() {
   const body = openOverlay('Karten-Browser', 'catalog');
-  body.innerHTML = '<p class="catalog-intro">Alle Karten im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht.</p>';
+  body.innerHTML = '<p class="catalog-intro">Alle Karten im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Beim Ziehen erscheint jedes Tile auf einem zufälligen freien Feld neben einem bestehenden Tile und lässt sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen.</p>';
   const ids = Object.keys(CARDS).filter(id => id !== 'banditen');
   for (const [category, label] of CATALOG_CATEGORIES) {
     const cards = ids.filter(id => catalogCategory(id) === category);
@@ -1425,6 +1564,59 @@ function drawBanditArrow(tile) {
   ctx.restore();
 }
 
+function drawBadge(cx, cy, text, color, scale = 1) {
+  ctx.font = `bold ${Math.round(15 * scale)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text).width + 14 * scale, h = 22 * scale;
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, cx, cy + 1);
+}
+
+function drawMovePath(points, swap) {
+  const centers = points.map(p => [(p.x + 0.5) * TILE, (p.y + 0.5) * TILE]);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [width, color] of [[12, 'rgba(20,30,25,.7)'], [6, '#ffe27a']]) {
+    ctx.beginPath();
+    ctx.moveTo(...centers[0]);
+    for (const c of centers.slice(1)) ctx.lineTo(...c);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash(width === 6 ? [14, 10] : []);
+    ctx.lineDashOffset = -performance.now() / 40;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
+  const arrow = (from, to) => {
+    const angle = Math.atan2(to[1] - from[1], to[0] - from[0]);
+    const tip = [to[0] - Math.cos(angle) * TILE * 0.18, to[1] - Math.sin(angle) * TILE * 0.18];
+    ctx.beginPath();
+    ctx.moveTo(...tip);
+    ctx.lineTo(tip[0] - Math.cos(angle - 0.5) * 22, tip[1] - Math.sin(angle - 0.5) * 22);
+    ctx.lineTo(tip[0] - Math.cos(angle + 0.5) * 22, tip[1] - Math.sin(angle + 0.5) * 22);
+    ctx.closePath();
+    ctx.fillStyle = '#ffe27a';
+    ctx.strokeStyle = 'rgba(20,30,25,.8)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fill();
+  };
+  const segments = centers.filter((c, i) => i === 0 || c[0] !== centers[i - 1][0] || c[1] !== centers[i - 1][1]);
+  if (segments.length > 1) arrow(segments[segments.length - 2], segments[segments.length - 1]);
+  if (swap && segments.length > 1) arrow(segments[1], segments[0]);
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+}
+
 function drawGrid(half) {
   ctx.strokeStyle = 'rgba(255,255,255,.25)';
   ctx.lineWidth = 1;
@@ -1461,13 +1653,16 @@ function draw() {
   const half = state.size / 2;
   ctx.fillStyle = 'rgba(37, 91, 47, .12)';
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
-  if (TILES[state.hand]) {
-    drawGrid(half);
-  }
+  if (moveMode) drawGrid(half);
 
   const tiles = Object.values(state.tiles);
   const workshopCount = tiles.filter(t => t.type === 'workshop').length;
+  const animNow = performance.now();
+  moveAnims = moveAnims.filter(a => animNow - a.start < a.duration);
+  const animated = [];
   for (const t of tiles) {
+    const pos = animatedPosition(t, animNow);
+    if (pos) { animated.push([t, pos]); continue; }
     drawTile(t, t.x * TILE, t.y * TILE);
     const partners = displayPartners(t).length;
     const supply = SUPPLY_CHAINS[t.type] ? tileProduction(state, t).supply : null;
@@ -1486,6 +1681,14 @@ function draw() {
     }
   }
 
+  for (const [t, pos] of animated) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.5)';
+    ctx.shadowBlur = 16;
+    drawTile(t, pos.x * TILE, pos.y * TILE);
+    ctx.restore();
+  }
+
   if (state.hand === 'joker_schutz') {
     for (let x = -half; x < half; x++) for (let y = -half; y < half; y++) {
       if (tileAt(state, x, y) || state.protectedFields[`${x},${y}`]) continue;
@@ -1497,8 +1700,8 @@ function draw() {
     }
   }
 
-  const visibleGuards = TILES[state.hand] ?
-    [...tiles.filter(t => t.type === 'wachturm'), ...(state.hand === 'wachturm' && placementPreview ? [previewCandidate()] : [])] :
+  const visibleGuards = moveMode ?
+    Object.values(previewSimulation()?.sim.tiles || state.tiles).filter(t => t.type === 'wachturm') :
     selected?.type === 'wachturm' && !state.hand ? [selected] : [];
   for (const guard of visibleGuards) {
     const radius = guardRadius(guard);
@@ -1513,10 +1716,10 @@ function draw() {
     ctx.strokeRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
   }
 
-  if (TILES[state.hand]) {
+  if (moveMode) {
     for (const slot of Object.keys(state.specialSlots || {})) {
       const [sx, sy] = slot.split(',').map(Number);
-      if (tileAt(state, sx, sy) || targets.some(t => t.x === sx && t.y === sy)) continue;
+      if (tileAt(state, sx, sy) || moveMode.moves.some(t => t.x === sx && t.y === sy)) continue;
       ctx.strokeStyle = 'rgba(255,214,90,.75)';
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 6]);
@@ -1527,70 +1730,73 @@ function draw() {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('+', sx * TILE + TILE / 2, sy * TILE + TILE / 2);
     }
-  }
 
-  for (const g of targets) {
-    const x = g.x * TILE, y = g.y * TILE;
-    ctx.fillStyle = g.special ? 'rgba(255,205,70,.88)' : 'rgba(85,240,90,.8)';
-    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-    ctx.strokeStyle = g.special ? '#5a3d05' : '#15421c';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
-    ctx.strokeStyle = g.special ? '#fff3c4' : '#f3ffb8';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
-    if (!g.special) continue;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x + TILE * 0.32, y + TILE / 2);
-    ctx.lineTo(x + TILE * 0.68, y + TILE / 2);
-    ctx.moveTo(x + TILE / 2, y + TILE * 0.32);
-    ctx.lineTo(x + TILE / 2, y + TILE * 0.68);
-    ctx.strokeStyle = '#5a3d05';
-    ctx.lineWidth = 12;
-    ctx.stroke();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-  }
-
-  if (placementPreview && TILES[state.hand]) {
-    const x = placementPreview.x * TILE, y = placementPreview.y * TILE;
-    drawTile(previewCandidate(), x, y, 0.88);
-    ctx.strokeStyle = '#172d20';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
-    ctx.strokeStyle = '#fff6b0';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
-
-    for (const tile of previewPartners()) {
-      ctx.fillStyle = 'rgba(255,174,50,.28)';
-      ctx.fillRect(tile.x * TILE + 2, tile.y * TILE + 2, TILE - 4, TILE - 4);
-      ctx.strokeStyle = '#ffb52e';
-      ctx.lineWidth = 5;
-      ctx.strokeRect(tile.x * TILE + 4, tile.y * TILE + 4, TILE - 8, TILE - 8);
+    const free = (state.freeMoves || 0) > 0;
+    for (const g of moveMode.moves) {
+      const x = g.x * TILE, y = g.y * TILE;
+      const afford = free || state.gold >= g.cost;
+      const chosen = movePreview === g;
+      ctx.fillStyle = !afford ? 'rgba(70,70,70,.5)' : g.special ? 'rgba(255,205,70,.8)' : 'rgba(120,205,255,.34)';
+      ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+      ctx.strokeStyle = !afford ? 'rgba(190,190,190,.45)' : g.special ? '#fff3c4' : 'rgba(225,245,255,.8)';
+      ctx.lineWidth = chosen ? 5 : 2;
+      ctx.strokeRect(x + 5, y + 5, TILE - 10, TILE - 10);
+      if (g.special) {
+        ctx.fillStyle = afford ? '#5a3d05' : 'rgba(255,255,255,.6)';
+        ctx.font = `bold ${TILE * 0.3}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('+', x + TILE / 2, y + TILE * 0.3);
+      }
+      if (!chosen) drawBadge(x + TILE / 2, y + TILE * (g.special ? 0.68 : 0.5), free ? 'Frei' : `${g.cost}🪙`, afford ? '#173a4d' : '#555');
     }
-    for (const buff of previewBuffs()) {
-      const bx = buff.tile.x * TILE, by = buff.tile.y * TILE;
-      ctx.fillStyle = 'rgba(71,210,105,.24)';
-      ctx.fillRect(bx + 2, by + 2, TILE - 4, TILE - 4);
-      ctx.strokeStyle = '#6cff91';
-      ctx.lineWidth = 5;
-      ctx.strokeRect(bx + 4, by + 4, TILE - 8, TILE - 8);
-      ctx.beginPath();
-      ctx.arc(bx + 16, by + 16, 11, 0, Math.PI * 2);
-      ctx.fillStyle = '#1c5635';
-      ctx.fill();
-      ctx.strokeStyle = '#e5ffe9';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#e5ffe9';
-      ctx.font = 'bold 15px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('↑', bx + 16, by + 16);
+    for (const swap of moveMode.swaps) {
+      const afford = free || state.gold >= swap.cost;
+      ctx.strokeStyle = afford ? '#c79bff' : 'rgba(190,190,190,.5)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([6, 5]);
+      ctx.strokeRect(swap.x * TILE + 4, swap.y * TILE + 4, TILE - 8, TILE - 8);
+      ctx.setLineDash([]);
+      if (movePreview !== swap) drawBadge(swap.x * TILE + TILE / 2, swap.y * TILE + TILE * 0.78, free ? '🔁 Frei' : `🔁 ${swap.cost}🪙`, afford ? '#4b2a6b' : '#555');
+    }
+
+    const tile = moveMode.tile;
+    const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 220);
+    ctx.strokeStyle = `rgba(255,235,59,${pulse})`;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(tile.x * TILE + 3, tile.y * TILE + 3, TILE - 6, TILE - 6);
+
+    const simulation = previewSimulation();
+    if (simulation) {
+      const points = movePreview.kind === 'swap' ? [tile, movePreview] : movePath(tile, movePreview);
+      drawMovePath(points, movePreview.kind === 'swap');
+      if (movePreview.kind === 'move') {
+        ctx.fillStyle = 'rgba(20,30,25,.45)';
+        ctx.fillRect(tile.x * TILE, tile.y * TILE, TILE, TILE);
+        const x = movePreview.x * TILE, y = movePreview.y * TILE;
+        drawTile(simulation.copies.get(tile), x, y, 0.88);
+        ctx.strokeStyle = '#fff6b0';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
+      }
+      const cx = (movePreview.x + 0.5) * TILE, cy = (movePreview.y + 0.5) * TILE;
+      drawBadge(cx, movePreview.y * TILE - 2, free ? '🧭 Frei' : `${movePreview.cost}🪙`, canPayMove(state, movePreview.cost) ? '#7a5200' : '#8a2020', 1.25);
+      for (const buff of previewBuffs()) {
+        const bx = buff.tile.x * TILE, by = buff.tile.y * TILE;
+        ctx.fillStyle = buff.gain ? 'rgba(71,210,105,.22)' : 'rgba(230,70,60,.25)';
+        ctx.fillRect(bx + 2, by + 2, TILE - 4, TILE - 4);
+        ctx.strokeStyle = buff.gain ? '#6cff91' : '#ff6b5e';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(bx + 6, by + 6, TILE - 12, TILE - 12);
+        ctx.beginPath();
+        ctx.arc(bx + 18, by + 18, 11, 0, Math.PI * 2);
+        ctx.fillStyle = buff.gain ? '#1c5635' : '#6b1d17';
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(buff.gain ? '↑' : '↓', bx + 18, by + 18);
+      }
     }
   }
 
@@ -1656,12 +1862,13 @@ function draw() {
     const [x, y] = field.split(',').map(Number);
     drawShield({ x, y }, true);
   }
-  if (showGrid && !TILES[state.hand]) drawGrid(half);
+  if (showGrid && !moveMode) drawGrid(half);
 }
 
 function frame() {
   draw();
   updateHud();
+  updateUndo();
   updateCraftingPanel();
   requestAnimationFrame(frame);
 }
