@@ -3,20 +3,22 @@ import assert from 'node:assert/strict';
 import { TILES } from '../src/config.js';
 import { addTile, newState, migrateState, tileProduction, productionRates, updateProduction, startPack, forgeCount, workshopDuration, placeHand, openPack, canStartRecovery, startRecovery, useJoker } from '../src/logic.js';
 
-test('tile yield includes its own production buffs, not bonuses it grants other tiles', () => {
+test('suppliers produce nothing alone and activate producers from two neighbors, including diagonals', () => {
   const s = { tiles: {}, nextId: 1 };
   const forest = addTile(s, 'wald', 0, 0);
   const logger = addTile(s, 'holzfaeller', 1, 0);
+  assert.deepEqual(tileProduction(s, forest), { base: { holz: 0, korn: 0, gold: 0 }, bonus: { holz: 0, korn: 0, gold: 0 } });
+  assert.deepEqual(tileProduction(s, logger).supply, { supplier: 'wald', count: 1, required: 2, active: false });
+  assert.equal(tileProduction(s, logger).base.holz, 1);
   addTile(s, 'wald', 2, 1);
   assert.deepEqual(tileProduction(s, logger), {
-    base: { holz: 1, korn: 0, gold: 0 }, bonus: { holz: 2, korn: 0, gold: 0 },
+    base: { holz: 4, korn: 0, gold: 0 }, bonus: { holz: 0, korn: 0, gold: 0 },
+    supply: { supplier: 'wald', count: 2, required: 2, active: true },
   });
-  assert.equal(tileProduction(s, forest).bonus.holz, 0);
-  const field = addTile(s, 'feld', 0, 4);
-  const mill = addTile(s, 'windmuehle', 1, 4);
-  assert.equal(tileProduction(s, field).base.korn, 1);
-  assert.equal(tileProduction(s, mill).bonus.korn, 1);
-  assert.deepEqual(productionRates(s), { holz: 5, korn: 3, gold: 0 });
+  addTile(s, 'feld', 5, 5);
+  const mill = addTile(s, 'windmuehle', 0, 5);
+  assert.equal(tileProduction(s, mill).base.korn, 1);
+  assert.deepEqual(productionRates(s), { holz: 4, korn: 1, gold: 0 });
 });
 
 test('HumanCity is crafted with resources, gains forge speed and opens from inventory', (t) => {
@@ -72,9 +74,9 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   addTile(s, 'haus', 0, 4);
   addTile(s, 'haus', 1, 4);
   addTile(s, 'taverne', 2, 4);
-  assert.deepEqual(productionRates(s), { holz: 3, korn: 3, gold: 3 });
+  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3 });
   assert.equal(updateProduction(s, 30999), true);
-  assert.deepEqual(s.resources, { holz: 100, korn: 6 });
+  assert.deepEqual(s.resources, { holz: 100, korn: 2 });
   assert.equal(s.gold, 6);
   assert.equal(s.productionAt, 21000);
   assert.equal(updateProduction(s, 30999), false);
@@ -225,7 +227,7 @@ test('starthilfe recovers a deadlocked game without granting infinite free packs
   assert.equal(canStartRecovery(s, w), false);
   updateProduction(s, 31000);
   assert.equal(canStartRecovery(s, w), false);
-  assert.deepEqual(new Set(openPack(s, 'starthilfe')), new Set(['wald', 'feld', 'gras', 'erde', 'wasser']));
+  assert.deepEqual(new Set(openPack(s, 'starthilfe')), new Set(['holzfaeller', 'windmuehle', 'wald', 'feld']));
   assert.equal(canStartRecovery(s, w), false);
 });
 
@@ -236,6 +238,9 @@ test('starthilfe is unavailable when normal production or an affordable pack can
   s.resources = { holz: 0, korn: 0 };
   addTile(s, 'wald', 1, 0);
   addTile(s, 'feld', -1, 0);
+  assert.equal(canStartRecovery(s, w), true);
+  addTile(s, 'holzfaeller', 1, 1);
+  addTile(s, 'windmuehle', -1, 1);
   assert.equal(canStartRecovery(s, w), false);
   s.tiles = { '0,0': w };
   s.resources = { holz: 20, korn: 15 };

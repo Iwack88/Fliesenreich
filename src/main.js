@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=21';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=26';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, PACK_MIN_SPECIAL, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=22';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, placeRandomLand, placeCells, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, forgeCount, forgeBonus, workshopDuration, canStartPack, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter } from './logic.js?v=27';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -297,17 +297,21 @@ function previewBuffs() {
   const simulated = { ...state, tiles: { ...state.tiles, [`${candidate.x},${candidate.y}`]: candidate } };
   const resources = { holz: '🪵', korn: '🌾', gold: '🪙' };
   const buffs = [];
+  const total = production => Object.fromEntries(Object.keys(resources).map(id => [id, production.base[id] + production.bonus[id]]));
   const formatBonus = (before, after) => Object.keys(resources)
     .filter(resource => after[resource] > before[resource])
     .map(resource => `+${fmt(after[resource] - before[resource])} ${resources[resource]}/Tick`)
     .join(', ');
+  const supplyNote = (before, after) => after?.active && !before?.active ? ' (aktiviert)' : '';
 
   for (const tile of Object.values(state.tiles)) {
-    const change = formatBonus(tileProduction(state, tile).bonus, tileProduction(simulated, tile).bonus);
-    if (change) buffs.push({ tile, text: change });
+    const before = tileProduction(state, tile), after = tileProduction(simulated, tile);
+    const change = formatBonus(total(before), total(after));
+    if (change) buffs.push({ tile, text: change + supplyNote(before.supply, after.supply) });
   }
-  const ownBonus = formatBonus({ holz: 0, korn: 0, gold: 0 }, tileProduction(simulated, candidate).bonus);
-  if (ownBonus) buffs.push({ tile: candidate, text: ownBonus, candidate: true });
+  const own = tileProduction(simulated, candidate);
+  const ownBonus = formatBonus({ holz: 0, korn: 0, gold: 0 }, total(own));
+  if (ownBonus) buffs.push({ tile: candidate, text: ownBonus + (own.supply ? own.supply.active ? ' (aktiv)' : ` (Notbetrieb ${own.supply.count}/${own.supply.required})` : ''), candidate: true });
 
   if (candidate.type === 'werkzeugschmiede') {
     for (const tile of Object.values(state.tiles).filter(tile => tile.type === 'workshop')) {
@@ -363,10 +367,10 @@ function updateTilePopup() {
   html += `<div class="dim">${RARITY[tileRarity(selected)].name} · Position ${selected.x}, ${selected.y}</div>`;
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
-    wald: 'Produziert Holz pro 10 Sekunden.',
-    holzfaeller: 'Produziert Holz; benachbarte Wälder erhöhen den Ertrag.',
-    feld: 'Produziert Korn pro 10 Sekunden.',
-    windmuehle: 'Produziert Korn; benachbarte Felder erhöhen den Ertrag.',
+    wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller; höhere Seltenheit erhöht deren Ertrag.',
+    holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Wälder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
+    feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen; höhere Seltenheit erhöht deren Ertrag.',
+    windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
     taverne: 'Erzeugt Gold mit benachbarten Häusern.',
     workshop: 'Produziert Packs. Benachbarte Werkzeugschmieden beschleunigen die Herstellung.',
@@ -378,11 +382,18 @@ function updateTilePopup() {
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
-  const { base, bonus } = tileProduction(state, selected);
+  const { base, bonus, supply } = tileProduction(state, selected);
   const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold' };
+  if (supply) {
+    const supplierName = TILES[supply.supplier].name;
+    html += supply.active
+      ? `<div>✅ Aktiv: <b>${supply.count} ${supplierName}-Nachbarn</b></div>`
+      : `<div>⚠️ Notbetrieb: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b> · ${EMERGENCY_RATE * 100} % Leistung</div>`;
+  }
   for (const id of ['holz', 'korn', 'gold']) {
     if (!base[id] && !bonus[id]) continue;
-    html += `<div>Aktueller Ertrag: <b>${base[id] + bonus[id]} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus</span></div>`;
+    const label = supply ? (supply.active ? `${base[id]} aus Nachbarn + ${bonus[id]} Seltenheit der Nachbarn` : 'Notbetrieb') : `${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus`;
+    html += `<div>Aktueller Ertrag: <b>${fmt(base[id] + bonus[id])} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${label}</span></div>`;
   }
   if (selected.type === 'haus' || selected.type === 'taverne') {
     if (!bonus.gold) html += '<div>Aktueller Ertrag: <b>0 Gold / 10 Sek.</b></div>';
@@ -403,7 +414,9 @@ function updateTilePopup() {
     html += selected.target ? `<div>Nächstes Ziel: <b>${target ? TILES[target.type].name : 'Freies Feld'} (${selected.target.x}, ${selected.target.y})</b></div>` :
       '<div>Kein ungeschütztes Ziel in Reichweite.</div>';
   }
-  if (def.gives) {
+  if (supply) {
+    html += `<div class="dim">Je ${TILES[supply.supplier].name}: +${SUPPLIER_OUTPUT * tileStrength(selected)}, zusätzlich +1 je Seltenheitsstufe dieses Nachbarn über Common.</div>`;
+  } else if (def.gives) {
     html += `<div>Basisbonus je Nachbar: <b>${givesText(def)}</b> pro 10 Sek. · höhere Seltenheit verstärkt das Paar.</div>`;
   }
   html += `<div>Aktive Paare: <b>${partners.length}</b> <span class="dim">(orange markiert)</span></div>`;
@@ -1020,7 +1033,7 @@ function showWorkshops() {
       if (canStartRecovery(state, tile)) {
         const row = document.createElement('div');
         row.className = 'pack';
-        row.textContent = `Starthilfe-Pack: kostenlos, mit Wald und Feld · ${formatTime(workshopDuration(state, tile, 'starthilfe'))}`;
+        row.textContent = `Starthilfe-Pack: kostenlos, mit Holzfäller, Windmühle, Wäldern und Feldern · ${formatTime(workshopDuration(state, tile, 'starthilfe'))}`;
         const button = document.createElement('button');
         button.textContent = 'Herstellen';
         button.onclick = () => {
@@ -1358,11 +1371,12 @@ function draw() {
   for (const t of tiles) {
     drawTile(t, t.x * TILE, t.y * TILE);
     const partners = displayPartners(t).length;
-    if (partners) {
-      ctx.fillStyle = '#ffd54f';
+    const supply = SUPPLY_CHAINS[t.type] ? tileProduction(state, t).supply : null;
+    if (partners || supply) {
+      ctx.fillStyle = supply && !supply.active ? '#ff8a65' : '#ffd54f';
       ctx.font = `bold ${TILE * 0.22}px sans-serif`;
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText(`×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
+      ctx.fillText(supply && !supply.active ? `⚠${supply.count}/${supply.required}` : `×${partners}`, t.x * TILE + 6, t.y * TILE + 4);
     }
     if (JOKERS[state.hand] && t.type !== 'banditen' &&
         (state.hand === 'joker_schutz' ? !state.protectedFields[`${t.x},${t.y}`] :

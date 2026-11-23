@@ -13,8 +13,8 @@ test('storage buildings add 50 only to their own resource and production respect
   addTile(s, 'lagerhalle', 1, 0);
   addTile(s, 'kornlager', 2, 0);
   addTile(s, 'goldlager', 3, 0);
-  addTile(s, 'wald', 0, 2);
-  addTile(s, 'feld', 1, 2);
+  addTile(s, 'holzfaeller', 0, 2);
+  addTile(s, 'windmuehle', 1, 2);
   addTile(s, 'haus', 2, 2);
   addTile(s, 'haus', 3, 2);
   assert.deepEqual(storageCapacity(s), { gold: 350, holz: 150, korn: 150 });

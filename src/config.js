@@ -22,6 +22,14 @@ export const START_RESOURCES = { holz: 8, korn: 8 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
 export const GUARD_RADIUS = 3;
+// Produzenten benötigen passende Nachbarn; ohne diese laufen sie im Notbetrieb.
+export const SUPPLY_CHAINS = {
+  holzfaeller: { supplier: 'wald', resource: 'holz' },
+  windmuehle: { supplier: 'feld', resource: 'korn' },
+};
+export const MIN_SUPPLIERS = 2;
+export const SUPPLIER_OUTPUT = 2;
+export const EMERGENCY_RATE = 0.25;
 export const SHOP_INTERVAL = 5 * 60 * 1000;
 export const SHOP_OFFER_COUNT = 4;
 export const SHOP_DISCOUNT = 0.25;

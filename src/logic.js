@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT } from './config.js?v=21';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_FILLER_TYPES, PACK_MIN_SPECIAL, SHUFFLE_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE } from './config.js?v=22';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -403,13 +403,21 @@ export const canAfford = (s, cost) => s.gold >= cost;
 export function tileProduction(s, tile) {
   const base = { holz: 0, korn: 0, gold: 0 };
   const bonus = { holz: 0, korn: 0, gold: 0 };
-  if (tile.type === 'wald' || tile.type === 'holzfaeller') base.holz = tileStrength(tile);
-  if (tile.type === 'feld' || tile.type === 'windmuehle') base.korn = tileStrength(tile);
+  const chain = SUPPLY_CHAINS[tile.type];
+  if (chain) {
+    const suppliers = NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o?.type === chain.supplier);
+    const strength = tileStrength(tile);
+    const active = suppliers.length >= MIN_SUPPLIERS;
+    if (active) {
+      base[chain.resource] = SUPPLIER_OUTPUT * strength * suppliers.length;
+      bonus[chain.resource] = suppliers.reduce((sum, o) => sum + tileStrength(o) - 1, 0);
+    } else {
+      base[chain.resource] = SUPPLIER_OUTPUT * strength * MIN_SUPPLIERS * EMERGENCY_RATE;
+    }
+    return { base, bonus, supply: { supplier: chain.supplier, count: suppliers.length, required: MIN_SUPPLIERS, active } };
+  }
   for (const other of partnersOf(s, tile)) {
-    const value = pairValue(tile, other);
-    if (tile.type === 'holzfaeller') bonus.holz += value;
-    else if (tile.type === 'windmuehle') bonus.korn += value;
-    else if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += value;
+    if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += pairValue(tile, other);
   }
   return { base, bonus };
 }
@@ -541,7 +549,7 @@ export function openPack(s, packId) {
   if (!s.packs[packId]) return null;
   if (packId === 'starthilfe') {
     s.packs[packId]--;
-    const cards = shuffled(['wald', 'feld', 'gras', 'erde', 'wasser']);
+    const cards = shuffled(['holzfaeller', 'windmuehle', 'wald', 'wald', 'feld', 'feld']);
     addCards(s, cards);
     return cards;
   }

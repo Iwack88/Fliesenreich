@@ -21,12 +21,13 @@ test('rarity is rolled on pack opening, survives shuffle, return, reload and pla
   s.packs.starthilfe = 1;
   t.mock.method(Math, 'random', () => .99);
   const cards = openPack(s, 'starthilfe');
-  assert.equal(cards.length, 5);
-  assert.deepEqual(s.deckRarities, Array(5).fill('epic'));
+  assert.equal(cards.length, 6);
+  assert.deepEqual(s.deckRarities, Array(6).fill('epic'));
   s.deckRarities[0] = 'rare';
-  const expected = new Map(s.deck.map((type, i) => [type, s.deckRarities[i]]));
+  const pairs = () => s.deck.map((type, i) => `${type}:${s.deckRarities[i]}`).sort();
+  const expected = pairs();
   assert.equal(shuffleDeck(s), true);
-  for (let i = 0; i < s.deck.length; i++) assert.equal(s.deckRarities[i], expected.get(s.deck[i]));
+  assert.deepEqual(pairs(), expected);
   const first = s.deck[0], rarity = s.deckRarities[0];
   assert.equal(drawCard(s), first);
   assert.equal(s.handRarity, rarity);
@@ -64,14 +65,15 @@ test('production and pair buffs use rarity without extending adjacency or double
   const s = { tiles: {}, nextId: 1 };
   const mill = addTile(s, 'windmuehle', 0, 0, 'epic');
   const field = addTile(s, 'feld', 1, 0, 'uncommon');
-  addTile(s, 'feld', 2, 0, 'epic');
-  assert.equal(tileProduction(s, mill).base.korn, 4);
+  addTile(s, 'feld', 1, 1, 'epic');
+  assert.equal(tileProduction(s, mill).base.korn, 16);
   assert.equal(tileProduction(s, mill).bonus.korn, 4);
+  assert.equal(tileProduction(s, field).base.korn, 0);
   assert.equal(pairValue(mill, field), pairValue(field, mill));
   const house = addTile(s, 'haus', 0, 3, 'rare');
   const tavern = addTile(s, 'taverne', 1, 3, 'uncommon');
   assert.equal(pairValue(house, tavern), 6);
-  assert.deepEqual(productionRates(s), { holz: 0, korn: 14, gold: 6 });
+  assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 6 });
 });
 
 test('rarity strengthens storage, workshops, forges and guards', () => {
