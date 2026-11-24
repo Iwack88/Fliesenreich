@@ -43,7 +43,7 @@ export const START_RESOURCES = { holz: 8, korn: 8, werkzeug: 30, forschung: 0 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
 export const BANDIT_CHARGES = 3;
-export const GUARD_RADIUS = 3;
+export const GUARD_RADIUS = 1;
 // Produzenten benötigen passende Nachbarn; ohne diese laufen sie im Notbetrieb.
 export const SUPPLY_CHAINS = {
   holzfaeller: { supplier: 'wald', resource: 'holz' },

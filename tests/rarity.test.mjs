@@ -78,7 +78,7 @@ test('production and pair buffs use rarity without extending adjacency or double
   assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 6, werkzeug: 0, forschung: 0 });
 });
 
-test('rarity strengthens storage, workshops, forges and guards', () => {
+test('rarity strengthens storage, workshops and forges but does not extend guard range', () => {
   const s = newState();
   const workshop = s.tiles['0,0'];
   workshop.type = 'workshop';
@@ -104,12 +104,12 @@ test('rarity strengthens storage, workshops, forges and guards', () => {
   const result = useJoker(s, storage.x, storage.y);
   assert.equal(result.losses.holz, 150);
   const guard = addTile(s, 'wachturm', 0, 4, 'rare');
-  addTile(s, 'haus', 5, 4);
-  addTile(s, 'haus', 6, 4);
+  addTile(s, 'haus', 1, 4);
+  addTile(s, 'haus', 2, 4);
   activateGuard(s, guard);
-  assert.equal(guardRadius(guard), GUARD_RADIUS + 2);
-  assert.equal(isProtected(s, 5, 4), true);
-  assert.equal(isProtected(s, 6, 4), false);
+  assert.equal(guardRadius(guard), GUARD_RADIUS);
+  assert.equal(isProtected(s, 1, 4), true);
+  assert.equal(isProtected(s, 2, 4), false);
 });
 
 test('shop purchases roll once and preserve the resulting tile rarity', t => {
