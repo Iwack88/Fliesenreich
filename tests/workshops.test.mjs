@@ -1,9 +1,45 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MAX_CRAFT_JOBS, PACKS, START_RESOURCES } from '../src/config.js';
-import { addTile, newState, migrateState, tileProduction, productionRates, updateProduction, startPack, canStartPack, maxStartablePacks, craftDuration, openPack, canStartRecovery, startRecovery, storageCapacity, useJoker } from '../src/logic.js';
+import { addTile, newState, migrateState, tileProduction, productionClusters, productionRates, updateProduction, startPack, canStartPack, maxStartablePacks, craftDuration, openPack, canStartRecovery, startRecovery, storageCapacity, useJoker } from '../src/logic.js';
 
 const ZERO = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
+
+test('active production clusters merge shared suppliers and include diagonal neighbors', () => {
+  const s = { tiles: {}, nextId: 1 };
+  const mill = addTile(s, 'windmuehle', 0, 0);
+  const field = addTile(s, 'feld', 1, 0);
+  addTile(s, 'gras', 0, 1);
+  assert.deepEqual(productionClusters(s), [], 'emergency production does not use a supplier');
+  const diagonal = addTile(s, 'feld', 1, 1);
+  const otherMill = addTile(s, 'windmuehle', 2, 0);
+  const third = addTile(s, 'feld', 3, 0);
+  const forest = addTile(s, 'wald', -3, 0);
+  const logger = addTile(s, 'holzfaeller', -3, 1);
+  const forest2 = addTile(s, 'wald', -2, 1);
+  const clusters = productionClusters(s).map(group => new Set(group));
+  assert.equal(clusters.length, 2);
+  assert.ok(clusters.some(group => group.size === 5 && [mill, field, diagonal, otherMill, third].every(tile => group.has(tile))));
+  assert.ok(clusters.some(group => group.size === 3 && [forest, logger, forest2].every(tile => group.has(tile))));
+  delete s.tiles['1,1'];
+  assert.ok(!productionClusters(s).some(group => group.includes(mill)));
+});
+
+test('gold pairs and forge chains form separate clusters, excluding unrelated tiles', () => {
+  const s = { tiles: {}, nextId: 1 };
+  const house = addTile(s, 'haus', 0, 0);
+  const tavern = addTile(s, 'taverne', 1, 1);
+  const house2 = addTile(s, 'haus', 2, 1);
+  const isolated = addTile(s, 'taverne', 5, 0);
+  const workshop = addTile(s, 'workshop', 0, 4);
+  const forge1 = addTile(s, 'werkzeugschmiede', 1, 4);
+  const forge2 = addTile(s, 'werkzeugschmiede', 0, 5);
+  const clusters = productionClusters(s);
+  assert.equal(clusters.length, 2);
+  assert.ok(clusters.some(group => group.length === 3 && [house, tavern, house2].every(tile => group.includes(tile))));
+  assert.ok(clusters.some(group => group.length === 3 && [workshop, forge1, forge2].every(tile => group.includes(tile))));
+  assert.ok(clusters.every(group => !group.includes(isolated)));
+});
 
 test('suppliers produce nothing alone and activate producers from two neighbors, including diagonals', () => {
   const s = { tiles: {}, nextId: 1 };

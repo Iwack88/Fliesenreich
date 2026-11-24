@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=32';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=37';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=38';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -1690,6 +1690,32 @@ function drawGrid(half) {
   ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
 }
 
+let clusterKey = '', clusterCache = [];
+function drawProductionClusters(tiles) {
+  const currentKey = tiles.map(tile => `${tile.id}:${tile.type}:${tile.x},${tile.y}`).join('|');
+  if (clusterKey !== currentKey) {
+    clusterKey = currentKey;
+    clusterCache = productionClusters(state);
+  }
+  ctx.save();
+  ctx.strokeStyle = '#ffdf31';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  for (const cluster of clusterCache) {
+    const cells = new Set(cluster.map(tile => `${tile.x},${tile.y}`));
+    ctx.beginPath();
+    for (const tile of cluster) {
+      const x = tile.x * TILE, y = tile.y * TILE;
+      if (!cells.has(`${tile.x},${tile.y - 1}`)) { ctx.moveTo(x, y); ctx.lineTo(x + TILE, y); }
+      if (!cells.has(`${tile.x + 1},${tile.y}`)) { ctx.moveTo(x + TILE, y); ctx.lineTo(x + TILE, y + TILE); }
+      if (!cells.has(`${tile.x},${tile.y + 1}`)) { ctx.moveTo(x, y + TILE); ctx.lineTo(x + TILE, y + TILE); }
+      if (!cells.has(`${tile.x - 1},${tile.y}`)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TILE); }
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (backgroundImage.complete && backgroundImage.naturalWidth) {
@@ -1925,6 +1951,7 @@ function draw() {
       ctx.strokeRect(target.x * TILE + 2, target.y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
+  drawProductionClusters(tiles);
   for (const field of Object.keys(state.protectedFields)) {
     const [x, y] = field.split(',').map(Number);
     drawShield({ x, y }, true);

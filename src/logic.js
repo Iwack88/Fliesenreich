@@ -493,12 +493,16 @@ export function useJoker(s, x, y, now = Date.now()) {
 
 export const canAfford = (s, cost) => s.gold >= cost;
 
+function suppliersOf(s, tile, chain) {
+  return NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o?.type === chain.supplier);
+}
+
 export function tileProduction(s, tile) {
   const base = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
   const bonus = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
   const chain = SUPPLY_CHAINS[tile.type];
   if (chain) {
-    const suppliers = NEIGHBORS.map(([dx, dy]) => s.tiles[key(tile.x + dx, tile.y + dy)]).filter(o => o?.type === chain.supplier);
+    const suppliers = suppliersOf(s, tile, chain);
     const strength = tileStrength(tile);
     const active = suppliers.length >= MIN_SUPPLIERS;
     if (active) {
@@ -518,6 +522,38 @@ export function tileProduction(s, tile) {
     if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += pairValue(tile, other);
   }
   return { base, bonus };
+}
+
+export function productionClusters(s) {
+  const links = new Map();
+  const connect = (a, b) => {
+    if (!links.has(a)) links.set(a, new Set());
+    if (!links.has(b)) links.set(b, new Set());
+    links.get(a).add(b);
+    links.get(b).add(a);
+  };
+  for (const tile of Object.values(s.tiles)) {
+    const chain = SUPPLY_CHAINS[tile.type];
+    if (chain) {
+      const suppliers = suppliersOf(s, tile, chain);
+      if (suppliers.length >= MIN_SUPPLIERS) for (const supplier of suppliers) connect(tile, supplier);
+    } else if (tile.type === 'haus' || tile.type === 'taverne') {
+      for (const partner of partnersOf(s, tile)) connect(tile, partner);
+    }
+  }
+  const visited = new Set(), clusters = [];
+  for (const tile of links.keys()) {
+    if (visited.has(tile)) continue;
+    const cluster = [tile];
+    visited.add(tile);
+    for (let i = 0; i < cluster.length; i++) {
+      for (const neighbor of links.get(cluster[i])) {
+        if (!visited.has(neighbor)) { visited.add(neighbor); cluster.push(neighbor); }
+      }
+    }
+    clusters.push(cluster);
+  }
+  return clusters;
 }
 
 export function productionRates(s) {
