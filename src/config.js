@@ -22,7 +22,7 @@ export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 export const PLACEMENT_SHARE = { common: 0.1, uncommon: 0.2, rare: 0.35, epic: 0.5 };
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
-export const START_DECK = { wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
+export const START_DECK = { gras: 1, erde: 1, wasser: 1, berge: 1, wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };
 
 export const BASE_CAPACITY = { gold: 300, holz: 100, korn: 100, werkzeug: 100 };
 export const MAX_CRAFT_JOBS = 30; // gleichzeitig laufende Aufträge
@@ -51,18 +51,18 @@ export const SHOP_OFFER_COUNT = 4;
 export const SHOP_DISCOUNT = 0.25;
 export const SHOP_PRICES = { common: 80, uncommon: 200, rare: 400 };
 
-// Zwei Wertkarten sind garantiert. Die dritte Karte ist optional eine Wertkarte oder eine Niete.
+// Zwei Karten sind garantiert. Die dritte Karte ist optional eine Karte oder eine Niete.
 export const LAND_WEIGHTS = { gras: 3, erde: 3, wasser: 3, berge: 1 };
 export const PACKS = {
   natur: {
     name: 'Landschafts-Pack', cost: { werkzeug: 30, holz: 30, korn: 25 }, duration: 4 * 60000,
     extraChance: 0.4, hazardChance: 0.1,
-    weights: { wald: 32, feld: 32, haus: 14, lagerhalle: 6, kornlager: 6, goldlager: 3, werkzeugschmiede: 3, joker_schutz: 2, joker_banditenzeit: 1, joker_shop: 1 },
+    weights: { wald: 32, feld: 32, haus: 14, lagerhalle: 6, kornlager: 6, goldlager: 3, werkzeugschmiede: 3, joker_schutz: 2, joker_banditenzeit: 1, joker_shop: 1, ...LAND_WEIGHTS },
   },
   basis: {
     name: 'Entdecker-Pack', cost: { werkzeug: 50, holz: 55, korn: 45 }, duration: 8 * 60000,
     extraChance: 0.4, hazardChance: 0.1,
-    weights: { holzfaeller: 18, windmuehle: 18, wald: 8, feld: 8, werkzeugschmiede: 8, workshop: 7, lagerhalle: 7, kornlager: 7, taverne: 5, joker_loeschen: 4, joker_verwandeln: 4, joker_schutz: 2, joker_freizug: 4 },
+    weights: { holzfaeller: 18, windmuehle: 18, wald: 8, feld: 8, werkzeugschmiede: 8, workshop: 7, lagerhalle: 7, kornlager: 7, taverne: 5, joker_loeschen: 4, joker_verwandeln: 4, joker_schutz: 2, joker_freizug: 4, ...LAND_WEIGHTS },
   },
   humancity: {
     name: 'HumanCity-Pack', cost: { werkzeug: 70, holz: 75, korn: 55 }, duration: 12 * 60000,

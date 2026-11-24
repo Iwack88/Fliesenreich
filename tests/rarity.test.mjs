@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GUARD_RADIUS, SHOP_INTERVAL, TILES, LAND_TYPES } from '../src/config.js';
+import { GUARD_RADIUS, SHOP_INTERVAL, TILES } from '../src/config.js';
 import { addTile, advanceShop, availablePlacementSlots, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
 
 test('tile rarity rolls use the agreed thresholds and leave jokers unchanged', t => {
@@ -129,7 +129,7 @@ test('transformation keeps rarity', t => {
   s.tiles = { '0,0': workshop };
   s.resources = { holz: 100, korn: 100 };
   const tile = addTile(s, 'gras', 1, 0, 'uncommon');
-  const types = Object.keys(TILES).filter(type => type !== 'banditen' && !LAND_TYPES.includes(type));
+  const types = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (types.indexOf('werkzeugschmiede') + .5) / types.length);
   s.hand = 'joker_verwandeln';
   const result = useJoker(s, 1, 0, 90000);

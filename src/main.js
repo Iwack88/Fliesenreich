@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=31';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=36';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=32';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=37';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -1209,8 +1209,9 @@ function showWorkshops() {
     head.className = 'pack-recipe-head';
     const info = document.createElement('div');
     const cost = Object.entries(pack.cost).map(([resource, amount]) => `${COST_ICONS[resource]} ${amount}`).join(' · ');
-    const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarten';
-    info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(craftDuration(id))}<div class="pack-chances">2 ${valueLabel}; dritte Karte: ${pct(pack.extraChance)} weitere Wertkarte${pack.hazardChance ? `, ${pct(pack.hazardChance)} Banditen-Niete` : ''}.</div>`;
+    const valueLabel = id === 'joker' ? 'Joker' : 'Karten';
+    const extraLabel = id === 'joker' ? 'weiterer Joker' : 'weitere Karte';
+    info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(craftDuration(id))}<div class="pack-chances">2 ${valueLabel}; dritte Karte: ${pct(pack.extraChance)} ${extraLabel}${pack.hazardChance ? `, ${pct(pack.hazardChance)} Banditen-Niete` : ''}.</div>`;
     const buttons = document.createElement('div');
     const button = document.createElement('button');
     button.textContent = 'Herstellen';
@@ -1227,7 +1228,7 @@ function showWorkshops() {
     head.append(info, buttons);
     row.appendChild(head);
     const chances = packChances(pack);
-    for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`]]) {
+    for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Karten'} – Chance je Karte`]]) {
       const groupTitle = document.createElement('div');
       groupTitle.className = 'pack-chances';
       groupTitle.textContent = label;
@@ -1322,7 +1323,7 @@ const CATALOG_CATEGORIES = [
   ['joker', '🃏 Joker'],
   ['gefahr', '⚠️ Gefahren'],
 ];
-const landText = 'Entsteht zufällig beim Weltstart und bei der Erweiterung. Hat derzeit keine Produktion.';
+const landText = 'Entsteht zufällig beim Weltstart und bei der Erweiterung; auch als Karte erhältlich. Hat derzeit keine Produktion.';
 const CARD_DESCRIPTIONS = {
   gras: landText,
   erde: landText,
@@ -1342,7 +1343,7 @@ const CARD_DESCRIPTIONS = {
   werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops, auch diagonal. Jede Seltenheitsstufe der Schmiede über Common bringt dem Workshop +1 Werkzeug pro 10 Sekunden.',
   wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Erscheinen oder Verschieben alle Banditencamps in diesem Bereich.',
   joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile oder dem letzten Rathaus. Kann ans Deckende gelegt werden.',
-  joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in ein anderes Gebäude, einen Forst oder ein Feld. Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
+  joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ außer Banditencamps. Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
   joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
   joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
@@ -1358,7 +1359,7 @@ function catalogCategory(id) {
 
 function showCatalog() {
   const body = openOverlay('Karten-Browser', 'catalog');
-  body.innerHTML = '<p class="catalog-intro">Alle Karten und Landschafts-Tiles im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Gezogene Tiles werden auf einem zufällig ausgewählten markierten Feld platziert und lassen sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen. Gras, Erde, Wasser und Berge entstehen beim Weltstart und der Erweiterung.</p>';
+  body.innerHTML = '<p class="catalog-intro">Alle Karten und Landschafts-Tiles im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Gezogene Tiles werden auf einem zufällig ausgewählten markierten Feld platziert und lassen sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen. Gras, Erde, Wasser und Berge entstehen auch beim Weltstart und der Erweiterung.</p>';
   const ids = Object.keys(CARDS).filter(id => id !== 'banditen');
   for (const [category, label] of CATALOG_CATEGORIES) {
     const cards = ids.filter(id => catalogCategory(id) === category);
@@ -1374,7 +1375,7 @@ function showCatalog() {
       el.className = 'card catalog-card';
       el.innerHTML = `${cardArt(id)}<b class="card-name">${card.name}</b>` +
         `<span class="card-description">${CARD_DESCRIPTIONS[id]}</span>` +
-        `<span class="card-meta">Vorkommen: ${LAND_TYPES.includes(id) ? 'Weltstart und Erweiterung' : packs.length ? packs.join(', ') : 'nur Start/Shop'}<br>Shop: ${LAND_TYPES.includes(id) ? 'nicht erhältlich' : `${Math.round(SHOP_PRICES[card.shopTier || card.rarity] * (1 - SHOP_DISCOUNT))} ${GOLD_ICON}`}</span>`;
+        `<span class="card-meta">Vorkommen: ${LAND_TYPES.includes(id) ? `Weltstart, Erweiterung, ${packs.join(', ')}` : packs.length ? packs.join(', ') : 'nur Start/Shop'}<br>Shop: ${Math.round(SHOP_PRICES[card.shopTier || card.rarity] * (1 - SHOP_DISCOUNT))} ${GOLD_ICON}</span>`;
       body.appendChild(el);
     }
   }
@@ -1455,15 +1456,7 @@ $('btn-shuffle').onclick = () => {
 };
 
 // ---------- Zeichnen ----------
-const TILE_GROUND = {
-  gras: '#9caf73',
-  erde: '#ba9b72',
-  wasser: '#8eb8ad',
-  berge: '#a5a9a0',
-  feld: '#c9b57d',
-  banditen: '#a7967c',
-};
-const DEFAULT_GROUND = '#a9bb85';
+const DEFAULT_GROUND = '#9caf73';
 
 function drawTerrain(type, x, y) {
   ctx.save();
@@ -1474,6 +1467,13 @@ function drawTerrain(type, x, y) {
   ctx.lineCap = 'round';
   const offsetX = ((Math.round(x / TILE) * 13 + Math.round(y / TILE) * 7) % 28 + 28) % 28;
   const offsetY = ((Math.round(x / TILE) * 5 + Math.round(y / TILE) * 11) % 26 + 26) % 26;
+  if (type === 'erde' || type === 'wasser') {
+    ctx.beginPath();
+    ctx.ellipse(48, 48, 37, 32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = type === 'erde' ? '#ba9b72' : '#8eb8ad';
+    ctx.fill();
+    ctx.clip();
+  }
   if (type === 'gras') {
     ctx.strokeStyle = '#698a50';
     ctx.lineWidth = 2.5;
@@ -1513,16 +1513,16 @@ function drawTerrain(type, x, y) {
   } else if (type === 'berge') {
     ctx.fillStyle = '#747e7d';
     ctx.beginPath();
-    ctx.moveTo(2, 70); ctx.lineTo(27, 24); ctx.lineTo(45, 50);
-    ctx.lineTo(63, 12); ctx.lineTo(94, 70); ctx.lineTo(94, 94); ctx.lineTo(2, 94);
+    ctx.moveTo(10, 78); ctx.lineTo(28, 29); ctx.lineTo(44, 52);
+    ctx.lineTo(62, 18); ctx.lineTo(86, 78);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#e2e5d9';
     ctx.beginPath();
-    ctx.moveTo(19, 39); ctx.lineTo(27, 24); ctx.lineTo(36, 37); ctx.lineTo(30, 34); ctx.lineTo(26, 39);
+    ctx.moveTo(22, 45); ctx.lineTo(28, 29); ctx.lineTo(35, 40); ctx.lineTo(30, 38); ctx.lineTo(26, 42);
     ctx.closePath(); ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(53, 33); ctx.lineTo(63, 12); ctx.lineTo(74, 33); ctx.lineTo(67, 29); ctx.lineTo(62, 34);
+    ctx.moveTo(53, 37); ctx.lineTo(62, 18); ctx.lineTo(72, 39); ctx.lineTo(66, 34); ctx.lineTo(61, 38);
     ctx.closePath(); ctx.fill();
   }
   ctx.restore();
@@ -1532,14 +1532,14 @@ function drawTile(tile, x, y, alpha = 1) {
   const def = TILES[tile.type];
   ctx.save();
   ctx.globalAlpha = alpha;
+  ctx.fillStyle = DEFAULT_GROUND;
+  ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
   if (images[tile.type]) {
-    ctx.drawImage(images[tile.type], x, y, TILE, TILE);
+    ctx.drawImage(images[tile.type], x + 7, y + 7, TILE - 14, TILE - 14);
     ctx.strokeStyle = 'rgba(0,0,0,.35)';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, TILE, TILE);
   } else {
-    ctx.fillStyle = TILE_GROUND[tile.type] || DEFAULT_GROUND;
-    ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
     if (LAND_TYPES.includes(tile.type)) {
       drawTerrain(tile.type, x, y);
     } else if (tileArt[tile.type]) {

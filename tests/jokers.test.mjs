@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TILES, LAND_TYPES, START_DECK, BANDIT_INTERVAL } from '../src/config.js';
+import { TILES, START_DECK, BANDIT_INTERVAL } from '../src/config.js';
 import { addTile, drawCard, newState, placeHand, useJoker } from '../src/logic.js';
 
 test('new games have one of each joker and drawing preserves them', () => {
   const state = newState();
   assert.equal(state.gold, 100);
-  assert.equal(state.deck.length, 9);
+  assert.equal(state.deck.length, 13);
   for (const id of ['joker_loeschen', 'joker_verwandeln']) {
     assert.equal(START_DECK[id], 1);
     assert.equal(state.deck.filter(card => card === id).length, 1);
@@ -51,7 +51,7 @@ test('delete joker consumes itself only on an existing tile, and protects the la
 });
 
 test('transformation can select every other tile type, never a joker or the old type', (t) => {
-  const types = Object.keys(TILES).filter(type => type !== 'banditen' && !LAND_TYPES.includes(type));
+  const types = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen');
   let value = 0;
   t.mock.method(Math, 'random', () => value);
   for (let i = 0; i < types.length; i++) {
@@ -70,7 +70,7 @@ test('transformation updates bonuses without an immediate gold payout', (t) => {
   const state = { gold: 3, tiles: {}, nextId: 1, hand: 'joker_verwandeln' };
   const tile = addTile(state, 'haus', 0, 0);
   const house = addTile(state, 'haus', 1, 1);
-  const pool = Object.keys(TILES).filter(type => type !== 'haus' && type !== 'banditen' && !LAND_TYPES.includes(type));
+  const pool = Object.keys(TILES).filter(type => type !== 'haus' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('taverne') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
   assert.equal(state.gold, 3);
@@ -88,7 +88,7 @@ test('transformation keeps the card on an empty target and never deducts lost bo
   house.earned = 2;
   assert.equal(useJoker(state, 2, 0), null);
   assert.equal(state.hand, 'joker_verwandeln');
-  const pool = Object.keys(TILES).filter(type => type !== 'taverne' && type !== 'banditen' && !LAND_TYPES.includes(type));
+  const pool = Object.keys(TILES).filter(type => type !== 'taverne' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('haus') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
   assert.deepEqual(result.pairs, [{ tile: house, value: 1 }]);

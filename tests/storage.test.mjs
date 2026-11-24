@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TILES, LAND_TYPES } from '../src/config.js';
+import { TILES } from '../src/config.js';
 import { addTile, migrateState, newState, placeHand, spawnBandit, spreadBandits, storageCapacity, updateProduction, useJoker } from '../src/logic.js';
 
 test('storage buildings add 50 only to their own resource and production respects each cap', () => {
@@ -36,7 +36,7 @@ test('storage loss by delete and transform immediately discards only excess of a
   s.hand = 'joker_loeschen';
   assert.deepEqual(useJoker(s, 0, 0).losses, { holz: 45 });
   assert.deepEqual(s.resources, { holz: 100, korn: 145 });
-  const pool = Object.keys(TILES).filter(type => type !== 'kornlager' && type !== 'banditen' && !LAND_TYPES.includes(type));
+  const pool = Object.keys(TILES).filter(type => type !== 'kornlager' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('goldlager') + 0.5) / pool.length);
   s.hand = 'joker_verwandeln';
   assert.deepEqual(useJoker(s, 1, 0).losses, { korn: 45 });

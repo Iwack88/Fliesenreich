@@ -100,8 +100,12 @@ test('a card with no free cells can return and select slots when space is availa
   assert.deepEqual(availablePlacementSlots(state), [[0, 0]]);
 });
 
-test('starting decks do not contain landscape cards', () => {
-  for (const type of LAND_TYPES) assert.equal(START_DECK[type], undefined);
+test('starting decks include one of each landscape card', () => {
+  const state = newState();
+  for (const type of LAND_TYPES) {
+    assert.equal(START_DECK[type], 1);
+    assert.equal(state.deck.filter(card => card === type).length, 1);
+  }
 });
 
 test('special slots avoid the start area and raise placed card rarity once', () => {

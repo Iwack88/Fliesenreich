@@ -7,16 +7,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #res span { margin-right: 10px; font-size: 16px; }
 #res { white-space: nowrap; }
 #r-banditen { color: #ffb8a8; font-variant-numeric: tabular-nums; }
-#queue-wrap { position: absolute; right: 10px; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 110px; }
+#queue-wrap { position: absolute; right: 10px; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 146px; }
 #btn-delete-card { margin: 0; padding: 5px 4px; font-size: 12px; background: rgba(110,40,40,.92); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; cursor: pointer; box-shadow: 0 3px 8px #0006; }
 #btn-delete-card:disabled { opacity: .5; cursor: default; }
 #queue { position: static; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; margin: 0; padding: 7px; background: rgba(15,30,25,.94); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; cursor: grab; touch-action: none; box-shadow: 3px 3px 0 #846f54, 6px 6px 0 #443d30, 0 3px 8px #0006; }
-.card-drag-ghost { position: fixed; z-index: 1000; left: 0; top: 0; width: 82px; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 2px solid #eee0b9; border-radius: 9px; background: rgba(15,30,25,.95); color: white; font-size: 12px; text-align: center; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 6px 16px #0009; }
-.card-drag-ghost .card-art { width: 48px; height: 48px; }
+.card-drag-ghost { position: fixed; z-index: 1000; left: 0; top: 0; width: 112px; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 2px solid #eee0b9; border-radius: 9px; background: rgba(15,30,25,.95); color: white; font-size: 12px; text-align: center; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 6px 16px #0009; }
+.card-drag-ghost .card-art { width: 68px; height: 68px; }
 .card-drag-ghost.returning { transition: left .2s ease, top .2s ease, opacity .2s ease; opacity: .25; }
 #queue:disabled { background: rgba(15,30,25,.94); color: #e5e5e5; opacity: .78; cursor: default; }
 .queue-label { color: #d7e5d9; }
-#queue .card-art { width: 48px; height: 48px; margin: 4px auto; }
+#queue .card-art { width: 76px; height: 76px; margin: 4px auto; }
 .chip { padding: 3px 8px; border-radius: 6px; color: #000; font-weight: 600; }
 #hud { flex-wrap: wrap; gap: 4px; }
 #actions { display: flex; align-items: center; }
@@ -76,8 +76,8 @@ button:disabled { background: #555; color: #999; }
   #tool-actions button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; margin: 0; padding: 2px; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; background: var(--button-green); }
   #tool-actions .action-icon { display: block; font-size: 18px; line-height: 1; }
   #tool-actions .action-label { display: none; }
-  #queue { top: calc(100% + 5px); right: 6px; width: 92px; padding: 5px; font-size: 10px; }
-  #queue .card-art { width: 38px; height: 38px; margin: 3px auto; }
+  #queue { width: 100%; padding: 6px; font-size: 12px; }
+  #queue .card-art { width: 76px; height: 76px; margin: 3px auto; }
   #panel { bottom: 60px; padding: 6px 8px; font-size: 13px; }
   #panel.has-ready-packs { padding-right: 8px; }
   #panel-info { max-width: calc(100vw - 130px); }
@@ -86,6 +86,10 @@ button:disabled { background: #555; color: #999; }
 @media (max-width: 500px) {
   #tool-actions { gap: 2px; }
   #tool-actions button { width: 31px; }
+}
+@media (max-height: 500px) {
+  #queue-wrap { width: 126px; }
+  #queue .card-art { width: 60px; height: 60px; }
 }
 @media (max-width: 410px) {
   #tool-actions { max-width: calc(100vw - 170px); flex-wrap: wrap; }

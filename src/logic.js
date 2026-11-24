@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=31';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=32';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -96,11 +96,6 @@ export function migrateState(s, now = Date.now()) {
   }
   if (!s.shop) {
     s.shop = { elapsed: 0, round: 0, offers: [] };
-    changed = true;
-  }
-  const offers = s.shop.offers.filter(offer => !LAND_TYPES.includes(offer.card));
-  if (offers.length !== s.shop.offers.length) {
-    s.shop.offers = offers;
     changed = true;
   }
   if (!s.shop.offers.length) {
@@ -231,7 +226,7 @@ export function packChances(pack) {
     return entries.map(([id, weight]) => [id, 100 * weight / total]);
   };
   if (!(pack.extraChance >= 0 && pack.hazardChance >= 0 && pack.extraChance + pack.hazardChance <= 1) ||
-      Object.keys(pack.weights).some(id => LAND_TYPES.includes(id) || id === 'banditen_niete')) {
+      Object.keys(pack.weights).some(id => id === 'banditen_niete')) {
     throw new Error(`Ungültiger Pack-Aufbau für ${pack.name}`);
   }
   return { value: percent(pack.weights) };
@@ -246,7 +241,7 @@ export function shopStatus(s) {
 export function refreshShop(s, resetTimer = true) {
   s.shop.round++;
   if (resetTimer) s.shop.elapsed = 0;
-  s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen' && !LAND_TYPES.includes(id)))
+  s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
     .slice(0, SHOP_OFFER_COUNT).map(card => ({
       card, price: Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
     }));
@@ -264,7 +259,6 @@ export function advanceShop(s, elapsedMs) {
 }
 
 export function buyShopCard(s, card, round) {
-  if (LAND_TYPES.includes(card)) return false;
   if (!shopStatus(s).open || s.shop.round !== round) return false;
   const offer = s.shop.offers.find(offer => offer.card === card);
   if (!offer || offer.bought || s.gold < offer.price) return false;
@@ -485,7 +479,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     return { kind: 'deleted', tile, losses };
   }
   if (s.hand !== 'joker_verwandeln') return null;
-  const types = Object.keys(TILES).filter(type => type !== tile.type && type !== 'banditen' && !LAND_TYPES.includes(type));
+  const types = Object.keys(TILES).filter(type => type !== tile.type && type !== 'banditen');
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
   tile.type = newType;
