@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=32';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=33';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -46,7 +46,7 @@ function shuffled(arr) {
 }
 
 export function newState() {
-  const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, crafting: [], size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
+  const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, research: { completed: false, endsAt: null }, productionAt: Date.now(), banditElapsed: 0, packs: {}, crafting: [], size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   s.deckRarities = s.deck.map(rollRarity);
   s.deckPlacementSlots = s.deck.map(() => null);
   s.shop = { elapsed: 0, round: 0, offers: [] };
@@ -124,6 +124,14 @@ export function migrateState(s, now = Date.now()) {
     s.resources.werkzeug = START_RESOURCES.werkzeug;
     changed = true;
   }
+  if (s.resources.forschung == null) {
+    s.resources.forschung = 0;
+    changed = true;
+  }
+  if (!s.research) {
+    s.research = { completed: false, endsAt: null };
+    changed = true;
+  }
   if (s.banditElapsed == null) {
     s.banditElapsed = 0;
     if (!Object.values(s.tiles).some(tile => tile.type === 'wachturm') && s.hand !== 'wachturm' && !s.deck.includes('wachturm')) {
@@ -179,14 +187,25 @@ function addLandTiles(s, oldSize, count) {
 }
 
 export function expandWorld(s) {
-  if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
+  const first = s.size === START_SIZE;
+  const second = s.size === EXPANDED_SIZE && s.research?.completed;
+  if (!first && !second) return false;
+  const cost = first ? EXPANSION_COST : RESEARCHED_EXPANSION_COST;
+  if (s.gold < cost) return false;
   const oldSize = s.size;
-  s.size = EXPANDED_SIZE;
+  s.size = first ? EXPANDED_SIZE : RESEARCHED_SIZE;
   s.specialSlots ||= {};
   addLandTiles(s, oldSize, EXPANSION_LAND_TILES);
   addSpecialSlots(s, (x, y) => !inBounds(oldSize, x, y));
   planBandits(s);
-  s.gold -= EXPANSION_COST;
+  s.gold -= cost;
+  return true;
+}
+
+export function startResearch(s, now = Date.now()) {
+  if (!s.research || s.research.completed || s.research.endsAt != null || !(s.resources.forschung >= RESEARCH_COST)) return false;
+  s.resources.forschung -= RESEARCH_COST;
+  s.research.endsAt = now + RESEARCH_DURATION;
   return true;
 }
 
@@ -498,20 +517,21 @@ function suppliersOf(s, tile, chain) {
 }
 
 export function tileProduction(s, tile) {
-  const base = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
-  const bonus = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
+  const base = { holz: 0, korn: 0, gold: 0, werkzeug: 0, forschung: 0 };
+  const bonus = { holz: 0, korn: 0, gold: 0, werkzeug: 0, forschung: 0 };
   const chain = SUPPLY_CHAINS[tile.type];
   if (chain) {
     const suppliers = suppliersOf(s, tile, chain);
     const strength = tileStrength(tile);
-    const active = suppliers.length >= MIN_SUPPLIERS;
+    const required = chain.required ?? MIN_SUPPLIERS;
+    const active = suppliers.length >= required;
     if (active) {
       base[chain.resource] = SUPPLIER_OUTPUT * strength * suppliers.length;
       bonus[chain.resource] = suppliers.reduce((sum, o) => sum + tileStrength(o) - 1, 0);
     } else {
-      base[chain.resource] = SUPPLIER_OUTPUT * strength * MIN_SUPPLIERS * EMERGENCY_RATE;
+      base[chain.resource] = SUPPLIER_OUTPUT * strength * required * (chain.emergencyRate ?? EMERGENCY_RATE);
     }
-    return { base, bonus, supply: { supplier: chain.supplier, count: suppliers.length, required: MIN_SUPPLIERS, active } };
+    return { base, bonus, supply: { supplier: chain.supplier, count: suppliers.length, required, active } };
   }
   if (tile.type === 'rathaus') {
     base.gold = TOWN_HALL_OUTPUT.gold;
@@ -536,7 +556,7 @@ export function productionClusters(s) {
     const chain = SUPPLY_CHAINS[tile.type];
     if (chain) {
       const suppliers = suppliersOf(s, tile, chain);
-      if (suppliers.length >= MIN_SUPPLIERS) for (const supplier of suppliers) connect(tile, supplier);
+      if (suppliers.length >= (chain.required ?? MIN_SUPPLIERS)) for (const supplier of suppliers) connect(tile, supplier);
     } else if (tile.type === 'haus' || tile.type === 'taverne') {
       for (const partner of partnersOf(s, tile)) connect(tile, partner);
     }
@@ -557,12 +577,13 @@ export function productionClusters(s) {
 }
 
 export function productionRates(s) {
-  const rates = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
+  const rates = { holz: 0, korn: 0, gold: 0, werkzeug: 0, forschung: 0 };
   for (const tile of Object.values(s.tiles)) {
     const { base, bonus } = tileProduction(s, tile);
     rates.holz += base.holz + bonus.holz;
     rates.korn += base.korn + bonus.korn;
     rates.werkzeug += base.werkzeug + bonus.werkzeug;
+    rates.forschung += base.forschung + bonus.forschung;
     // Gold belongs to a pair, which appears in both tiles' detail views.
     rates.gold += (base.gold + bonus.gold) / (tile.type === 'rathaus' ? 1 : 2);
   }
@@ -602,6 +623,7 @@ export function updateProduction(s, now = Date.now()) {
     const rates = productionRates(s);
     const caps = storageCapacity(s);
     for (const id of ['holz', 'korn', 'werkzeug']) s.resources[id] = Math.max(s.resources[id], Math.min(caps[id], s.resources[id] + rates[id] * ticks));
+    s.resources.forschung = (s.resources.forschung ?? 0) + rates.forschung * ticks;
     s.gold = Math.max(s.gold, Math.min(caps.gold, s.gold + rates.gold * ticks));
     s.productionAt += ticks * PRODUCTION_INTERVAL;
     changed = true;
@@ -610,6 +632,11 @@ export function updateProduction(s, now = Date.now()) {
   if (done.length) {
     for (const job of done) s.packs[job.pack] = (s.packs[job.pack] || 0) + 1;
     s.crafting = s.crafting.filter(job => job.endsAt > now);
+    changed = true;
+  }
+  if (s.research && !s.research.completed && s.research.endsAt != null && s.research.endsAt <= now) {
+    s.research.completed = true;
+    s.research.endsAt = null;
     changed = true;
   }
   return changed;

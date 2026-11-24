@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=32';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=38';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=33';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=39';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -54,7 +54,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=5');
+    const response = await fetch('assets/card-art.svg?v=6');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -409,6 +409,15 @@ const fmt = (n) => String(Math.round(n * 100) / 100);
 const givesText = (def) => Object.entries(def.gives || {}).map(([id, n]) => `${TILES[id].name} +${n}`).join(', ');
 
 function displayPartners(tile) {
+  if (tile.type === 'schule' || tile.type === 'haus') {
+    const partners = partnersOf(state, tile);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      if (!dx && !dy) continue;
+      const neighbor = tileAt(state, tile.x + dx, tile.y + dy);
+      if (neighbor?.type === (tile.type === 'schule' ? 'haus' : 'schule')) partners.push(neighbor);
+    }
+    return partners;
+  }
   const otherType = tile.type === 'workshop' ? 'werkzeugschmiede' : tile.type === 'werkzeugschmiede' ? 'workshop' : null;
   if (!otherType) return partnersOf(state, tile);
   const neighbors = [];
@@ -445,7 +454,7 @@ function previewBuffs() {
   const simulation = previewSimulation();
   if (!simulation) return [];
   const { sim, copies } = simulation;
-  const resources = { holz: '🪵', korn: '🌾', gold: '🪙', werkzeug: '🔨' };
+  const resources = { holz: '🪵', korn: '🌾', gold: '🪙', werkzeug: '🔨', forschung: '🔬' };
   const total = production => Object.fromEntries(Object.keys(resources).map(id => [id, production.base[id] + production.bonus[id]]));
   const buffs = [];
   for (const tile of Object.values(state.tiles)) {
@@ -462,7 +471,7 @@ function previewBuffs() {
     }
     if (!parts.length) continue;
     const note = now.supply?.active && !before.supply?.active ? ' (aktiviert)' :
-      before.supply?.active && !now.supply?.active ? ' (Notbetrieb)' : '';
+      before.supply?.active && !now.supply?.active ? (tile.type === 'schule' ? ' (inaktiv)' : ' (Notbetrieb)') : '';
     buffs.push({ tile: after, name: TILES[tile.type].name, moved: copies.has(tile), gain: gain >= 0, text: parts.join(', ') + note });
   }
   previewBuffCache = buffs;
@@ -535,6 +544,7 @@ function updateTilePopup() {
     windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
     taverne: 'Erzeugt Gold mit benachbarten Häusern.',
+    schule: 'Erzeugt Forschungspunkte mit benachbarten Häusern, auch diagonal. Ohne Haus produziert sie nichts.',
     rathaus: `Das Start-Gebäude: erzeugt automatisch ${TOWN_HALL_OUTPUT.gold} Gold und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug pro 10 Sekunden.`,
     workshop: `Produziert Werkzeuge. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal), sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
@@ -546,14 +556,16 @@ function updateTilePopup() {
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   const { base, bonus, supply } = tileProduction(state, selected);
-  const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold', werkzeug: '🔨 Werkzeuge' };
+  const resourceNames = { holz: '🪵 Holz', korn: '🌾 Korn', gold: '🪙 Gold', werkzeug: '🔨 Werkzeuge', forschung: '🔬 Forschungspunkte' };
   if (supply) {
     const supplierName = TILES[supply.supplier].name;
     html += supply.active
       ? `<div>✅ Aktiv: <b>${supply.count} ${supplierName}-Nachbarn</b></div>`
-      : `<div>⚠️ Notbetrieb: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b> · ${EMERGENCY_RATE * 100} % Leistung</div>`;
+      : selected.type === 'schule'
+        ? `<div>⚠️ Inaktiv: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b></div>`
+        : `<div>⚠️ Notbetrieb: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b> · ${EMERGENCY_RATE * 100} % Leistung</div>`;
   }
-  for (const id of ['holz', 'korn', 'gold', 'werkzeug']) {
+  for (const id of ['holz', 'korn', 'gold', 'werkzeug', 'forschung']) {
     if (!base[id] && !bonus[id]) continue;
     const label = supply ? (supply.active ? `${base[id]} aus Nachbarn + ${bonus[id]} Seltenheit der Nachbarn` : 'Notbetrieb') : `${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus`;
     html += `<div>Aktueller Ertrag: <b>${fmt(base[id] + bonus[id])} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${label}</span></div>`;
@@ -596,7 +608,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=5#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=6#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const heldTile = TILES[state.hand] && state.hand !== 'banditen';
@@ -620,6 +632,7 @@ function updateHud() {
   $('r-holz').textContent = `${state.resources.holz}/${caps.holz}`;
   $('r-korn').textContent = `${state.resources.korn}/${caps.korn}`;
   $('r-werkzeug').textContent = `${Math.floor(state.resources.werkzeug)}/${caps.werkzeug}`;
+  $('r-forschung').textContent = fmt(state.resources.forschung);
   $('r-banditen').textContent = formatTime(BANDIT_INTERVAL - state.banditElapsed);
   const readyPacks = Object.values(state.packs).reduce((sum, count) => sum + count, 0);
   $('btn-cards-label').textContent = readyPacks ? `Inventar 📦${readyPacks}` : 'Inventar';
@@ -838,6 +851,7 @@ const WAREHOUSE_RESOURCES = [
   { id: 'holz', name: 'Holz', icon: '🪵' },
   { id: 'korn', name: 'Korn', icon: '🌾' },
   { id: 'werkzeug', name: 'Werkzeuge', icon: '🔨' },
+  { id: 'forschung', name: 'Forschungspunkte', icon: '🔬' },
 ];
 
 function filterName(filter) {
@@ -941,7 +955,7 @@ function updateWarehouse() {
   for (const resource of WAREHOUSE_RESOURCES) {
     const stock = resource.id === 'gold' ? state.gold : state.resources[resource.id];
     const button = document.querySelector(`[data-resource="${resource.id}"]`);
-    button.textContent = `${resource.icon} ${resource.name} · Bestand: ${fmt(stock)} / ${caps[resource.id]}`;
+    button.textContent = `${resource.icon} ${resource.name} · Bestand: ${fmt(stock)}${resource.id === 'forschung' ? '' : ` / ${caps[resource.id]}`}`;
     button.setAttribute('aria-pressed', String(warehouseResource?.id === resource.id));
   }
   const detail = $('warehouse-detail');
@@ -953,6 +967,10 @@ function updateWarehouse() {
   const rate = productionRates(state)[id];
   detail.innerHTML = `<b>${icon} ${name}: +${fmt(rate)} pro Tick</b><div class="pack-chances">Ein Tick dauert ${PRODUCTION_INTERVAL / 1000} Sekunden. Gesamtertrag aller Tiles inklusive Nachbarschaftsboni; Goldpaare zählen nur einmal.</div>`;
   const stock = id === 'gold' ? state.gold : state.resources[id];
+  if (id === 'forschung') {
+    detail.innerHTML += '<div class="pack-chances">Forschungspunkte haben kein Lagerlimit und werden im Forschungsmenü eingesetzt.</div>';
+    return;
+  }
   const stored = Math.min(rate, Math.max(0, caps[id] - stock));
   detail.innerHTML += `<div class="pack-chances">Bei aktuellem Lagerstand passen beim nächsten Tick ${fmt(stored)} ${name} ins Lager. Lagerlimit: ${caps[id]}; neu produzierter Überschuss verfällt.${stock > caps[id] ? ' Vorhandener Überschuss bleibt bis zur Ausgabe erhalten.' : ''}</div>`;
 }
@@ -1015,7 +1033,7 @@ function showShop() {
   const body = openOverlay('Shop', 'shop');
   body.innerHTML = '';
   const sale = shopStatus(state);
-  shopViewKey = `${state.shop.round}|${sale.open}`;
+  shopViewKey = `${state.shop.round}|${sale.open}|${state.size}|${state.research.completed}`;
   const status = document.createElement('div');
   status.id = 'shop-sale-status';
   status.className = 'workshop';
@@ -1041,14 +1059,18 @@ function showShop() {
       body.appendChild(row);
     }
   }
-  if (state.size === START_SIZE) {
+  const addExpansion = (size, cost) => {
     const row = document.createElement('div');
     row.className = 'pack';
-    row.innerHTML = `<span><b>Spielfeld erweitern</b> – ${EXPANDED_SIZE}×${EXPANDED_SIZE}</span>`;
+    const prerequisite = size === RESEARCHED_SIZE && state.size !== EXPANDED_SIZE;
+    row.innerHTML = `<span><b>Spielfeld erweitern</b> – ${size}×${size}${prerequisite ? '<br>Zuerst 16×16 kaufen.' : ''}</span>`;
     const btn = document.createElement('button');
-    btn.textContent = costText(EXPANSION_COST);
-    btn.disabled = state.gold < EXPANSION_COST;
+    btn.dataset.expansion = size;
+    btn.textContent = costText(cost);
+    btn.disabled = prerequisite || state.gold < cost;
     btn.onclick = () => {
+      syncBandits();
+      syncProduction();
       if (!expandWorld(state)) { toast('Erweiterung nicht möglich'); return; }
       refreshTargets();
       save();
@@ -1057,10 +1079,12 @@ function showShop() {
     };
     row.appendChild(btn);
     body.appendChild(row);
-  }
-  if (state.size !== START_SIZE) {
+  };
+  if (state.size === START_SIZE) addExpansion(EXPANDED_SIZE, EXPANSION_COST);
+  if (state.research.completed && state.size < RESEARCHED_SIZE) addExpansion(RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST);
+  if (state.size === RESEARCHED_SIZE) {
     const notice = document.createElement('p');
-    notice.textContent = 'Das Spielfeld ist bereits erweitert.';
+    notice.textContent = 'Das Spielfeld ist auf die maximale Größe erweitert.';
     body.appendChild(notice);
   }
   updateShopView();
@@ -1069,7 +1093,7 @@ function showShop() {
 function updateShopView() {
   if (overlayView !== 'shop') return;
   const sale = shopStatus(state);
-  if (shopViewKey !== `${state.shop.round}|${sale.open}`) {
+  if (shopViewKey !== `${state.shop.round}|${sale.open}|${state.size}|${state.research.completed}`) {
     const scroll = $('overlay-box').scrollTop;
     showShop();
     $('overlay-box').scrollTop = scroll;
@@ -1082,11 +1106,44 @@ function updateShopView() {
     button.textContent = offer.bought ? 'Ausverkauft' : `Kaufen · ${offer.price} ${GOLD_ICON}`;
     button.disabled = !sale.open || offer.bought || state.gold < offer.price;
   }
+  const first = document.querySelector(`[data-expansion="${EXPANDED_SIZE}"]`);
+  if (first) first.disabled = state.gold < EXPANSION_COST;
+  const second = document.querySelector(`[data-expansion="${RESEARCHED_SIZE}"]`);
+  if (second) second.disabled = state.size !== EXPANDED_SIZE || state.gold < RESEARCHED_EXPANSION_COST;
 }
 
 function formatTime(ms) {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function showResearch() {
+  const body = openOverlay('Forschung', 'research');
+  body.innerHTML = `<div class="workshop"><b>🔬 Forschungspunkte: <span id="research-points"></span></b><div id="research-rate" class="pack-chances"></div></div>
+    <div class="workshop"><b>🗺️ Spielfeld 32×32</b><div class="pack-chances">Schaltet die Erweiterung im Shop frei. Dafür muss zuerst 16×16 gekauft werden.</div>
+    <div id="research-status"></div><button id="research-start">Forschen · ${RESEARCH_COST} 🔬</button></div>`;
+  $('research-start').onclick = () => {
+    syncBandits();
+    syncProduction();
+    if (!startResearch(state)) { toast('Forschung nicht möglich'); updateResearchView(); return; }
+    save();
+    updateResearchView();
+    toast('Forschung gestartet');
+  };
+  updateResearchView();
+}
+
+function updateResearchView() {
+  if (overlayView !== 'research') return;
+  const { completed, endsAt } = state.research;
+  $('research-points').textContent = fmt(state.resources.forschung);
+  $('research-rate').textContent = `+${fmt(productionRates(state).forschung)} pro ${PRODUCTION_INTERVAL / 1000} Sekunden · Schulen brauchen benachbarte Häuser.`;
+  $('research-status').textContent = completed ? '✅ Erforscht · im Shop verfügbar' :
+    endsAt != null ? `⏳ Forschung läuft · noch ${formatTime(endsAt - Date.now())}` :
+      `Dauer: ${formatTime(RESEARCH_DURATION)} · Kosten: ${RESEARCH_COST} 🔬`;
+  const button = $('research-start');
+  button.hidden = completed || endsAt != null;
+  button.disabled = state.resources.forschung < RESEARCH_COST;
 }
 
 function updateJobIndicator(indicator, now = Date.now()) {
@@ -1337,6 +1394,7 @@ const CARD_DESCRIPTIONS = {
   windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Aktiv erzeugt sie pro 10 Sekunden je Feld ${SUPPLIER_OUTPUT} Korn × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Feldern läuft sie im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Korn).`,
   haus: 'Erzeugt Gold mit benachbarten Gebäuden, auch diagonal: Haus + Haus 1 Gold, Haus + Taverne 2 Gold pro 10 Sekunden. Jedes Paar zählt einmal und wird mit der höheren Seltenheitsstufe der beiden multipliziert.',
   taverne: 'Erzeugt mit jedem benachbarten Haus 2 Gold pro 10 Sekunden, auch diagonal. Zwei Tavernen erzeugen zusammen nichts. Das Paar wird mit der höheren Seltenheitsstufe multipliziert.',
+  schule: `Erzeugt Forschungspunkte 🔬 mit benachbarten Häusern, auch diagonal. Je Haus ${SUPPLIER_OUTPUT} Punkte × Seltenheitsstufe der Schule und +1 je Seltenheitsstufe des Hauses über Common. Ohne Haus keine Produktion.`,
   rathaus: `Das Start-Gebäude. Erzeugt ohne Nachbarn automatisch ${TOWN_HALL_OUTPUT.gold} Gold 🪙 und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug 🔨 pro 10 Sekunden, damit du auch bei schlechten Kartenziehungen immer Grundressourcen hast. Kann nicht gelöscht werden; der Lösch-Joker verschont das letzte Rathaus.`,
   workshop: `Produziert Werkzeuge 🔨, mit denen Packs hergestellt werden. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Schmiede ${SUPPLIER_OUTPUT} Werkzeuge × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Schmieden läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Werkzeug).`,
   lagerhalle: `Erhöht das Holzlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Holz über dem neuen Limit.`,
@@ -1426,6 +1484,7 @@ $('btn-catalog').onclick = showCatalog;
 $('btn-cards').onclick = () => { syncProduction(); showInventory(); };
 $('ready-packs').onclick = () => { syncBandits(); syncProduction(); showInventory(); };
 $('btn-workshop').onclick = () => { syncBandits(); syncProduction(); showWorkshops(); };
+$('btn-research').onclick = () => { syncBandits(); syncProduction(); showResearch(); };
 $('btn-warehouse').onclick = () => { syncBandits(); syncProduction(); showWarehouse(); };
 for (const button of document.querySelectorAll('[data-hud-resource]')) {
   button.onclick = () => { syncBandits(); syncProduction(); showWarehouse(button.dataset.hudResource); };
@@ -1982,6 +2041,7 @@ setInterval(() => {
   syncProduction();
   updateWarehouse();
   updateShopView();
+  updateResearchView();
   for (const indicator of document.querySelectorAll('.job-status')) updateJobIndicator(indicator);
 }, 1000);
 document.addEventListener('visibilitychange', () => {

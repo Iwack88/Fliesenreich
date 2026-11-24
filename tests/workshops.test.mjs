@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MAX_CRAFT_JOBS, PACKS, START_RESOURCES } from '../src/config.js';
 import { addTile, newState, migrateState, tileProduction, productionClusters, productionRates, updateProduction, startPack, canStartPack, maxStartablePacks, craftDuration, openPack, canStartRecovery, startRecovery, storageCapacity, useJoker } from '../src/logic.js';
 
-const ZERO = { holz: 0, korn: 0, gold: 0, werkzeug: 0 };
+const ZERO = { holz: 0, korn: 0, gold: 0, werkzeug: 0, forschung: 0 };
 
 test('active production clusters merge shared suppliers and include diagonal neighbors', () => {
   const s = { tiles: {}, nextId: 1 };
@@ -157,9 +157,9 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   addTile(s, 'haus', 0, 4);
   addTile(s, 'haus', 1, 4);
   addTile(s, 'taverne', 2, 4);
-  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3, werkzeug: 0 });
+  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3, werkzeug: 0, forschung: 0 });
   assert.equal(updateProduction(s, 30999), true);
-  assert.deepEqual(s.resources, { holz: 100, korn: 2, werkzeug: 0 });
+  assert.deepEqual(s.resources, { holz: 100, korn: 2, werkzeug: 0, forschung: 0 });
   assert.equal(s.gold, 6);
   assert.equal(s.productionAt, 21000);
   assert.equal(updateProduction(s, 30999), false);

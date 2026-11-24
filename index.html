@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=32">
+<link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -17,6 +17,7 @@
     <button class="hud-resource" data-hud-resource="holz" aria-label="Holz im Warehouse anzeigen">🪵 <b id="r-holz">0</b></button>
     <button class="hud-resource" data-hud-resource="korn" aria-label="Korn im Warehouse anzeigen">🌾 <b id="r-korn">0</b></button>
     <button class="hud-resource" data-hud-resource="werkzeug" aria-label="Werkzeuge im Warehouse anzeigen">🔨 <b id="r-werkzeug">0</b></button>
+    <button class="hud-resource" data-hud-resource="forschung" aria-label="Forschungspunkte im Warehouse anzeigen">🔬 <b id="r-forschung">0</b></button>
     <span title="Zeit bis zur nächsten Ausbreitung">🏴 <b id="r-banditen">5:00</b></span>
   </div>
   <div id="actions">
@@ -24,6 +25,7 @@
       <button id="btn-full" aria-label="Vollbild" title="Vollbild"><span class="action-icon" aria-hidden="true">⛶</span><span class="action-label">Vollbild</span></button>
       <button id="btn-cards" aria-label="Inventar" title="Inventar"><span class="action-icon" aria-hidden="true">🎒</span><span id="btn-cards-label" class="action-label">Inventar</span></button>
       <button id="btn-workshop" aria-label="Workshop" title="Workshop"><span class="action-icon" aria-hidden="true">🛠️</span><span class="action-label">Workshop</span></button>
+      <button id="btn-research" aria-label="Forschung" title="Forschung"><span class="action-icon" aria-hidden="true">🔬</span><span class="action-label">Forschung</span></button>
       <button id="btn-warehouse" aria-label="Warehouse" title="Warehouse"><span class="action-icon" aria-hidden="true">🏚️</span><span class="action-label">Warehouse</span></button>
       <button id="btn-catalog" aria-label="Karten-Browser" title="Alle Karten ansehen"><span class="action-icon" aria-hidden="true">📖</span><span class="action-label">Karten</span></button>
       <button id="btn-archive" aria-label="Archiv" title="Archiv"><span class="action-icon" aria-hidden="true">📜</span><span class="action-label">Archiv</span></button>
@@ -71,6 +73,6 @@
 <button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=59"></script>
+<script type="module" src="src/main.js?v=60"></script>
 </body>
 </html>

@@ -65,7 +65,7 @@ button:disabled { background: #555; color: #999; }
   #res .hud-resource { padding: 3px 4px; margin: 0; border-radius: 6px; font-size: 13px; }
   #res span { margin: 0 2px; font-size: 12px; }
   #actions { display: contents; }
-  #primary-actions { position: fixed; top: 40px; left: 6px; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px; border: 1px solid rgba(236, 222, 187, .4); border-radius: 11px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; transition: transform .2s ease; }
+  #primary-actions { position: fixed; top: 40px; left: 6px; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px; max-height: calc(100vh - 46px); overflow-y: auto; border: 1px solid rgba(236, 222, 187, .4); border-radius: 11px; background: rgba(15, 30, 25, .84); box-shadow: 0 3px 10px #0006; transition: transform .2s ease; }
   #primary-actions.menu-collapsed { transform: translateX(calc(-100% - 6px)); }
   #hud #primary-toggle { position: fixed; top: 50%; left: 0; z-index: 4; display: flex; align-items: center; justify-content: center; width: 36px; height: 48px; margin: 0; padding: 0; border-radius: 0 8px 8px 0; background: var(--button-green); transform: translateY(-50%); transition: left .2s ease; }
   #hud #primary-toggle[aria-expanded="true"] { left: 76px; }

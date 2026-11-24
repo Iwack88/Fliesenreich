@@ -8,6 +8,10 @@ export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;
 export const EXPANSION_COST = 30;
+export const RESEARCHED_SIZE = 32;
+export const RESEARCHED_EXPANSION_COST = 150;
+export const RESEARCH_COST = 100;
+export const RESEARCH_DURATION = 10 * 60000;
 export const START_LAND_TILES = 12;
 export const EXPANSION_LAND_TILES = 36;
 // Spezial-Bauplätze: Anteil freier Felder und Mindestabstand zum Startbereich.
@@ -31,9 +35,10 @@ export const RESOURCE_CHAINS = {
   korn: ['feld', 'windmuehle', 'kornlager'],
   gold: ['haus', 'taverne', 'goldlager'],
   werkzeug: ['werkzeugschmiede', 'workshop'],
+  forschung: ['haus', 'schule'],
 };
 export const STORAGE_BONUS = 50;
-export const START_RESOURCES = { holz: 8, korn: 8, werkzeug: 30 };
+export const START_RESOURCES = { holz: 8, korn: 8, werkzeug: 30, forschung: 0 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
 export const GUARD_RADIUS = 3;
@@ -42,6 +47,7 @@ export const SUPPLY_CHAINS = {
   holzfaeller: { supplier: 'wald', resource: 'holz' },
   windmuehle: { supplier: 'feld', resource: 'korn' },
   workshop: { supplier: 'werkzeugschmiede', resource: 'werkzeug' },
+  schule: { supplier: 'haus', resource: 'forschung', required: 1, emergencyRate: 0 },
 };
 export const MIN_SUPPLIERS = 2;
 export const SUPPLIER_OUTPUT = 2;
@@ -67,7 +73,7 @@ export const PACKS = {
   humancity: {
     name: 'HumanCity-Pack', cost: { werkzeug: 70, holz: 75, korn: 55 }, duration: 12 * 60000,
     extraChance: 0.4, hazardChance: 0.15,
-    weights: { haus: 45, taverne: 22, wachturm: 15, goldlager: 10, joker_schutz: 4, joker_banditenzeit: 4 },
+    weights: { haus: 45, taverne: 22, schule: 10, wachturm: 15, goldlager: 10, joker_schutz: 4, joker_banditenzeit: 4 },
   },
   joker: {
     name: 'Joker-Pack', cost: { werkzeug: 100, gold: 350 }, duration: 8 * 60000,
@@ -98,6 +104,7 @@ export const TILES = {
   rathaus:      { name: 'Rathaus',    color: '#c8a45c', icon: '🏛️', rarity: 'common', category: 'siedlung' },
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'common', shopTier: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
+  schule:       { name: 'Schule',      color: '#d3b47d', icon: '🏫', rarity: 'common', shopTier: 'uncommon', category: 'siedlung' },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
   lagerhalle:   { name: 'Holzlager',   color: '#9b8c76', icon: '🪵', rarity: 'common', shopTier: 'uncommon', category: 'industrie', storage: 'holz' },
   kornlager:    { name: 'Kornlager',   color: '#bda95c', icon: '🌾', rarity: 'common', shopTier: 'uncommon', category: 'industrie', storage: 'korn' },
