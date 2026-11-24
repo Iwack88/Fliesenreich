@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUARD_RADIUS, SHOP_INTERVAL, TILES } from '../src/config.js';
-import { addTile, advanceShop, availablePlacementSlots, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
+import { activateGuard, addTile, advanceShop, availablePlacementSlots, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
 
 test('tile rarity rolls use the agreed thresholds and leave jokers unchanged', t => {
   let value = 0;
@@ -104,6 +104,9 @@ test('rarity strengthens storage, workshops, forges and guards', () => {
   const result = useJoker(s, storage.x, storage.y);
   assert.equal(result.losses.holz, 150);
   const guard = addTile(s, 'wachturm', 0, 4, 'rare');
+  addTile(s, 'haus', 5, 4);
+  addTile(s, 'haus', 6, 4);
+  activateGuard(s, guard);
   assert.equal(guardRadius(guard), GUARD_RADIUS + 2);
   assert.equal(isProtected(s, 5, 4), true);
   assert.equal(isProtected(s, 6, 4), false);

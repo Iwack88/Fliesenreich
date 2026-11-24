@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=34';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, hasTileProtection, fortifyTile, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=40';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, hasTileProtection, fortifyTile, isActiveGuard, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=41';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -284,6 +284,12 @@ function startMove(tile) {
   if (state.hand || !tile || tile.type === 'banditen') return;
   syncBandits();
   syncProduction();
+  if (isActiveGuard(tile)) {
+    selected = tile;
+    updatePanel();
+    toast('Aktivierte Wachtürme können nicht verschoben werden');
+    return;
+  }
   moveMode = { tile, ...moveOptions(state, tile) };
   movePreview = null;
   previewBuffCache = null;
@@ -532,13 +538,26 @@ function updateTilePopup() {
   const partners = displayPartners(selected);
   let html = `<div class="head"><b>${def.icon} ${def.name}</b><button id="tile-close">✕</button></div>`;
   html += `<div class="dim">${RARITY[tileRarity(selected)].name} · Position ${selected.x}, ${selected.y}</div>`;
-  if (selected.type !== 'banditen') {
+  if (selected.type === 'wachturm' && !isActiveGuard(selected)) {
+    html += '<button id="guard-activate" class="tile-fortify">🛡️ Schützen · Gratis</button><div>Danach ist der Turm unbeweglich.</div>';
+  }
+  if (selected.type !== 'banditen' && !isActiveGuard(selected)) {
     const free = state.freeMoves || 0;
     html += `<button id="tile-move" class="tile-move">↔ Verschieben · ${free ? `🧭 ${free} frei` : `${moveStepCost(selected)} ${GOLD_ICON}/Feld`}</button>`;
+  }
+  if (selected.type !== 'banditen') {
     if (hasTileProtection(selected)) html += '<div>🛡️ Dieses Tile ist dauerhaft vor Banditen geschützt.</div>';
     else html += `<button id="tile-fortify" class="tile-fortify" ${state.gold < FORTIFY_COST ? 'disabled' : ''}>🛡️ Verstärken · ${FORTIFY_COST} ${GOLD_ICON}</button>`;
   }
+  if (selected.type === 'wachturm') {
+    html += isActiveGuard(selected)
+      ? '<div>✅ Gebietsschutz aktiv · Turm kann nicht verschoben oder getauscht werden.</div>'
+      : '<div>Gebietsschutz noch inaktiv. Aktivieren schützt Tiles im Radius gratis und vertreibt Camps.</div>';
+  }
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
+  if (!hasTileProtection(selected) && !state.protectedFields[`${selected.x},${selected.y}`] && isProtected(state, selected.x, selected.y)) {
+    html += '<div>🛡️ Durch einen aktiven Wachturm geschützt, solange das Tile im Radius bleibt.</div>';
+  }
   const descriptions = {
     wald: 'Produziert allein nichts. Versorgt benachbarte Holzfäller; höhere Seltenheit erhöht deren Ertrag.',
     holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Forste (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
@@ -553,7 +572,7 @@ function updateTilePopup() {
     kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops; höhere Seltenheit erhöht deren Ertrag.',
-    wachturm: `Schützt einen Bereich von ${guardRadius(selected) * 2 + 1}×${guardRadius(selected) * 2 + 1} Feldern und entfernt dort Banditencamps.`,
+    wachturm: `Schutzradius: ${guardRadius(selected) * 2 + 1}×${guardRadius(selected) * 2 + 1} Felder. Nur eigene Tiles werden geschützt; freie Felder nicht.`,
     banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
@@ -608,6 +627,20 @@ function updateTilePopup() {
     save();
     refreshTargets();
     toast(`${TILES[tile.type].name} dauerhaft verstärkt · −${FORTIFY_COST} ${GOLD_ICON}`);
+  };
+  if ($('guard-activate')) $('guard-activate').onclick = () => {
+    const tile = selected;
+    syncBandits();
+    syncProduction();
+    const result = activateGuard(state, tile);
+    if (!result) { toast('Gebietsschutz konnte nicht aktiviert werden'); refreshTargets(); return; }
+    if (lastMove && (lastMove.record.tile === tile || lastMove.record.other === tile)) {
+      lastMove = null;
+      updateUndo();
+    }
+    save();
+    refreshTargets();
+    toast(`Gebietsschutz aktiviert${result.cleared ? ` · ${result.cleared} Camps vertrieben` : ''}`);
   };
 }
 
@@ -1413,7 +1446,7 @@ const CARD_DESCRIPTIONS = {
   kornlager: `Erhöht das Kornlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Korn über dem neuen Limit.`,
   goldlager: `Erhöht das Goldlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Gold über dem neuen Limit.`,
   werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops, auch diagonal. Jede Seltenheitsstufe der Schmiede über Common bringt dem Workshop +1 Werkzeug pro 10 Sekunden.',
-  wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Erscheinen oder Verschieben alle Banditencamps in diesem Bereich.',
+  wachturm: 'Der Turm selbst ist immer geschützt. Im Info-Panel kann kostenlos der Gebietsschutz aktiviert werden: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Dabei werden Camps vertrieben; eigene Tiles im Radius sind geschützt, freie Felder nicht. Danach ist der Turm unbeweglich.',
   joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile oder dem letzten Rathaus. Kann ans Deckende gelegt werden.',
   joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ außer Banditencamps. Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
@@ -1881,9 +1914,9 @@ function draw() {
     const minY = Math.max(-half, guard.y - radius);
     const maxX = Math.min(half - 1, guard.x + radius);
     const maxY = Math.min(half - 1, guard.y + radius);
-    ctx.fillStyle = 'rgba(80, 175, 255, .18)';
+    ctx.fillStyle = isActiveGuard(guard) ? 'rgba(80, 175, 255, .18)' : 'rgba(255, 190, 80, .18)';
     ctx.fillRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
-    ctx.strokeStyle = '#63c7ff';
+    ctx.strokeStyle = isActiveGuard(guard) ? '#63c7ff' : '#ffc45e';
     ctx.lineWidth = 4;
     ctx.strokeRect(minX * TILE, minY * TILE, (maxX - minX + 1) * TILE, (maxY - minY + 1) * TILE);
   }

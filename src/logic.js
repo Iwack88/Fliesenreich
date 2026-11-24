@@ -347,21 +347,23 @@ export function placeHand(s, x, y, now = Date.now()) {
   const special = isSpecialSlot(s, x, y);
   const tile = addTile(s, s.hand, x, y, placementRarity(s, s.hand, s.handRarity, x, y));
   if (special) delete s.specialSlots[key(x, y)];
-  const cleared = tile.type === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
   s.handRarity = null;
   delete s.handPlacementSlots;
-  return { tile, cleared, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+  return { tile, cleared: 0, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
 
-export const hasTileProtection = tile => !!tile && (tile.type === 'rathaus' || tile.fortified === true);
+export const hasTileProtection = tile => !!tile && (tile.type === 'rathaus' || tile.type === 'wachturm' || tile.fortified === true);
+export const isActiveGuard = tile => tile?.type === 'wachturm' && tile.guardActive === true;
+const inGuardRange = (guard, x, y) => Math.abs(guard.x - x) <= guardRadius(guard) && Math.abs(guard.y - y) <= guardRadius(guard);
 
 export function isProtected(s, x, y, tiles = Object.values(s.tiles)) {
-  return hasTileProtection(tileAt(s, x, y)) || !!s.protectedFields?.[key(x, y)] || tiles.some(t => t.type === 'wachturm' &&
-    Math.abs(t.x - x) <= guardRadius(t) && Math.abs(t.y - y) <= guardRadius(t));
+  const tile = tileAt(s, x, y);
+  return hasTileProtection(tile) || !!s.protectedFields?.[key(x, y)] ||
+    (!!tile && tile.type !== 'banditen' && tiles.some(t => isActiveGuard(t) && inGuardRange(t, x, y)));
 }
 
 export function fortifyTile(s, tile) {
@@ -372,15 +374,18 @@ export function fortifyTile(s, tile) {
   return true;
 }
 
-function clearGuardedBandits(s) {
+export function activateGuard(s, guard) {
+  if (!guard || guard.type !== 'wachturm' || isActiveGuard(guard) || tileAt(s, guard.x, guard.y) !== guard) return null;
+  guard.guardActive = true;
   let cleared = 0;
   for (const tile of Object.values(s.tiles)) {
-    if (tile.type === 'banditen' && isProtected(s, tile.x, tile.y)) {
+    if (tile.type === 'banditen' && inGuardRange(guard, tile.x, tile.y)) {
       delete s.tiles[key(tile.x, tile.y)];
       cleared++;
     }
   }
-  return cleared;
+  planBandits(s);
+  return { cleared };
 }
 
 function replaceWithBandits(s, cells, now) {
@@ -417,7 +422,7 @@ export function spawnBandit(s, now = Date.now()) {
 
 export function planBandits(s) {
   const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');
-  const guards = Object.values(s.tiles).filter(tile => tile.type === 'wachturm');
+  const guards = Object.values(s.tiles).filter(isActiveGuard);
   const claimed = new Set();
   let changed = false;
   const eligible = (camp, x, y) => {
@@ -512,12 +517,12 @@ export function useJoker(s, x, y, now = Date.now()) {
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
   tile.type = newType;
+  delete tile.guardActive;
   const losses = trimStorage(s, TILES[oldType].storage ? [TILES[oldType].storage] : []);
-  const cleared = newType === 'wachturm' ? clearGuardedBandits(s) : 0;
   planBandits(s);
   s.hand = null;
   s.handRarity = null;
-  return { kind: 'transformed', tile, oldType, cleared, losses, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
+  return { kind: 'transformed', tile, oldType, cleared: 0, losses, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
 export const canAfford = (s, cost) => s.gold >= cost;
@@ -678,7 +683,7 @@ function freePaths(others, tile, half) {
 
 // Ziele für ein Tile: alle über freie Felder erreichbaren Positionen.
 export function moveOptions(s, tile) {
-  if (!tile || tile.type === 'banditen' || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
+  if (!tile || tile.type === 'banditen' || isActiveGuard(tile) || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
   const all = new Set(Object.keys(s.tiles));
   all.delete(key(tile.x, tile.y));
   const half = s.size / 2;
@@ -692,7 +697,7 @@ export function moveOptions(s, tile) {
     moves.push({ kind: 'move', x, y, distance, path, cost: distance * step, special: isSpecialSlot(s, x, y) });
   }
   const swaps = DIRS4.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
-    .filter(other => other && other.type !== 'banditen')
+    .filter(other => other && other.type !== 'banditen' && !isActiveGuard(other))
     .map(other => ({ kind: 'swap', x: other.x, y: other.y, tile: other, cost: SWAP_COST }));
   return { moves, swaps };
 }
@@ -715,12 +720,6 @@ function relocate(s, tile, x, y) {
   s.tiles[key(x, y)] = tile;
 }
 
-function afterMove(s, moved) {
-  const cleared = moved.some(tile => tile.type === 'wachturm') ? clearGuardedBandits(s) : 0;
-  planBandits(s);
-  return cleared;
-}
-
 export function moveTile(s, tile, x, y, now = Date.now()) {
   const option = moveOptions(s, tile).moves.find(move => move.x === x && move.y === y);
   if (!option) return null;
@@ -734,8 +733,8 @@ export function moveTile(s, tile, x, y, now = Date.now()) {
     tile.rarity = upgradedRarity(tileRarity(tile));
     delete s.specialSlots[key(x, y)];
   }
-  const cleared = afterMove(s, [tile]);
-  return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, path: option.path, ...payment, special: option.special, oldRarity, cleared,
+  planBandits(s);
+  return { kind: 'move', tile, from, to: { x, y }, distance: option.distance, path: option.path, ...payment, special: option.special, oldRarity, cleared: 0,
     pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -746,8 +745,8 @@ export function swapTiles(s, tile, other, now = Date.now()) {
   const from = { x: tile.x, y: tile.y }, to = { x: other.x, y: other.y };
   relocate(s, tile, to.x, to.y);
   relocate(s, other, from.x, from.y);
-  const cleared = afterMove(s, [tile, other]);
-  return { kind: 'swap', tile, other, from, to, ...payment, cleared,
+  planBandits(s);
+  return { kind: 'swap', tile, other, from, to, ...payment, cleared: 0,
     pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -756,10 +755,10 @@ export function undoMove(s, record, now = Date.now()) {
   if (!record || record.cleared) return false;
   const { from, to } = record;
   const tile = tileAt(s, to.x, to.y);
-  if (tile?.id !== record.tile.id) return false;
+  if (tile?.id !== record.tile.id || isActiveGuard(tile)) return false;
   if (record.kind === 'swap') {
     const other = tileAt(s, from.x, from.y);
-    if (other?.id !== record.other.id) return false;
+    if (other?.id !== record.other.id || isActiveGuard(other)) return false;
     relocate(s, tile, from.x, from.y);
     relocate(s, other, to.x, to.y);
   } else {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FORTIFY_COST, GUARD_RADIUS, TILES } from '../src/config.js';
-import { addTile, advanceBandits, drawCard, fortifyTile, hasTileProtection, isProtected, migrateState, moveTile, newState, placeHand, planBandits, spawnBandit, spreadBandits, swapTiles, undoMove, useJoker } from '../src/logic.js';
+import { activateGuard, addTile, advanceBandits, drawCard, fortifyTile, hasTileProtection, isActiveGuard, isProtected, migrateState, moveOptions, moveTile, newState, placeHand, planBandits, spawnBandit, spreadBandits, swapTiles, undoMove, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
@@ -103,19 +103,132 @@ test('fortification survives transformation but disappears with the deleted tile
   assert.equal(isProtected(s, 0, 0, []), false);
 });
 
-test('guard shields all cells within its square and clears existing camps when placed', () => {
+test('a guard protects itself until activated, then protects tiles and clears camps in range', () => {
   const s = emptyWorld();
   addTile(s, 'gras', 0, 0);
   addTile(s, 'banditen', 3, 3);
   addTile(s, 'banditen', 5, 0);
+  addTile(s, 'haus', 1 - GUARD_RADIUS, -GUARD_RADIUS);
+  addTile(s, 'haus', 1 - GUARD_RADIUS - 1, 0);
   s.hand = 'wachturm';
   s.handPlacementSlots = [[1, 0]];
   const result = placeHand(s, 1, 0);
-  assert.equal(result.cleared, 1);
+  assert.equal(result.cleared, 0);
+  assert.equal(isProtected(s, 1, 0), true);
+  assert.equal(isProtected(s, 0, 0), false);
+  assert.equal(s.tiles['3,3'].type, 'banditen');
+  assert.deepEqual(activateGuard(s, result.tile), { cleared: 1 });
   assert.equal(s.tiles['3,3'], undefined);
   assert.equal(s.tiles['5,0'].type, 'banditen');
   assert.equal(isProtected(s, 1 - GUARD_RADIUS, -GUARD_RADIUS), true);
   assert.equal(isProtected(s, 1 - GUARD_RADIUS - 1, 0), false);
+  assert.equal(isProtected(s, 2, 0), false, 'empty fields are not shielded');
+  assert.equal(activateGuard(s, result.tile), null);
+});
+
+test('active guards lock movement and swaps even when undoing an earlier move', () => {
+  const s = emptyWorld();
+  s.gold = 300;
+  const guard = addTile(s, 'wachturm', 0, 0);
+  const house = addTile(s, 'haus', 2, 0);
+  const moved = moveTile(s, guard, 1, 0);
+  assert.ok(moved);
+  assert.deepEqual(activateGuard(s, guard), { cleared: 0 });
+  assert.deepEqual(moveOptions(s, guard), { moves: [], swaps: [] });
+  assert.equal(moveTile(s, guard, 0, 0), null);
+  assert.equal(swapTiles(s, house, guard), null);
+  assert.ok(!moveOptions(s, house).swaps.some(option => option.tile === guard));
+  assert.equal(undoMove(s, moved), false);
+  assert.equal(s.tiles['1,0'], guard);
+  const restored = JSON.parse(JSON.stringify(s));
+  assert.equal(isActiveGuard(restored.tiles['1,0']), true);
+  assert.deepEqual(moveOptions(restored, restored.tiles['1,0']), { moves: [], swaps: [] });
+});
+
+test('tiles gain and lose area protection as they move, while personal protection remains', () => {
+  const s = emptyWorld();
+  s.gold = 300;
+  const guard = addTile(s, 'wachturm', 0, 0);
+  const house = addTile(s, 'haus', 4, 0);
+  activateGuard(s, guard);
+  assert.equal(isProtected(s, 4, 0), false);
+  assert.ok(moveTile(s, house, 3, 0));
+  assert.equal(isProtected(s, 3, 0), true);
+  assert.ok(moveTile(s, house, 4, 0));
+  assert.equal(isProtected(s, 4, 0), false);
+  const second = addTile(s, 'wachturm', 7, 0);
+  activateGuard(s, second);
+  assert.equal(isProtected(s, 4, 0), true);
+  assert.ok(moveTile(s, house, 3, 0));
+  assert.equal(isProtected(s, 3, 0), true);
+  assert.equal(fortifyTile(s, house), true);
+  assert.ok(moveTile(s, house, 3, -1));
+  assert.equal(isProtected(s, 3, -1), true);
+  s.hand = 'joker_loeschen';
+  assert.equal(useJoker(s, 0, 0).kind, 'deleted');
+  assert.equal(isProtected(s, 3, -1), true, 'personal fortification survives losing tower coverage');
+});
+
+test('overlapping guards and personal protection remain independent when a tower is removed', () => {
+  const s = emptyWorld();
+  const first = addTile(s, 'wachturm', 0, 0);
+  const second = addTile(s, 'wachturm', 4, 0);
+  const house = addTile(s, 'haus', 2, 0);
+  activateGuard(s, first);
+  activateGuard(s, second);
+  s.hand = 'joker_loeschen';
+  assert.equal(useJoker(s, 0, 0).kind, 'deleted');
+  assert.equal(isProtected(s, house.x, house.y), true);
+  s.hand = 'joker_loeschen';
+  assert.equal(useJoker(s, 4, 0).kind, 'deleted');
+  assert.equal(isProtected(s, house.x, house.y), false);
+});
+
+test('activation prevents undoing a swap whether the tower initiated it or was its target', () => {
+  for (const initiates of [false, true]) {
+    const s = emptyWorld();
+    const guard = addTile(s, 'wachturm', 0, 0);
+    const house = addTile(s, 'haus', 1, 0);
+    const swap = initiates ? swapTiles(s, guard, house) : swapTiles(s, house, guard);
+    assert.ok(swap);
+    activateGuard(s, guard);
+    assert.equal(undoMove(s, swap), false);
+  }
+});
+
+test('entering a guarded empty target replans the attack and active towers do not shield empty cells', () => {
+  const s = emptyWorld();
+  const guard = addTile(s, 'wachturm', 0, 0);
+  const camp = addTile(s, 'banditen', 4, 0);
+  activateGuard(s, guard);
+  camp.target = { x: 3, y: 0 };
+  assert.equal(isProtected(s, 3, 0), false);
+  s.hand = 'feld';
+  s.handPlacementSlots = [[3, 0]];
+  const field = placeHand(s, 3, 0).tile;
+  assert.equal(isProtected(s, 3, 0), true);
+  assert.notDeepEqual(camp.target, { x: 3, y: 0 });
+  assert.equal(s.tiles['3,0'], field);
+});
+
+test('old towers stay inactive on loading and transformation removes their activated area protection', t => {
+  const s = newState();
+  s.tiles = {};
+  const guard = addTile(s, 'wachturm', 0, 0);
+  const house = addTile(s, 'haus', 1, 0);
+  const old = JSON.parse(JSON.stringify(s));
+  migrateState(old);
+  assert.equal(isProtected(old, 0, 0), true);
+  assert.equal(isProtected(old, 1, 0), false);
+  assert.equal(isActiveGuard(old.tiles['0,0']), false);
+  activateGuard(s, guard);
+  assert.equal(isProtected(s, 1, 0), true);
+  const types = Object.keys(TILES).filter(type => type !== 'wachturm' && type !== 'banditen');
+  t.mock.method(Math, 'random', () => (types.indexOf('gras') + 0.5) / types.length);
+  s.hand = 'joker_verwandeln';
+  assert.equal(useJoker(s, 0, 0).tile.type, 'gras');
+  assert.equal(isActiveGuard(guard), false);
+  assert.equal(isProtected(s, house.x, house.y), false);
 });
 
 test('camps cannot be deleted, transformed or protected by jokers', () => {
@@ -169,8 +282,9 @@ test('old saves gain empty permanent protection without altering the world', () 
 
 test('protection joker can protect free or tower-protected fields but rejects invalid targets', () => {
   const s = emptyWorld();
-  addTile(s, 'wachturm', 0, 0);
+  const guard = addTile(s, 'wachturm', 0, 0);
   const workshop = addTile(s, 'workshop', 1, 0);
+  activateGuard(s, guard);
   s.hand = 'joker_schutz';
   assert.equal(useJoker(s, 8, 0), null);
   assert.equal(useJoker(s, 0.5, 0), null);
@@ -197,15 +311,17 @@ test('bandit cards cannot spawn on permanently protected occupied or empty field
   assert.equal(s.tiles['0,0'].type, 'haus');
 });
 
-test('a tile transformed into a guard clears camps in range', (t) => {
+test('a tile transformed into a guard starts inactive and clears camps only on activation', (t) => {
   const s = emptyWorld();
   addTile(s, 'gras', 0, 0);
   addTile(s, 'banditen', 2, 0);
   const pool = Object.keys(TILES).filter(type => type !== 'gras' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('wachturm') + 0.5) / pool.length);
   s.hand = 'joker_verwandeln';
-  assert.equal(useJoker(s, 0, 0).cleared, 1);
+  assert.equal(useJoker(s, 0, 0).cleared, 0);
   assert.equal(s.tiles['0,0'].type, 'wachturm');
+  assert.equal(s.tiles['2,0'].type, 'banditen');
+  assert.equal(activateGuard(s, s.tiles['0,0']).cleared, 1);
   assert.equal(s.tiles['2,0'], undefined);
 });
 
@@ -225,7 +341,7 @@ test('all camps spread once simultaneously without attacking guarded cells', () 
   const guarded = emptyWorld();
   addTile(guarded, 'banditen', -4, 0);
   addTile(guarded, 'workshop', -3, 0);
-  addTile(guarded, 'wachturm', 0, 0);
+  activateGuard(guarded, addTile(guarded, 'wachturm', 0, 0));
   spreadBandits(guarded, 0);
   assert.equal(guarded.tiles['-3,0'].type, 'workshop');
 });
@@ -314,14 +430,15 @@ test('new targets prioritize an unprotected occupied neighbor over empty fields'
   assert.deepEqual(camp.target, { x: 1, y: 1 });
 });
 
-test('no target is chosen outside the board or inside guard protection', () => {
+test('bandits may target free fields inside an active guard radius but not outside the board', () => {
   const s = emptyWorld();
   s.size = 8;
   const camp = addTile(s, 'banditen', -4, 0);
-  addTile(s, 'wachturm', -1, 0);
+  activateGuard(s, addTile(s, 'wachturm', 0, 0));
   planBandits(s);
-  assert.equal(camp.target, undefined);
-  assert.deepEqual(spreadBandits(s, 0), []);
+  assert.ok(camp.target.x >= -4 && camp.target.y >= -4 && camp.target.y < 4);
+  assert.equal(isProtected(s, camp.target.x, camp.target.y), false);
+  assert.equal(spreadBandits(s, 0).length, 1);
 });
 
 test('a guard protects an announced target and forces a different target immediately', () => {
@@ -333,7 +450,9 @@ test('a guard protects an announced target and forces a different target immedia
   camp.target = { x: 1, y: 0 };
   s.hand = 'wachturm';
   s.handPlacementSlots = [[4, 0]];
-  placeHand(s, 4, 0);
+  const guard = placeHand(s, 4, 0).tile;
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  activateGuard(s, guard);
   assert.deepEqual(camp.target, { x: -1, y: 0 });
   assert.equal(spreadBandits(s, 0)[0].previous.type, 'wald');
   assert.equal(s.tiles['1,0'].type, 'feld');
@@ -385,7 +504,9 @@ test('a bandit card takes an unprotected occupied tile if no free cells remain',
 test('a bandit card is not consumed when every field is guarded', () => {
   const s = emptyWorld();
   s.size = 2;
-  addTile(s, 'wachturm', 0, 0);
+  const guard = addTile(s, 'wachturm', 0, 0);
+  for (const [x, y] of [[-1, -1], [0, -1], [-1, 0]]) addTile(s, 'haus', x, y);
+  activateGuard(s, guard);
   s.hand = 'banditen_niete';
   assert.equal(spawnBandit(s, 0), null);
   assert.equal(s.hand, 'banditen_niete');
