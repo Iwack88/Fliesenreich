@@ -10,20 +10,21 @@ function world() {
   return s;
 }
 
-test('move targets stay adjacent, keep the map connected and cost per field by rarity', () => {
+test('moves may leave gaps or split clusters and cost per field by rarity', () => {
   const s = world();
   const a = addTile(s, 'windmuehle', 0, 0);
   addTile(s, 'feld', 1, 0);
   addTile(s, 'feld', 2, 0);
   const { moves, swaps } = moveOptions(s, a);
-  assert.ok(moves.every(m => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => s.tiles[`${m.x + dx},${m.y + dy}`] && s.tiles[`${m.x + dx},${m.y + dy}`] !== a)));
+  assert.equal(moves.find(m => m.x === -2 && m.y === 0).cost, 20);
   assert.equal(moves.find(m => m.x === 3 && m.y === 0).cost, 50);
   assert.equal(moves.find(m => m.x === 2 && m.y === 1).cost, 30);
   assert.deepEqual(swaps.map(swap => swap.tile.x), [1]);
-  const middle = s.tiles['1,0'];
-  assert.ok(!moveOptions(s, middle).moves.some(m => m.x === 1 && m.y === 1), 'moving the bridge must not split the map');
   a.rarity = 'epic';
   assert.equal(moveOptions(s, a).moves.find(m => m.x === 3 && m.y === 0).cost, 150);
+  const middle = s.tiles['1,0'];
+  assert.ok(moveOptions(s, middle).moves.some(m => m.x === 1 && m.y === 1), 'moving the bridge may split the map');
+  assert.ok(moveTile(s, middle, 1, 1));
 });
 
 test('moving pays gold, uses special slots once and can be undone with a refund', () => {
@@ -77,7 +78,7 @@ test('swapping neighbours costs 50 gold, free moves are used first and banditen 
   assert.equal(s.tiles['0,0'], a);
 });
 
-test('tiles only glide along free outer fields and never across occupied ones', () => {
+test('tiles take the shortest free path and never cross occupied fields', () => {
   const s = world();
   const a = addTile(s, 'windmuehle', 0, 0);
   addTile(s, 'feld', 1, 0);
@@ -88,4 +89,33 @@ test('tiles only glide along free outer fields and never across occupied ones', 
   assert.ok(around.path.every(p => !s.tiles[`${p.x},${p.y}`] || s.tiles[`${p.x},${p.y}`] === a));
   assert.equal(moves.find(m => m.x === 2 && m.y === 1).distance, 3);
   assert.equal(moveTile(s, a, 3, 0).cost, 50);
+});
+
+test('an isolated tile can travel across empty fields and undo the move', () => {
+  const s = world();
+  const tile = addTile(s, 'wald', -3, -3);
+  addTile(s, 'haus', 2, 2);
+  const option = moveOptions(s, tile).moves.find(m => m.x === 0 && m.y === -1);
+  assert.equal(option.distance, 5);
+  assert.equal(option.cost, 50);
+  assert.deepEqual(option.path[0], { x: -3, y: -3 });
+  assert.deepEqual(option.path.at(-1), { x: 0, y: -1 });
+  const record = moveTile(s, tile, 0, -1);
+  assert.equal(s.gold, 250);
+  assert.equal(s.tiles['0,-1'], tile);
+  assert.equal(undoMove(s, record), true);
+  assert.equal(s.gold, 300);
+  assert.equal(s.tiles['-3,-3'], tile);
+});
+
+test('impassable barriers and board boundaries restrict moves, but swaps remain available', () => {
+  const s = world();
+  const tile = addTile(s, 'haus', 0, 0);
+  for (let y = -4; y < 4; y++) addTile(s, 'gras', 1, y);
+  const { moves, swaps } = moveOptions(s, tile);
+  assert.ok(moves.some(m => m.x === -4 && m.y === -4));
+  assert.ok(!moves.some(m => m.x >= 1));
+  assert.ok(moves.every(m => m.x >= -4 && m.y >= -4 && m.y < 4));
+  assert.equal(moveTile(s, tile, 2, 0), null);
+  assert.ok(swaps.some(m => m.x === 1 && m.y === 0));
 });

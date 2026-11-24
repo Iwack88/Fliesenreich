@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=29';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=30';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -569,39 +569,19 @@ export function craftDuration(packId) {
   return packId === 'starthilfe' ? 30000 : PACKS[packId].duration;
 }
 
-function components(keys) {
-  const labels = new Map();
-  let count = 0;
-  for (const start of keys) {
-    if (labels.has(start)) continue;
-    const queue = [start];
-    labels.set(start, count);
-    while (queue.length) {
-      const [x, y] = queue.pop().split(',').map(Number);
-      for (const [dx, dy] of DIRS4) {
-        const next = key(x + dx, y + dy);
-        if (keys.has(next) && !labels.has(next)) { labels.set(next, count); queue.push(next); }
-      }
-    }
-    count++;
-  }
-  return { labels, count };
-}
-
 export const moveStepCost = tile => MOVE_STEP_COST[tileRarity(tile)];
 export const canPayMove = (s, cost) => (s.freeMoves || 0) > 0 || s.gold >= cost;
 
-// Kürzeste Wege über freie Felder entlang der Außenkante: Jedes Wegfeld muss (auch diagonal) an ein anderes Tile grenzen.
-function freePaths(s, others, tile, half) {
+// Kürzeste Wege über freie Felder, ohne belegte Felder zu überqueren.
+function freePaths(others, tile, half) {
   const start = { x: tile.x, y: tile.y };
   const paths = new Map([[key(start.x, start.y), [start]]]);
   const queue = [start];
-  const hugs = (x, y) => NEIGHBORS.some(([dx, dy]) => others.has(key(x + dx, y + dy)));
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i];
     for (const [dx, dy] of DIRS4) {
       const x = cur.x + dx, y = cur.y + dy, k = key(x, y);
-      if (paths.has(k) || others.has(k) || x < -half || x >= half || y < -half || y >= half || !hugs(x, y)) continue;
+      if (paths.has(k) || others.has(k) || x < -half || x >= half || y < -half || y >= half) continue;
       paths.set(k, [...paths.get(key(cur.x, cur.y)), { x, y }]);
       queue.push({ x, y });
     }
@@ -609,22 +589,18 @@ function freePaths(s, others, tile, half) {
   return paths;
 }
 
-// Ziele für ein Tile: freie Felder neben anderen Tiles, ohne die Karte in mehr Inseln zu zerteilen.
+// Ziele für ein Tile: alle über freie Felder erreichbaren Positionen.
 export function moveOptions(s, tile) {
   if (!tile || tile.type === 'banditen' || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
   const all = new Set(Object.keys(s.tiles));
-  const before = components(all).count;
   all.delete(key(tile.x, tile.y));
-  const { labels, count } = components(all);
   const half = s.size / 2;
   const step = moveStepCost(tile);
-  const paths = freePaths(s, all, tile, half);
+  const paths = freePaths(all, tile, half);
   const moves = [];
   for (const [cell, path] of paths) {
     const [x, y] = cell.split(',').map(Number);
     if (x === tile.x && y === tile.y) continue;
-    const joined = new Set(DIRS4.map(([dx, dy]) => labels.get(key(x + dx, y + dy))).filter(label => label !== undefined));
-    if (!joined.size || count - joined.size + 1 > before) continue;
     const distance = path.length - 1;
     moves.push({ kind: 'move', x, y, distance, path, cost: distance * step, special: isSpecialSlot(s, x, y) });
   }
