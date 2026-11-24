@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CARDS, SHOP_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from '../src/config.js';
+import { CARDS, LAND_TYPES, SHOP_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT } from '../src/config.js';
 import { newState, migrateState, shopStatus, advanceShop, buyShopCard, drawCard } from '../src/logic.js';
 
 test('shop is open immediately and refreshes after five active minutes', () => {
@@ -57,11 +57,28 @@ test('refreshes replace stock, reject stale offers and can offer every playable 
     }
     assert.equal(buyShopCard(s, s.shop.offers[0].card, s.shop.round - 1), false);
   }
-  assert.deepEqual(seen, new Set(Object.keys(CARDS).filter(id => id !== 'banditen')));
+  assert.deepEqual(seen, new Set(Object.keys(CARDS).filter(id => id !== 'banditen' && !LAND_TYPES.includes(id))));
   const before = s.shop.round;
   advanceShop(s, SHOP_INTERVAL * 2 + 60000);
   assert.equal(s.shop.round, before + 2);
   assert.deepEqual(shopStatus(s), { open: true, remaining: SHOP_INTERVAL - 60000 });
+});
+
+test('old landscape offers are removed while owned cards and other offers remain', () => {
+  const s = newState();
+  s.deck = ['gras', 'haus'];
+  s.deckRarities = ['rare', 'common'];
+  s.hand = 'wasser';
+  s.handRarity = 'epic';
+  s.shop.offers = [{ card: 'berge', price: 60, bought: false }, { card: 'haus', price: 60, bought: true }];
+  assert.equal(buyShopCard(s, 'berge', s.shop.round), false);
+  assert.equal(migrateState(s), true);
+  assert.deepEqual(s.shop.offers, [{ card: 'haus', price: 60, bought: true }]);
+  assert.deepEqual(s.deck, ['gras', 'haus']);
+  assert.deepEqual(s.deckRarities, ['rare', 'common']);
+  assert.equal(s.hand, 'wasser');
+  assert.equal(s.handRarity, 'epic');
+  assert.equal(migrateState(s), false);
 });
 
 test('old saves keep their stock, purchase flags and timer or receive initial offers', () => {

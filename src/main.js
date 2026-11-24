@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=28';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=33';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=29';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=34';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -1145,8 +1145,8 @@ function showWorkshops() {
     head.className = 'pack-recipe-head';
     const info = document.createElement('div');
     const cost = Object.entries(pack.cost).map(([resource, amount]) => `${COST_ICONS[resource]} ${amount}`).join(' · ');
-    const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarte';
-    info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(craftDuration(id))}<div class="pack-chances">${pack.land} Landkarten + 1 ${valueLabel}, mit ${pct(pack.extraChance)} eine zweite.${pack.hazardChance ? ` Mit ${pct(pack.hazardChance)} ersetzt eine Banditen-Niete eine Landkarte.` : ''}</div>`;
+    const valueLabel = id === 'joker' ? 'Joker' : 'Wertkarten';
+    info.innerHTML = `<b>${pack.name}</b> · ${cost} · ${formatTime(craftDuration(id))}<div class="pack-chances">2 ${valueLabel}; dritte Karte: ${pct(pack.extraChance)} weitere Wertkarte${pack.hazardChance ? `, ${pct(pack.hazardChance)} Banditen-Niete` : ''}.</div>`;
     const buttons = document.createElement('div');
     const button = document.createElement('button');
     button.textContent = 'Herstellen';
@@ -1163,7 +1163,7 @@ function showWorkshops() {
     head.append(info, buttons);
     row.appendChild(head);
     const chances = packChances(pack);
-    for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`], ['land', 'Landkarten – Chance je Karte']]) {
+    for (const [group, label] of [['value', `${id === 'joker' ? 'Joker' : 'Wertkarten'} – Chance je Karte`]]) {
       const groupTitle = document.createElement('div');
       groupTitle.className = 'pack-chances';
       groupTitle.textContent = label;
@@ -1195,7 +1195,7 @@ function showWorkshops() {
   if (canStartRecovery(state)) {
     const row = document.createElement('div');
     row.className = 'pack';
-    row.textContent = `Starthilfe-Pack: kostenlos, mit Holzfäller, Windmühle, Forsten und Feldern · ${formatTime(craftDuration('starthilfe'))}`;
+    row.textContent = `Starthilfe-Pack: kostenlos, mit Holzfäller, Windmühle und einem Forst oder Feld · ${formatTime(craftDuration('starthilfe'))}`;
     const button = document.createElement('button');
     button.textContent = 'Herstellen';
     button.onclick = () => {
@@ -1258,7 +1258,7 @@ const CATALOG_CATEGORIES = [
   ['joker', '🃏 Joker'],
   ['gefahr', '⚠️ Gefahren'],
 ];
-const landText = 'Hat derzeit keine Produktion und füllt Lücken im Reich.';
+const landText = 'Entsteht zufällig beim Weltstart und bei der Erweiterung. Hat derzeit keine Produktion.';
 const CARD_DESCRIPTIONS = {
   gras: landText,
   erde: landText,
@@ -1277,8 +1277,8 @@ const CARD_DESCRIPTIONS = {
   goldlager: `Erhöht das Goldlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Gold über dem neuen Limit.`,
   werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops, auch diagonal. Jede Seltenheitsstufe der Schmiede über Common bringt dem Workshop +1 Werkzeug pro 10 Sekunden.',
   wachturm: 'Schützt ein Quadrat um sich vor Banditen: Common 7×7, Uncommon 9×9, Rare 11×11, Epic 13×13 Felder. Vertreibt beim Erscheinen oder Verschieben alle Banditencamps in diesem Bereich.',
-  joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile oder dem letzten Workshop. Kann ans Deckende gelegt werden.',
-  joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ (nie in ein Banditencamp). Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
+  joker_loeschen: 'Entfernt ein angetipptes Tile ohne Rückzahlung. Nicht möglich bei Banditencamps, dem letzten Tile oder dem letzten Rathaus. Kann ans Deckende gelegt werden.',
+  joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in ein anderes Gebäude, einen Forst oder ein Feld. Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
   joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
   joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
@@ -1294,7 +1294,7 @@ function catalogCategory(id) {
 
 function showCatalog() {
   const body = openOverlay('Karten-Browser', 'catalog');
-  body.innerHTML = '<p class="catalog-intro">Alle Karten im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Beim Ziehen erscheint jedes Tile auf einem zufälligen freien Feld neben einem bestehenden Tile und lässt sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen.</p>';
+  body.innerHTML = '<p class="catalog-intro">Alle Karten und Landschafts-Tiles im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Gezogene Tiles erscheinen auf einem zufälligen freien Feld neben einem bestehenden Tile und lassen sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen. Gras, Erde, Wasser und Berge entstehen beim Weltstart und der Erweiterung.</p>';
   const ids = Object.keys(CARDS).filter(id => id !== 'banditen');
   for (const [category, label] of CATALOG_CATEGORIES) {
     const cards = ids.filter(id => catalogCategory(id) === category);
@@ -1305,12 +1305,12 @@ function showCatalog() {
     body.appendChild(title);
     for (const id of cards) {
       const card = CARDS[id];
-      const packs = Object.values(PACKS).filter(pack => pack.weights[id] || (LAND_TYPES.includes(id) && pack.land) || (id === 'banditen_niete' && pack.hazardChance)).map(pack => pack.name);
+      const packs = Object.values(PACKS).filter(pack => pack.weights[id] || (id === 'banditen_niete' && pack.hazardChance)).map(pack => pack.name);
       const el = document.createElement('div');
       el.className = 'card catalog-card';
       el.innerHTML = `${cardArt(id)}<b class="card-name">${card.name}</b>` +
         `<span class="card-description">${CARD_DESCRIPTIONS[id]}</span>` +
-        `<span class="card-meta">Vorkommen: ${packs.length ? packs.join(', ') : 'nur Start/Shop'}<br>Shop: ${Math.round(SHOP_PRICES[card.shopTier || card.rarity] * (1 - SHOP_DISCOUNT))} ${GOLD_ICON}</span>`;
+        `<span class="card-meta">Vorkommen: ${LAND_TYPES.includes(id) ? 'Weltstart und Erweiterung' : packs.length ? packs.join(', ') : 'nur Start/Shop'}<br>Shop: ${LAND_TYPES.includes(id) ? 'nicht erhältlich' : `${Math.round(SHOP_PRICES[card.shopTier || card.rarity] * (1 - SHOP_DISCOUNT))} ${GOLD_ICON}`}</span>`;
       body.appendChild(el);
     }
   }

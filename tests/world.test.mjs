@@ -1,12 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAND_TYPES, START_DECK, PACKS, PACK_LAND_WEIGHTS } from '../src/config.js';
+import { LAND_TYPES, START_DECK, START_LAND_TILES, EXPANSION_LAND_TILES } from '../src/config.js';
 import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomTile, expandWorld, returnHand } from '../src/logic.js';
 
-test('new worlds contain only the town hall and guard, with no randomly generated tiles', () => {
+test('new worlds spawn random landscape anywhere without replacing start buildings', t => {
+  let seed = 42;
+  t.mock.method(Math, 'random', () => {
+    seed = (1664525 * seed + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  });
   const state = newState();
   assert.equal(state.size, 8);
-  assert.deepEqual(Object.values(state.tiles).map(tile => tile.type), ['rathaus', 'wachturm']);
+  const land = Object.values(state.tiles).filter(tile => LAND_TYPES.includes(tile.type));
+  assert.equal(land.length, START_LAND_TILES);
+  assert.equal(Object.keys(state.tiles).length, START_LAND_TILES + 2);
+  assert.ok(land.every(tile => inBounds(state.size, tile.x, tile.y)));
+  assert.ok(land.every(tile => !state.specialSlots[`${tile.x},${tile.y}`]));
+  assert.ok(land.some(tile => ![[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => state.tiles[`${tile.x + dx},${tile.y + dy}`])));
   assert.equal(state.tiles['0,0'].type, 'rathaus');
   assert.equal(state.tiles['1,0'].type, 'wachturm');
 });
@@ -26,11 +36,11 @@ test('free placement only allows unoccupied neighboring cells within the world',
   assert.equal(state.gold, gold);
 });
 
-test('expansion costs gold once and preserves every existing tile without generating new ones', () => {
+test('expansion costs gold once and adds landscape only in the new area', () => {
   const state = newState();
   const camp = addTile(state, 'banditen', -3, -3);
   camp.target = { x: -3, y: -2 };
-  const original = JSON.stringify(state.tiles);
+  const original = structuredClone(state.tiles);
   state.gold = 29;
   assert.equal(expandWorld(state), false);
   state.gold = 30;
@@ -39,7 +49,11 @@ test('expansion costs gold once and preserves every existing tile without genera
   assert.equal(state.gold, 0);
   assert.equal(state.size, 16);
   assert.equal(state.hand, 'wald');
-  assert.equal(JSON.stringify(state.tiles), original);
+  for (const [key, tile] of Object.entries(original)) assert.deepEqual(state.tiles[key], tile);
+  const added = Object.entries(state.tiles).filter(([key]) => !original[key]).map(([, tile]) => tile);
+  assert.equal(added.length, EXPANSION_LAND_TILES);
+  assert.ok(added.every(tile => LAND_TYPES.includes(tile.type) && !inBounds(8, tile.x, tile.y) && inBounds(16, tile.x, tile.y)));
+  assert.ok(added.every(tile => !state.specialSlots[`${tile.x},${tile.y}`]));
   assert.equal(expandWorld(state), false);
 });
 
@@ -81,10 +95,8 @@ test('a land card with no available neighboring cell can return to the deck unch
   assert.deepEqual(state.deckRarities, ['rare']);
 });
 
-test('mountain cards are available from the start and landscape packs', () => {
-  assert.ok(START_DECK.berge > 0);
-  assert.ok(PACK_LAND_WEIGHTS.berge > 0);
-  for (const pack of Object.values(PACKS)) assert.ok(pack.land > 0);
+test('starting decks do not contain landscape cards', () => {
+  for (const type of LAND_TYPES) assert.equal(START_DECK[type], undefined);
 });
 
 test('special slots avoid the start area, raise rarity once and are skipped by land cards', () => {

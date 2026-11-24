@@ -4,9 +4,9 @@ Bau-/Management-Spiel mit Tiles. Die Inselgrafik `assets/game-background.jpg` bi
 
 ## Spielfeld
 
-Ein neues Spielfeld startet mit 8×8 Feldern, einem **Rathaus** und einem benachbarten Wachturm; es werden keine weiteren Tiles oder Banditencamps erzeugt. Bestehende Spielstände bleiben unverändert. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
+Ein neues Spielfeld startet mit 8×8 Feldern, einem **Rathaus**, einem benachbarten Wachturm und 12 zufällig verteilten Landschafts-Tiles (Gras, Erde, Wasser, Berge). Sie können auch getrennt von anderen Tiles liegen; es entstehen keine Banditencamps. Bestehende Welten bleiben unverändert. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
-Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen keine neuen Tiles oder Banditencamps.
+Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen im neuen Bereich 36 weitere zufällige Landschafts-Tiles, aber keine Banditencamps. Für jedes Landschafts-Tile beträgt die Chance auf Gras, Erde oder Wasser je 30 %, auf Berge 10 %.
 
 Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand zurücksetzen und eine neue Welt erzeugen. Das Raster erscheint automatisch beim Verschieben; mit **▦ Grid** lässt es sich jederzeit ein- und ausblenden. Die Einstellung gilt für die aktuelle Spielsitzung.
 
@@ -18,7 +18,7 @@ Der **📖 Karten**-Browser im linken Menü zeigt alle Karten des Spiels nach Ka
 
 Mit **Filter** werden einzelne Tile-Typen oder Rohstoffketten hervorgehoben; andere Tiles werden wie bei einer Tile-Auswahl abgedunkelt. Die Ketten umfassen Forst, Holzfäller und Holzlager; Feld, Windmühle und Kornlager; Haus, Taverne und Goldlager; beziehungsweise Werkzeugschmiede und Workshop. Ein aktiver Filter wird am Button markiert und kann mit **✕** daneben sofort ausgeschaltet werden. Beim Platzieren oder Verwenden eines Jokers pausiert die Hervorhebung, damit die Zielfelder sichtbar bleiben; danach erscheint sie wieder. Der Filter gilt nur für die aktuelle Spielsitzung.
 
-Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn, 30 Werkzeugen sowie 13 Karten, darunter Berge und ein Holzlager. Bestehende Spielstände behalten ihre Welt und erhalten einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
+Neue Spiele starten zum Testen mit 100 Gold, je 8 Holz und Korn, 30 Werkzeugen sowie 9 Karten, darunter ein Holzlager. Gras, Erde, Wasser und Berge gibt es nicht mehr im Startdeck, in Packs oder im Shop. Bereits besessene Landschaftskarten auf der Hand oder im Deck bleiben erhalten und funktionieren weiterhin; alte Shopangebote dieser Karten entfallen. Bestehende Spielstände behalten ihre Welt und erhalten bei älteren Speicherständen einmalig eine Wachturm-Karte am Deckanfang sowie eine Banditen-Niete am Deckende. Ältere Spielstände ohne Rohstoffe erhalten zusätzlich Startrohstoffe und bei Bedarf eine Workshop-Karte.
 
 ## Seltenheit
 
@@ -54,16 +54,16 @@ In der Pack-Auswahl stehen die möglichen Karten mit Symbol, Name und Chance pro
 
 Ein Pack-Symbol links unten zeigt die Anzahl fertiger Packs und öffnet das Inventar. Sobald alle geöffnet sind, verschwindet es.
 
-Jedes Pack enthält eine feste Anzahl Landkarten (Gras, Erde, Wasser je 30 %, Berge 10 %), eine garantierte Wertkarte und mit 40 % Chance eine zweite. Bei Landschafts- und Entdecker-Pack ersetzt mit 10 % Chance, beim HumanCity-Pack mit 15 % eine Banditen-Niete eine Landkarte. Gezielte Anschaffungen laufen über den Shop.
+Jedes normale Pack enthält zwei garantierte Wertkarten und höchstens eine dritte Karte: Mit 40 % Chance eine weitere Wertkarte, beim Landschafts- und Entdecker-Pack alternativ mit 10 %, beim HumanCity-Pack mit 15 % eine Banditen-Niete. Das Joker-Pack enthält keine Niete. Die übrige Chance ergibt keine dritte Karte. Gezielte Anschaffungen laufen über den Shop.
 
-- **Landschafts-Pack:** 4 Landkarten + 1–2 Wertkarten, vor allem Forst (32 %) und Feld (32 %), dazu Haus 14 %, Holz- und Kornlager je 6 %, Goldlager und Werkzeugschmiede je 3 %, Schutz-Joker 2 %, Banditenzeit- und Shop-Refresh-Joker je 1 %.
-- **Entdecker-Pack:** 3 Landkarten + 1–2 Wertkarten: Holzfäller und Windmühle je 18 %, Forst und Feld je 8 %, Werkzeugschmiede 8 %, Workshop, Holz- und Kornlager je 7 %, Taverne 5 %, Lösch-, Verwandlungs- und Freizug-Joker je 4 %, Schutz-Joker 2 %.
-- **HumanCity-Pack:** 3 Landkarten + 1–2 Wertkarten: Haus 45 %, Taverne 22 %, Wachturm 15 %, Goldlager 10 %, Schutz- und Banditenzeit-Joker je 4 %.
-- **Joker-Pack:** 3 Landkarten + 1–2 Joker, alle sechs Joker je ca. 17 %, ohne Banditen-Nieten.
+- **Landschafts-Pack:** Forst (32 %) und Feld (32 %), dazu Haus 14 %, Holz- und Kornlager je 6 %, Goldlager und Werkzeugschmiede je 3 %, Schutz-Joker 2 %, Banditenzeit- und Shop-Refresh-Joker je 1 %.
+- **Entdecker-Pack:** Holzfäller und Windmühle je 18 %, Forst und Feld je 8 %, Werkzeugschmiede 8 %, Workshop, Holz- und Kornlager je 7 %, Taverne 5 %, Lösch-, Verwandlungs- und Freizug-Joker je 4 %, Schutz-Joker 2 %.
+- **HumanCity-Pack:** Haus 45 %, Taverne 22 %, Wachturm 15 %, Goldlager 10 %, Schutz- und Banditenzeit-Joker je 4 %.
+- **Joker-Pack:** Alle sechs Joker je ca. 17 %, ohne Banditen-Nieten.
 
-Die Workshop-Übersicht zeigt diese Chancen getrennt für Wert- und Landkarten. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet das Spiel ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle sowie je zwei Forsten und Feldern an.
+Die Workshop-Übersicht zeigt die Chancen pro Wertkarte. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet das Spiel ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle und einem Forst oder Feld an.
 
-Der **Karten-Shop** ist dauerhaft offen und bietet sofort vier verschiedene zufällige Karten aus dem gesamten spielbaren Pool, inklusive Joker und Banditen-Nieten (keine direkt kaufbaren Banditencamps). Alle fünf aktiven Spielminuten wird das Angebot erneuert. Der Preis hängt weiterhin vom Kartentyp ab: regulär 80, 200 oder 400 Gold; mit 25 % Rabatt 60, 150 oder 300 Gold. Die Tile-Seltenheit wird erst beim Kauf ausgelost und verändert den Preis nicht. Jede angebotene Karte kann pro Angebot einmal gekauft werden und kommt ans Deckende. Angebote, Käufe und Restzeit werden gespeichert; bei geschlossenem oder unsichtbarem Spiel pausiert die Shop-Zeit.
+Der **Karten-Shop** ist dauerhaft offen und bietet sofort vier verschiedene zufällige Karten, inklusive Joker und Banditen-Nieten; Landschafts-Tiles und Banditencamps sind nicht erhältlich. Alle fünf aktiven Spielminuten wird das Angebot erneuert. Der Preis hängt weiterhin vom Kartentyp ab: regulär 80, 200 oder 400 Gold; mit 25 % Rabatt 60, 150 oder 300 Gold. Die Tile-Seltenheit wird erst beim Kauf ausgelost und verändert den Preis nicht. Jede angebotene Karte kann pro Angebot einmal gekauft werden und kommt ans Deckende. Angebote, Käufe und Restzeit werden gespeichert; bei geschlossenem oder unsichtbarem Spiel pausiert die Shop-Zeit.
 
 ## Banditen und Wachtürme
 
@@ -75,7 +75,7 @@ Eine gezogene Banditen-Niete erscheint sofort auf einem zufälligen ungeschützt
 
 ## Joker
 
-Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Löschen entfernt ein angetipptes Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Tile-Typ außer Banditencamps; neue Nachbarschaften wirken auf die zukünftige Produktion. Banditencamps, das letzte Tile, das letzte Rathaus ist vor diesen Jokern geschützt.
+Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Löschen entfernt ein angetipptes Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Tile-Typ außer Landschafts-Tiles und Banditencamps; neue Nachbarschaften wirken auf die zukünftige Produktion. Banditencamps, das letzte Tile und das letzte Rathaus sind vor diesen Jokern geschützt.
 
 Der **Schutz-Joker** schützt ein angetipptes freies oder belegtes Feld dauerhaft vor Banditen, auch wenn dort später ein anderes Tile steht oder ein Wachturm entfernt wird. Er kann auch auf bereits durch einen Wachturm geschützte Felder angewendet werden, nicht aber auf Banditencamps oder bereits dauerhaft geschützte Felder. Ein goldenes Schild zeigt den dauerhaften Schutz, unabhängig vom Schutz-Anzeigeschalter. Banditen wählen gegebenenfalls sofort ein anderes Ziel. Ungültige Ziele verbrauchen keinen Joker; Joker können ans Deckende gelegt werden.
 

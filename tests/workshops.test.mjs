@@ -103,8 +103,8 @@ test('Joker pack charges gold and tools once and delivers only jokers', () => {
   assert.equal(s.packs.joker, 1);
   const cards = openPack(s, 'joker');
   const jokers = cards.filter(id => id.startsWith('joker_')).length;
-  assert.ok(jokers >= 1 && jokers <= 2);
-  assert.equal(cards.length, 3 + jokers);
+  assert.ok(jokers >= 2 && jokers <= 3);
+  assert.equal(cards.length, jokers);
   assert.ok(!cards.includes('banditen_niete'));
 });
 
@@ -192,7 +192,10 @@ test('starthilfe recovers a deadlocked game without granting infinite free packs
   assert.equal(canStartRecovery(s), false);
   updateProduction(s, 31000);
   assert.equal(canStartRecovery(s), false);
-  assert.deepEqual(new Set(openPack(s, 'starthilfe')), new Set(['holzfaeller', 'windmuehle', 'wald', 'feld']));
+  const cards = openPack(s, 'starthilfe');
+  assert.equal(cards.length, 3);
+  assert.ok(cards.includes('holzfaeller') && cards.includes('windmuehle'));
+  assert.ok(cards.includes('wald') || cards.includes('feld'));
   assert.equal(canStartRecovery(s), false);
 });
 

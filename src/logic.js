@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=28';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=29';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -50,6 +50,7 @@ export function newState() {
   addTile(s, START_TILE, 0, 0);
   addTile(s, 'wachturm', 1, 0);
   s.specialSlots = {};
+  addLandTiles(s, 0, START_LAND_TILES);
   addSpecialSlots(s);
   return s;
 }
@@ -90,6 +91,11 @@ export function migrateState(s, now = Date.now()) {
   }
   if (!s.shop) {
     s.shop = { elapsed: 0, round: 0, offers: [] };
+    changed = true;
+  }
+  const offers = s.shop.offers.filter(offer => !LAND_TYPES.includes(offer.card));
+  if (offers.length !== s.shop.offers.length) {
+    s.shop.offers = offers;
     changed = true;
   }
   if (!s.shop.offers.length) {
@@ -150,11 +156,26 @@ export function inBounds(size, x, y) {
   return x >= -half && x < half && y >= -half && y < half;
 }
 
+function addLandTiles(s, oldSize, count) {
+  const cells = [];
+  for (let x = -s.size / 2; x < s.size / 2; x++) for (let y = -s.size / 2; y < s.size / 2; y++) {
+    if (oldSize && inBounds(oldSize, x, y)) continue;
+    if (s.tiles[key(x, y)] || s.specialSlots?.[key(x, y)]) continue;
+    if (!oldSize && (Math.abs(x) + Math.abs(y) <= 1 || Math.abs(x - 1) + Math.abs(y) <= 1)) continue;
+    cells.push([x, y]);
+  }
+  if (cells.length < count) throw new Error('Nicht genügend freie Felder für die Landschaftsgenerierung');
+  for (const [x, y] of shuffled(cells).slice(0, count)) {
+    addTile(s, pickWeighted(Object.entries(LAND_WEIGHTS)), x, y);
+  }
+}
+
 export function expandWorld(s) {
   if (s.size !== START_SIZE || s.gold < EXPANSION_COST) return false;
   const oldSize = s.size;
   s.size = EXPANDED_SIZE;
   s.specialSlots ||= {};
+  addLandTiles(s, oldSize, EXPANSION_LAND_TILES);
   addSpecialSlots(s, (x, y) => !inBounds(oldSize, x, y));
   planBandits(s);
   s.gold -= EXPANSION_COST;
@@ -188,10 +209,11 @@ export function packChances(pack) {
     }
     return entries.map(([id, weight]) => [id, 100 * weight / total]);
   };
-  if (!Number.isInteger(pack.land) || pack.land < 1 || !(pack.extraChance >= 0 && pack.extraChance <= 1) || !(pack.hazardChance >= 0 && pack.hazardChance <= 1)) {
+  if (!(pack.extraChance >= 0 && pack.hazardChance >= 0 && pack.extraChance + pack.hazardChance <= 1) ||
+      Object.keys(pack.weights).some(id => LAND_TYPES.includes(id) || id === 'banditen_niete')) {
     throw new Error(`Ungültiger Pack-Aufbau für ${pack.name}`);
   }
-  return { land: percent(PACK_LAND_WEIGHTS), value: percent(pack.weights) };
+  return { value: percent(pack.weights) };
 }
 
 export const cardCount = (s) => s.deck.length;
@@ -203,7 +225,7 @@ export function shopStatus(s) {
 export function refreshShop(s, resetTimer = true) {
   s.shop.round++;
   if (resetTimer) s.shop.elapsed = 0;
-  s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen'))
+  s.shop.offers = shuffled(Object.keys(CARDS).filter(id => id !== 'banditen' && !LAND_TYPES.includes(id)))
     .slice(0, SHOP_OFFER_COUNT).map(card => ({
       card, price: Math.round(SHOP_PRICES[CARDS[card].shopTier || CARDS[card].rarity] * (1 - SHOP_DISCOUNT)), bought: false,
     }));
@@ -221,6 +243,7 @@ export function advanceShop(s, elapsedMs) {
 }
 
 export function buyShopCard(s, card, round) {
+  if (LAND_TYPES.includes(card)) return false;
   if (!shopStatus(s).open || s.shop.round !== round) return false;
   const offer = s.shop.offers.find(offer => offer.card === card);
   if (!offer || offer.bought || s.gold < offer.price) return false;
@@ -442,7 +465,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     return { kind: 'deleted', tile, losses };
   }
   if (s.hand !== 'joker_verwandeln') return null;
-  const types = Object.keys(TILES).filter(type => type !== tile.type && type !== 'banditen');
+  const types = Object.keys(TILES).filter(type => type !== tile.type && type !== 'banditen' && !LAND_TYPES.includes(type));
   const newType = types[Math.floor(Math.random() * types.length)];
   const oldType = tile.type;
   tile.type = newType;
@@ -738,20 +761,19 @@ export function openPack(s, packId) {
   if (!s.packs[packId]) return null;
   if (packId === 'starthilfe') {
     s.packs[packId]--;
-    const cards = shuffled(['holzfaeller', 'windmuehle', 'wald', 'wald', 'feld', 'feld']);
+    const cards = shuffled(['holzfaeller', 'windmuehle', Math.random() < 0.5 ? 'wald' : 'feld']);
     addCards(s, cards);
     return cards;
   }
   const pack = PACKS[packId];
   if (!pack) throw new Error(`Unbekanntes Pack: ${packId}`);
   packChances(pack);
-  const landPool = Object.entries(PACK_LAND_WEIGHTS);
   const valuePool = Object.entries(pack.weights);
   s.packs[packId]--;
-  const drawn = Array.from({ length: pack.land }, () => pickWeighted(landPool));
-  if (Math.random() < pack.hazardChance) drawn[0] = 'banditen_niete';
-  drawn.push(pickWeighted(valuePool));
-  if (Math.random() < pack.extraChance) drawn.push(pickWeighted(valuePool));
+  const drawn = [pickWeighted(valuePool), pickWeighted(valuePool)];
+  const third = Math.random();
+  if (third < pack.hazardChance) drawn.push('banditen_niete');
+  else if (third < pack.hazardChance + pack.extraChance) drawn.push(pickWeighted(valuePool));
   const cards = shuffled(drawn);
   addCards(s, cards);
   return cards;
