@@ -33,6 +33,8 @@ let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 let showShields = false;
 let showGrid = false;
+const CLUSTERS_KEY = 'fliesenreich-show-production-clusters';
+let showClusters = localStorage.getItem(CLUSTERS_KEY) !== 'false';
 const FOLLOW_KEY = 'fliesenreich-follow-new-tiles';
 let followNewTiles = localStorage.getItem(FOLLOW_KEY) === 'true';
 function focusNewTile(tile) {
@@ -1433,6 +1435,12 @@ $('btn-grid').onclick = () => {
   showGrid = !showGrid;
   $('btn-grid').setAttribute('aria-pressed', String(showGrid));
 };
+$('btn-clusters').setAttribute('aria-pressed', String(showClusters));
+$('btn-clusters').onclick = () => {
+  showClusters = !showClusters;
+  localStorage.setItem(CLUSTERS_KEY, String(showClusters));
+  $('btn-clusters').setAttribute('aria-pressed', String(showClusters));
+};
 $('btn-follow').setAttribute('aria-pressed', String(followNewTiles));
 $('btn-follow').onclick = () => {
   followNewTiles = !followNewTiles;
@@ -1951,7 +1959,7 @@ function draw() {
       ctx.strokeRect(target.x * TILE + 2, target.y * TILE + 2, TILE - 4, TILE - 4);
     }
   }
-  drawProductionClusters(tiles);
+  if (showClusters) drawProductionClusters(tiles);
   for (const field of Object.keys(state.protectedFields)) {
     const [x, y] = field.split(',').map(Number);
     drawShield({ x, y }, true);

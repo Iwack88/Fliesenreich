@@ -27,7 +27,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #btn-shuffle .action-icon { display: inline; }
 #hud .hud-resource { padding: 4px; margin: 0 2px 0 0; background: transparent; font-size: 16px; }
 #hud .hud-resource:focus-visible { outline: 2px solid #a8e1ff; }
-#btn-shields[aria-pressed="true"], #btn-grid[aria-pressed="true"], #btn-follow[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
+#btn-shields[aria-pressed="true"], #btn-grid[aria-pressed="true"], #btn-follow[aria-pressed="true"], #btn-clusters[aria-pressed="true"] { background: #286ca1; outline: 2px solid #a8e1ff; }
 #hud #btn-filter.filter-active { background: #b98539; outline: 2px solid #ffe2a1; }
 #hud #filter-clear[hidden] { display: none; }
 button { font-size: 16px; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--button-green); color: #fff; margin-left: 8px; }
