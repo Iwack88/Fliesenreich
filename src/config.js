@@ -3,6 +3,7 @@
 
 export const START_GOLD = 100;
 export const DELETE_CARD_REWARD = 10; // Gold fürs Löschen der nächsten Karte
+export const FORTIFY_COST = 50;
 export const UNDELETABLE_CARDS = ['banditen', 'banditen_niete', 'berge', 'gras', 'wasser', 'erde', 'rathaus'];
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GUARD_RADIUS, TILES } from '../src/config.js';
-import { addTile, advanceBandits, drawCard, isProtected, migrateState, newState, placeHand, planBandits, spawnBandit, spreadBandits, useJoker } from '../src/logic.js';
+import { FORTIFY_COST, GUARD_RADIUS, TILES } from '../src/config.js';
+import { addTile, advanceBandits, drawCard, fortifyTile, hasTileProtection, isProtected, migrateState, moveTile, newState, placeHand, planBandits, spawnBandit, spreadBandits, swapTiles, undoMove, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
@@ -16,6 +16,91 @@ test('new games have a guarded town hall and no automatically spawned camps', ()
     const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');
     assert.equal(camps.length, 0);
   }
+});
+
+test('town halls are protected without a tower in both new and old saves', () => {
+  const s = newState();
+  delete s.tiles['1,0'];
+  const hall = s.tiles['0,0'];
+  assert.equal(hasTileProtection(hall), true);
+  assert.equal(isProtected(s, 0, 0, []), true);
+  assert.equal(fortifyTile(s, hall), false);
+  const loaded = JSON.parse(JSON.stringify(s));
+  const camp = addTile(loaded, 'banditen', 1, 0);
+  camp.target = { x: 0, y: 0 };
+  migrateState(loaded);
+  assert.notDeepEqual(camp.target, { x: 0, y: 0 });
+  spreadBandits(loaded);
+  assert.equal(loaded.tiles['0,0'].type, 'rathaus');
+});
+
+test('fortification costs 50 gold once and immediately reroutes attacks', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  const house = addTile(s, 'haus', 1, 0);
+  camp.target = { x: 1, y: 0 };
+  s.gold = FORTIFY_COST - 1;
+  assert.equal(fortifyTile(s, house), false);
+  assert.deepEqual(camp.target, { x: 1, y: 0 });
+  s.gold = FORTIFY_COST;
+  assert.equal(fortifyTile(s, camp), false);
+  assert.equal(fortifyTile(s, { ...house }), false);
+  assert.equal(fortifyTile(s, house), true);
+  assert.equal(s.gold, 0);
+  assert.notDeepEqual(camp.target, { x: 1, y: 0 });
+  assert.equal(fortifyTile(s, house), false);
+  assert.equal(isProtected(s, 1, 0, []), true);
+  const loaded = JSON.parse(JSON.stringify(s));
+  assert.equal(hasTileProtection(loaded.tiles['1,0']), true);
+  spreadBandits(loaded);
+  assert.equal(loaded.tiles['1,0'].type, 'haus');
+});
+
+test('fortification follows tiles when moved, swapped and undone, even with other protection', () => {
+  const s = emptyWorld();
+  s.gold = 300;
+  s.protectedFields = { '0,0': true };
+  const house = addTile(s, 'haus', 0, 0);
+  const other = addTile(s, 'feld', 2, 0);
+  assert.equal(fortifyTile(s, house), true);
+  const move = moveTile(s, house, 1, 0);
+  assert.ok(move);
+  assert.equal(isProtected(s, 1, 0, []), true);
+  assert.equal(isProtected(s, 0, 0, []), true, 'joker protection stays on the field');
+  const swap = swapTiles(s, house, other);
+  assert.ok(swap);
+  assert.equal(isProtected(s, 2, 0, []), true);
+  assert.equal(isProtected(s, 1, 0, []), false);
+  assert.equal(undoMove(s, swap), true);
+  assert.equal(isProtected(s, 1, 0, []), true);
+  assert.equal(undoMove(s, move), true);
+  assert.equal(hasTileProtection(s.tiles['0,0']), true);
+});
+
+test('bandit cards cannot replace a fortified tile when no free cells exist', () => {
+  const s = emptyWorld();
+  s.size = 2;
+  const house = addTile(s, 'haus', 0, 0);
+  fortifyTile(s, house);
+  for (const [x, y] of [[-1, -1], [-1, 0], [0, -1]]) addTile(s, 'banditen', x, y);
+  s.hand = 'banditen_niete';
+  assert.equal(spawnBandit(s), null);
+  assert.equal(s.tiles['0,0'], house);
+});
+
+test('fortification survives transformation but disappears with the deleted tile', t => {
+  const s = emptyWorld();
+  const house = addTile(s, 'haus', 0, 0);
+  addTile(s, 'feld', 2, 0);
+  assert.equal(fortifyTile(s, house), true);
+  const types = Object.keys(TILES).filter(type => type !== 'haus' && type !== 'banditen');
+  t.mock.method(Math, 'random', () => (types.indexOf('gras') + 0.5) / types.length);
+  s.hand = 'joker_verwandeln';
+  assert.equal(useJoker(s, 0, 0).tile.type, 'gras');
+  assert.equal(isProtected(s, 0, 0, []), true);
+  s.hand = 'joker_loeschen';
+  assert.equal(useJoker(s, 0, 0).kind, 'deleted');
+  assert.equal(isProtected(s, 0, 0, []), false);
 });
 
 test('guard shields all cells within its square and clears existing camps when placed', () => {

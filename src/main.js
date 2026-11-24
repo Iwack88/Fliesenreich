@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=33';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=39';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=34';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, hasTileProtection, fortifyTile, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=40';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -535,6 +535,8 @@ function updateTilePopup() {
   if (selected.type !== 'banditen') {
     const free = state.freeMoves || 0;
     html += `<button id="tile-move" class="tile-move">↔ Verschieben · ${free ? `🧭 ${free} frei` : `${moveStepCost(selected)} ${GOLD_ICON}/Feld`}</button>`;
+    if (hasTileProtection(selected)) html += '<div>🛡️ Dieses Tile ist dauerhaft vor Banditen geschützt.</div>';
+    else html += `<button id="tile-fortify" class="tile-fortify" ${state.gold < FORTIFY_COST ? 'disabled' : ''}>🛡️ Verstärken · ${FORTIFY_COST} ${GOLD_ICON}</button>`;
   }
   if (state.protectedFields[`${selected.x},${selected.y}`]) html += '<div>🛡️ Dieses Feld ist dauerhaft vor Banditen geschützt.</div>';
   const descriptions = {
@@ -598,6 +600,15 @@ function updateTilePopup() {
   el.classList.remove('hidden');
   $('tile-close').onclick = () => { selected = null; updatePanel(); };
   if ($('tile-move')) $('tile-move').onclick = () => startMove(selected);
+  if ($('tile-fortify')) $('tile-fortify').onclick = () => {
+    const tile = selected;
+    syncBandits();
+    syncProduction();
+    if (!fortifyTile(state, tile)) { toast('Verstärkung nicht möglich'); refreshTargets(); return; }
+    save();
+    refreshTargets();
+    toast(`${TILES[tile.type].name} dauerhaft verstärkt · −${FORTIFY_COST} ${GOLD_ICON}`);
+  };
 }
 
 let queueKey = '';
@@ -628,6 +639,7 @@ function renderQueue() {
 
 function updateHud() {
   const caps = storageCapacity(state);
+  if ($('tile-fortify')) $('tile-fortify').disabled = state.gold < FORTIFY_COST;
   $('r-gold').textContent = `${state.gold}/${caps.gold}`;
   $('r-holz').textContent = `${state.resources.holz}/${caps.holz}`;
   $('r-korn').textContent = `${state.resources.korn}/${caps.korn}`;
@@ -1991,7 +2003,7 @@ function draw() {
 
   if (showShields) {
     const guards = tiles.filter(tile => tile.type === 'wachturm');
-    for (const tile of tiles) if (!state.protectedFields[`${tile.x},${tile.y}`] && isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
+    for (const tile of tiles) if (!hasTileProtection(tile) && !state.protectedFields[`${tile.x},${tile.y}`] && isProtected(state, tile.x, tile.y, guards)) drawShield(tile);
   }
   for (const tile of tiles) if (tile.type === 'banditen' && tile.target) drawBanditArrow(tile);
   if ((selected || activeFilter) && !state.hand) {
@@ -2023,6 +2035,7 @@ function draw() {
     const [x, y] = field.split(',').map(Number);
     drawShield({ x, y }, true);
   }
+  for (const tile of tiles) if (hasTileProtection(tile)) drawShield(animatedPosition(tile, animNow) || tile, true);
   if (showGrid && !moveMode && !TILES[state.hand]) drawGrid(half);
 }
 
