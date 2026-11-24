@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { LAND_TYPES, START_DECK, PACKS, PACK_LAND_WEIGHTS } from '../src/config.js';
 import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomTile, expandWorld, returnHand } from '../src/logic.js';
 
-test('new worlds contain only the workshop and guard, with no randomly generated tiles', () => {
+test('new worlds contain only the town hall and guard, with no randomly generated tiles', () => {
   const state = newState();
   assert.equal(state.size, 8);
-  assert.deepEqual(Object.values(state.tiles).map(tile => tile.type), ['workshop', 'wachturm']);
-  assert.equal(state.tiles['0,0'].type, 'workshop');
+  assert.deepEqual(Object.values(state.tiles).map(tile => tile.type), ['rathaus', 'wachturm']);
+  assert.equal(state.tiles['0,0'].type, 'rathaus');
   assert.equal(state.tiles['1,0'].type, 'wachturm');
 });
 

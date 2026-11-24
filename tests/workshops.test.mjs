@@ -26,6 +26,7 @@ test('suppliers produce nothing alone and activate producers from two neighbors,
 test('workshops need two neighboring forges and run in emergency mode otherwise', () => {
   const s = newState();
   const w = s.tiles['0,0'];
+  w.type = 'workshop';
   assert.equal(tileProduction(s, w).base.werkzeug, 1);
   assert.deepEqual(tileProduction(s, w).supply, { supplier: 'werkzeugschmiede', count: 0, required: 2, active: false });
   addTile(s, 'werkzeugschmiede', 1, 1);
@@ -155,7 +156,7 @@ test('migration preserves old progress and provides a workshop card only once', 
   assert.equal(s.deck.filter(id => id === 'workshop').length, 1);
 });
 
-test('joker protects only the last workshop', () => {
+test('joker protects only the last town hall', () => {
   const s = newState();
   const first = s.tiles['0,0'];
   for (const joker of ['joker_loeschen', 'joker_verwandeln']) {
@@ -163,10 +164,21 @@ test('joker protects only the last workshop', () => {
     assert.equal(useJoker(s, 0, 0), null);
     assert.equal(s.hand, joker);
   }
-  const second = addTile(s, 'workshop', 1, 0);
+  const second = addTile(s, 'rathaus', 2, 0);
   s.hand = 'joker_loeschen';
-  assert.equal(useJoker(s, 1, 0).tile, second);
+  assert.equal(useJoker(s, 2, 0).tile, second);
   assert.equal(s.tiles['0,0'], first);
+});
+
+test('the town hall alone yields 1 gold and 1 tool per tick, independent of neighbors', () => {
+  const s = newState();
+  s.tiles = { '0,0': s.tiles['0,0'] };
+  assert.deepEqual(productionRates(s), { ...ZERO, gold: 1, werkzeug: 1 });
+  const gold = s.gold, tools = s.resources.werkzeug;
+  s.productionAt = 0;
+  updateProduction(s, 30000);
+  assert.equal(s.gold, gold + 3);
+  assert.equal(s.resources.werkzeug, tools + 3);
 });
 
 test('starthilfe recovers a deadlocked game without granting infinite free packs', () => {

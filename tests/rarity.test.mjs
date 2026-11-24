@@ -79,6 +79,7 @@ test('production and pair buffs use rarity without extending adjacency or double
 test('rarity strengthens storage, workshops, forges and guards', () => {
   const s = newState();
   const workshop = s.tiles['0,0'];
+  workshop.type = 'workshop';
   s.tiles = { '0,0': workshop };
   workshop.rarity = 'rare';
   s.resources = { holz: 100, korn: 100 };
@@ -120,6 +121,7 @@ test('shop purchases roll once and preserve the resulting tile rarity', t => {
 test('transformation keeps rarity', t => {
   const s = newState();
   const workshop = s.tiles['0,0'];
+  workshop.type = 'workshop';
   s.tiles = { '0,0': workshop };
   s.resources = { holz: 100, korn: 100 };
   const tile = addTile(s, 'gras', 1, 0, 'uncommon');

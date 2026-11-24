@@ -3,7 +3,7 @@
 
 export const START_GOLD = 100;
 export const DELETE_CARD_REWARD = 10; // Gold fürs Löschen der nächsten Karte
-export const UNDELETABLE_CARDS = ['banditen', 'banditen_niete', 'berge', 'gras', 'wasser', 'erde'];
+export const UNDELETABLE_CARDS = ['banditen', 'banditen_niete', 'berge', 'gras', 'wasser', 'erde', 'rathaus'];
 export const SHUFFLE_COST = 5; // Gold pro Shuffle
 export const START_SIZE = 8;
 export const EXPANDED_SIZE = 16;
@@ -93,6 +93,7 @@ export const TILES = {
   feld:         { name: 'Feld',        color: '#d9c35a', icon: '🌱', rarity: 'common',   category: 'landschaft' },
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { wald: 1 } },
   windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { feld: 1 } },
+  rathaus:      { name: 'Rathaus',    color: '#c8a45c', icon: '🏛️', rarity: 'common', category: 'siedlung' },
   haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'common', shopTier: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
@@ -119,4 +120,6 @@ export const HAZARDS = {
 
 export const CARDS = { ...TILES, ...JOKERS, ...HAZARDS };
 
-export const START_TILE = 'workshop';
+export const START_TILE = 'rathaus';
+// Das Rathaus liefert pro Produktionstick garantiert diese Grundressourcen.
+export const TOWN_HALL_OUTPUT = { gold: 1, werkzeug: 1 };

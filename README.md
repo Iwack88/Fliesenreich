@@ -4,7 +4,7 @@ Bau-/Management-Spiel mit Tiles. Die Inselgrafik `assets/game-background.jpg` bi
 
 ## Spielfeld
 
-Ein neues Spielfeld startet mit 8×8 Feldern, einem Workshop und einem benachbarten Wachturm; es werden keine weiteren Tiles oder Banditencamps erzeugt. Bestehende Spielstände bleiben unverändert. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
+Ein neues Spielfeld startet mit 8×8 Feldern, einem **Rathaus** und einem benachbarten Wachturm; es werden keine weiteren Tiles oder Banditencamps erzeugt. Bestehende Spielstände bleiben unverändert. Boni zählen für passende Nachbarn einschließlich diagonaler Felder.
 
 Im Shop kann das Spielfeld einmalig für 30 Gold auf 16×16 erweitert werden; dabei entstehen keine neuen Tiles oder Banditencamps.
 
@@ -34,6 +34,8 @@ Jedes Tile außer Banditencamps lässt sich jederzeit über **↔ Verschieben** 
 
 ## Produktion und Workshops
 
+Das **🏛️ Rathaus** ist das Start-Tile und erzeugt ohne Nachbarn automatisch 1 Gold und 1 Werkzeug pro 10 Sekunden, damit auch bei schlechten Kartenziehungen immer Grundressourcen vorhanden sind. Es wird nicht gezogen, lässt sich nicht als Karte löschen, und der Lösch-/Verwandlungs-Joker verschont das letzte Rathaus. Ein Workshop ist für den Spielstart nicht mehr nötig und nur noch ein zusätzlicher Werkzeug-Produzent.
+
 Forste, Felder und Werkzeugschmieden produzieren allein nichts. Ein Holzfäller braucht mindestens zwei benachbarte Forste, eine Windmühle mindestens zwei benachbarte Felder und ein Workshop mindestens zwei benachbarte Werkzeugschmieden; diagonale Nachbarn zählen. Ist ein Gebäude aktiv, erzeugt es alle 10 Sekunden je passendem Nachbarn 2 × seine Stärke, also bei Common 2 (Workshops: 🔨 Werkzeuge). Jede Seltenheitsstufe des Nachbarn über Common bringt +1. Mit null oder einem passenden Nachbarn läuft es im Notbetrieb mit 25 % der Mindestleistung, also bei Common 1 pro Intervall. Auf dem Spielfeld zeigt ⚠ mit Zahl den Notbetrieb; Tile-Info und Platzierungsvorschau zeigen Status und Ertragsänderung. Ein Common-Haus/Haus-Paar erzeugt 1 Gold und ein Common-Haus/Taverne-Paar 2 Gold pro Intervall; jedes Paar zählt einmal. Höhere Seltenheit verstärkt diese Werte wie oben beschrieben. Produktion und Herstellungsaufträge laufen auch bei geschlossenem Spiel anhand der vergangenen Zeit weiter.
 
 Beim Antippen eines Tiles bleiben es und seine direkten Bonus-Partner hervorgehoben; andere Tiles werden deutlich ausgegraut. Die Detailansicht zeigt den aktuellen Ertrag mit Basis und Nachbarschaftsbonus sowie bei Workshops Schmiedestatus und Werkzeugertrag. Gold-Erträge beziehen sich auf die gemeinsamen Paare und zählen nicht doppelt.
@@ -59,7 +61,7 @@ Jedes Pack enthält eine feste Anzahl Landkarten (Gras, Erde, Wasser je 30 %, Be
 - **HumanCity-Pack:** 3 Landkarten + 1–2 Wertkarten: Haus 45 %, Taverne 22 %, Wachturm 15 %, Goldlager 10 %, Schutz- und Banditenzeit-Joker je 4 %.
 - **Joker-Pack:** 3 Landkarten + 1–2 Joker, alle sechs Joker je ca. 17 %, ohne Banditen-Nieten.
 
-Die Workshop-Übersicht zeigt diese Chancen getrennt für Wert- und Landkarten. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet der Workshop ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle sowie je zwei Forsten und Feldern an.
+Die Workshop-Übersicht zeigt diese Chancen getrennt für Wert- und Landkarten. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet das Spiel ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle sowie je zwei Forsten und Feldern an.
 
 Der **Karten-Shop** ist dauerhaft offen und bietet sofort vier verschiedene zufällige Karten aus dem gesamten spielbaren Pool, inklusive Joker und Banditen-Nieten (keine direkt kaufbaren Banditencamps). Alle fünf aktiven Spielminuten wird das Angebot erneuert. Der Preis hängt weiterhin vom Kartentyp ab: regulär 80, 200 oder 400 Gold; mit 25 % Rabatt 60, 150 oder 300 Gold. Die Tile-Seltenheit wird erst beim Kauf ausgelost und verändert den Preis nicht. Jede angebotene Karte kann pro Angebot einmal gekauft werden und kommt ans Deckende. Angebote, Käufe und Restzeit werden gespeichert; bei geschlossenem oder unsichtbarem Spiel pausiert die Shop-Zeit.
 
@@ -73,7 +75,7 @@ Eine gezogene Banditen-Niete erscheint sofort auf einem zufälligen ungeschützt
 
 ## Joker
 
-Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Löschen entfernt ein angetipptes Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Tile-Typ außer Banditencamps; neue Nachbarschaften wirken auf die zukünftige Produktion. Banditencamps, das letzte Tile, der letzte Workshop und beschäftigte Workshops sind vor diesen Jokern geschützt.
+Ein neuer Spielstand enthält je einen Lösch- und Verwandlungsjoker; im Entdecker-Pack können beide ebenfalls vorkommen. Löschen entfernt ein angetipptes Tile ohne Rückzahlung. Verwandeln wählt zufällig einen anderen Tile-Typ außer Banditencamps; neue Nachbarschaften wirken auf die zukünftige Produktion. Banditencamps, das letzte Tile, das letzte Rathaus ist vor diesen Jokern geschützt.
 
 Der **Schutz-Joker** schützt ein angetipptes freies oder belegtes Feld dauerhaft vor Banditen, auch wenn dort später ein anderes Tile steht oder ein Wachturm entfernt wird. Er kann auch auf bereits durch einen Wachturm geschützte Felder angewendet werden, nicht aber auf Banditencamps oder bereits dauerhaft geschützte Felder. Ein goldenes Schild zeigt den dauerhaften Schutz, unabhängig vom Schutz-Anzeigeschalter. Banditen wählen gegebenenfalls sofort ein anderes Ziel. Ungültige Ziele verbrauchen keinen Joker; Joker können ans Deckende gelegt werden.
 

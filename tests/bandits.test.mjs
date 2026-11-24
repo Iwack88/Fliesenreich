@@ -7,10 +7,10 @@ function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
 }
 
-test('new games have a guarded workshop and no automatically spawned camps', () => {
+test('new games have a guarded town hall and no automatically spawned camps', () => {
   for (let i = 0; i < 50; i++) {
     const s = newState();
-    assert.equal(s.tiles['0,0'].type, 'workshop');
+    assert.equal(s.tiles['0,0'].type, 'rathaus');
     assert.equal(s.tiles['1,0'].type, 'wachturm');
     assert.equal(isProtected(s, 0, 0), true);
     const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');

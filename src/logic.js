@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=27';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, PACK_LAND_WEIGHTS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=28';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -430,7 +430,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     return { kind: 'protected', tile, x, y };
   }
   if (!tile || tile.type === 'banditen') return null;
-  if (tile.type === 'workshop' && Object.values(s.tiles).filter(t => t.type === 'workshop').length <= 1) return null;
+  if (tile.type === 'rathaus' && Object.values(s.tiles).filter(t => t.type === 'rathaus').length <= 1) return null;
   if (s.hand === 'joker_loeschen') {
     if (Object.keys(s.tiles).length <= 1) return null;
     const lostStorage = TILES[tile.type].storage;
@@ -472,6 +472,11 @@ export function tileProduction(s, tile) {
     }
     return { base, bonus, supply: { supplier: chain.supplier, count: suppliers.length, required: MIN_SUPPLIERS, active } };
   }
+  if (tile.type === 'rathaus') {
+    base.gold = TOWN_HALL_OUTPUT.gold;
+    base.werkzeug = TOWN_HALL_OUTPUT.werkzeug;
+    return { base, bonus };
+  }
   for (const other of partnersOf(s, tile)) {
     if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += pairValue(tile, other);
   }
@@ -486,7 +491,7 @@ export function productionRates(s) {
     rates.korn += base.korn + bonus.korn;
     rates.werkzeug += base.werkzeug + bonus.werkzeug;
     // Gold belongs to a pair, which appears in both tiles' detail views.
-    rates.gold += (base.gold + bonus.gold) / 2;
+    rates.gold += (base.gold + bonus.gold) / (tile.type === 'rathaus' ? 1 : 2);
   }
   return rates;
 }
@@ -716,7 +721,7 @@ export function startPack(s, packId, now = Date.now()) {
 export function canStartRecovery(s) {
   const rates = productionRates(s);
   const cost = PACKS.natur.cost;
-  return Object.values(s.tiles).some(t => t.type === 'workshop') && hasCraftSlot(s) &&
+  return hasCraftSlot(s) &&
     (!s.hand || JOKERS[s.hand] || HAZARDS[s.hand]) && s.deck.every(id => JOKERS[id] || HAZARDS[id]) && !Object.values(s.packs).some(Boolean) &&
     !s.crafting.length &&
     Object.entries(cost).some(([id, amount]) => s.resources[id] < amount && rates[id] === 0);

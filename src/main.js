@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS } from './config.js?v=27';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=32';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=28';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=33';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -241,7 +241,7 @@ function onTap(sx, sy) {
       const tile = tileAt(state, c.x, c.y);
       toast(tile?.type === 'banditen' ? 'Banditencamps sind gegen Joker geschützt' :
         state.hand === 'joker_schutz' ? (state.protectedFields[`${c.x},${c.y}`] ? 'Dieses Feld ist bereits dauerhaft geschützt' : 'Wähle ein Feld innerhalb des Spielfelds') :
-        tile?.type === 'workshop' ? 'Der letzte Workshop ist geschützt' :
+        tile?.type === 'rathaus' ? 'Das letzte Rathaus ist geschützt' :
         Object.keys(state.tiles).length <= 1 && state.hand === 'joker_loeschen'
           ? 'Das letzte Tile kann nicht gelöscht werden' : 'Wähle ein vorhandenes Tile');
       return;
@@ -532,6 +532,7 @@ function updateTilePopup() {
     windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
     taverne: 'Erzeugt Gold mit benachbarten Häusern.',
+    rathaus: `Das Start-Gebäude: erzeugt automatisch ${TOWN_HALL_OUTPUT.gold} Gold und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug pro 10 Sekunden.`,
     workshop: `Produziert Werkzeuge. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal), sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     lagerhalle: `Erhöht das Holzlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     kornlager: `Erhöht das Kornlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
@@ -1104,9 +1105,9 @@ function showWorkshops() {
   summary.textContent = `🔨 Werkzeuge: ${Math.floor(state.resources.werkzeug)}/${caps.werkzeug} · +${fmt(rates.werkzeug)} alle ${PRODUCTION_INTERVAL / 1000} Sek. · Aufträge: ${state.crafting.length}/${MAX_CRAFT_JOBS}`;
   body.appendChild(summary);
   const workshops = Object.values(state.tiles).filter(tile => tile.type === 'workshop');
-  if (!workshops.length) {
+  if (!workshops.length && !Object.values(state.tiles).some(tile => tile.type === 'rathaus')) {
     const notice = document.createElement('p');
-    notice.textContent = 'Kein Workshop platziert – es entstehen keine Werkzeuge. Ohne Workshop-Karte oder fertiges Pack ist ein neues Spiel nötig.';
+    notice.textContent = 'Weder Rathaus noch Workshop platziert – es entstehen keine Werkzeuge.';
     body.appendChild(notice);
   }
   for (const tile of workshops) {
@@ -1269,6 +1270,7 @@ const CARD_DESCRIPTIONS = {
   windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Aktiv erzeugt sie pro 10 Sekunden je Feld ${SUPPLIER_OUTPUT} Korn × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Feldern läuft sie im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Korn).`,
   haus: 'Erzeugt Gold mit benachbarten Gebäuden, auch diagonal: Haus + Haus 1 Gold, Haus + Taverne 2 Gold pro 10 Sekunden. Jedes Paar zählt einmal und wird mit der höheren Seltenheitsstufe der beiden multipliziert.',
   taverne: 'Erzeugt mit jedem benachbarten Haus 2 Gold pro 10 Sekunden, auch diagonal. Zwei Tavernen erzeugen zusammen nichts. Das Paar wird mit der höheren Seltenheitsstufe multipliziert.',
+  rathaus: `Das Start-Gebäude. Erzeugt ohne Nachbarn automatisch ${TOWN_HALL_OUTPUT.gold} Gold 🪙 und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug 🔨 pro 10 Sekunden, damit du auch bei schlechten Kartenziehungen immer Grundressourcen hast. Kann nicht gelöscht werden; der Lösch-Joker verschont das letzte Rathaus.`,
   workshop: `Produziert Werkzeuge 🔨, mit denen Packs hergestellt werden. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Schmiede ${SUPPLIER_OUTPUT} Werkzeuge × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Schmieden läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Werkzeug).`,
   lagerhalle: `Erhöht das Holzlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Holz über dem neuen Limit.`,
   kornlager: `Erhöht das Kornlimit um ${STORAGE_BONUS} je Seltenheitsstufe (Common ${STORAGE_BONUS} bis Epic ${STORAGE_BONUS * 4}), unabhängig von der Position. Wird es zerstört, verfällt Korn über dem neuen Limit.`,
@@ -1647,7 +1649,7 @@ function draw() {
   if (moveMode) drawGrid(half);
 
   const tiles = Object.values(state.tiles);
-  const workshopCount = tiles.filter(t => t.type === 'workshop').length;
+  const townHallCount = tiles.filter(t => t.type === 'rathaus').length;
   const animNow = performance.now();
   moveAnims = moveAnims.filter(a => animNow - a.start < a.duration);
   const animated = [];
@@ -1665,7 +1667,7 @@ function draw() {
     }
     if (JOKERS[state.hand] && t.type !== 'banditen' &&
         (state.hand === 'joker_schutz' ? !state.protectedFields[`${t.x},${t.y}`] :
-          (state.hand !== 'joker_loeschen' || tiles.length > 1) && (t.type !== 'workshop' || workshopCount > 1))) {
+          (state.hand !== 'joker_loeschen' || tiles.length > 1) && (t.type !== 'rathaus' || townHallCount > 1))) {
       ctx.strokeStyle = '#d39cff';
       ctx.lineWidth = 4;
       ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
