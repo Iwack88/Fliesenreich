@@ -22,7 +22,7 @@ export const SPECIAL_SLOT_CLEARANCE = 2;
 export const MOVE_STEP_COST = { common: 10, uncommon: 15, rare: 20, epic: 30 };
 export const SWAP_COST = 50;
 export const FREE_MOVE_JOKER = 5;
-export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_shop', 'joker_freizug'];
+export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_banditenschwaeche', 'joker_shop', 'joker_freizug'];
 export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 export const PLACEMENT_SHARE = { common: 0.1, uncommon: 0.2, rare: 0.35, epic: 0.5 };
 
@@ -42,6 +42,7 @@ export const STORAGE_BONUS = 50;
 export const START_RESOURCES = { holz: 8, korn: 8, werkzeug: 30, forschung: 0 };
 export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
+export const BANDIT_CHARGES = 3;
 export const GUARD_RADIUS = 3;
 // Produzenten benötigen passende Nachbarn; ohne diese laufen sie im Notbetrieb.
 export const SUPPLY_CHAINS = {
@@ -74,12 +75,12 @@ export const PACKS = {
   humancity: {
     name: 'HumanCity-Pack', cost: { werkzeug: 70, holz: 75, korn: 55 }, duration: 12 * 60000,
     extraChance: 0.4, hazardChance: 0.15,
-    weights: { haus: 45, taverne: 22, schule: 10, wachturm: 15, goldlager: 10, joker_schutz: 4, joker_banditenzeit: 4 },
+    weights: { haus: 45, taverne: 22, schule: 10, wachturm: 15, goldlager: 10, joker_schutz: 4, joker_banditenzeit: 4, joker_banditenschwaeche: 4 },
   },
   joker: {
     name: 'Joker-Pack', cost: { werkzeug: 100, gold: 350 }, duration: 8 * 60000,
     extraChance: 0.4, hazardChance: 0,
-    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_shop: 1, joker_freizug: 1 },
+    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_banditenschwaeche: 1, joker_shop: 1, joker_freizug: 1 },
   },
 };
 
@@ -120,6 +121,7 @@ export const JOKERS = {
   joker_verwandeln: { name: 'Verwandlungs-Joker', icon: '✨', color: '#b88bdb', rarity: 'rare' },
   joker_schutz: { name: 'Schutz-Joker', icon: '🛡️', color: '#b88bdb', rarity: 'rare' },
   joker_banditenzeit: { name: 'Banditenzeit-Joker', icon: '⏳', color: '#b88bdb', rarity: 'rare' },
+  joker_banditenschwaeche: { name: 'Banditen-Schwächungs-Joker', icon: '⚔️', color: '#b88bdb', rarity: 'rare' },
   joker_shop: { name: 'Shop-Refresh-Joker', icon: '🔄', color: '#b88bdb', rarity: 'rare' },
   joker_freizug: { name: 'Freizug-Joker', icon: '🧭', color: '#b88bdb', rarity: 'rare' },
 };

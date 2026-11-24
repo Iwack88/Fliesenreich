@@ -1,11 +1,99 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FORTIFY_COST, GUARD_RADIUS, TILES } from '../src/config.js';
-import { activateGuard, addTile, advanceBandits, drawCard, fortifyTile, hasTileProtection, isActiveGuard, isProtected, migrateState, moveOptions, moveTile, newState, placeHand, planBandits, spawnBandit, spreadBandits, swapTiles, undoMove, useJoker } from '../src/logic.js';
+import { BANDIT_CHARGES, BANDIT_INTERVAL, FORTIFY_COST, GUARD_RADIUS, TILES } from '../src/config.js';
+import { activateGuard, addTile, advanceBandits, drawCard, fortifyTile, hasTileProtection, isActiveGuard, isBanditAdjacent, isProtected, migrateState, moveOptions, moveTile, newState, placeHand, planBandits, spawnBandit, spreadBandits, swapTiles, undoMove, useJoker } from '../src/logic.js';
 
 function emptyWorld() {
   return { size: 16, gold: 100, resources: { holz: 8, korn: 8 }, productionAt: 0, banditElapsed: 0, packs: {}, nextId: 1, tiles: {}, deck: [], hand: null };
 }
+
+test('camps start with three charges, consume one each tick and expire after their final attack', () => {
+  const s = emptyWorld();
+  const camp = addTile(s, 'banditen', 0, 0);
+  assert.equal(camp.charges, BANDIT_CHARGES);
+  const first = advanceBandits(s, BANDIT_INTERVAL);
+  assert.equal(camp.charges, 2);
+  assert.equal(first.captured.length, 1);
+  const spawned = first.captured[0].tile;
+  assert.equal(spawned.charges, 3, 'new camps do not lose a charge on their birth tick');
+  advanceBandits(s, BANDIT_INTERVAL);
+  assert.equal(camp.charges, 1);
+  assert.equal(spawned.charges, 2);
+  const final = advanceBandits(s, BANDIT_INTERVAL);
+  assert.ok(final.expired.includes(camp));
+  assert.equal(s.tiles['0,0'], undefined);
+  assert.equal(spawned.charges, 1);
+});
+
+test('blocked camps still consume charges and expire without a target', () => {
+  const s = emptyWorld();
+  s.size = 2;
+  addTile(s, 'wachturm', 0, 0);
+  for (const [x, y] of [[-1, -1], [0, -1], [-1, 0]]) addTile(s, 'banditen', x, y);
+  const result = advanceBandits(s, BANDIT_INTERVAL * 3);
+  assert.equal(result.ticks, 3);
+  assert.equal(result.captured.length, 0);
+  assert.equal(result.expired.length, 3);
+  assert.deepEqual(Object.keys(s.tiles), ['0,0']);
+});
+
+test('existing camps receive charges once on migration and keep remaining charges after reload', () => {
+  const s = newState();
+  const camp = addTile(s, 'banditen', -4, -4);
+  delete camp.charges;
+  assert.equal(migrateState(s), true);
+  assert.equal(camp.charges, 3);
+  camp.charges = 1;
+  const loaded = JSON.parse(JSON.stringify(s));
+  migrateState(loaded);
+  assert.equal(loaded.tiles['-4,-4'].charges, 1);
+});
+
+test('all neighboring tiles including diagonals are locked regardless of protection', () => {
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    if (!dx && !dy) continue;
+    const s = emptyWorld();
+    addTile(s, 'banditen', 0, 0);
+    const tile = addTile(s, 'haus', dx, dy);
+    assert.equal(fortifyTile(s, tile), true);
+    assert.equal(isBanditAdjacent(s, tile), true);
+    assert.deepEqual(moveOptions(s, tile), { moves: [], swaps: [] });
+    assert.equal(moveTile(s, tile, dx + 2, dy + 2), null);
+  }
+});
+
+test('locked swap partners cannot be moved; newly adjacent tiles and undo stay locked until camps disappear', () => {
+  const s = emptyWorld();
+  s.gold = 300;
+  const tile = addTile(s, 'haus', 0, 0);
+  const blocked = addTile(s, 'feld', 1, 0);
+  const camp = addTile(s, 'banditen', 2, 1);
+  assert.equal(isBanditAdjacent(s, tile), false);
+  assert.equal(isBanditAdjacent(s, blocked), true);
+  assert.ok(!moveOptions(s, tile).swaps.some(option => option.tile === blocked));
+  assert.equal(swapTiles(s, tile, blocked), null);
+  const record = moveTile(s, tile, 1, 1);
+  assert.ok(record);
+  assert.equal(isBanditAdjacent(s, tile), true);
+  assert.deepEqual(moveOptions(s, tile), { moves: [], swaps: [] });
+  assert.equal(undoMove(s, record), false);
+  camp.charges = 1;
+  camp.target = { x: 3, y: 2 };
+  const tick = advanceBandits(s, BANDIT_INTERVAL);
+  assert.ok(tick.expired.includes(camp));
+  assert.equal(isBanditAdjacent(s, tile), false);
+  assert.equal(undoMove(s, record), true);
+});
+
+test('newly placed tiles are immediately locked next to a camp', () => {
+  const s = emptyWorld();
+  addTile(s, 'banditen', 0, 0);
+  s.hand = 'haus';
+  s.handPlacementSlots = [[1, 1]];
+  const house = placeHand(s, 1, 1).tile;
+  assert.equal(isBanditAdjacent(s, house), true);
+  assert.deepEqual(moveOptions(s, house), { moves: [], swaps: [] });
+});
 
 test('new games have a guarded town hall and no automatically spawned camps', () => {
   for (let i = 0; i < 50; i++) {
@@ -462,10 +550,10 @@ test('global clock attacks after ten active minutes and persists its remainder',
   const s = emptyWorld();
   addTile(s, 'banditen', 0, 0);
   addTile(s, 'feld', 1, 0);
-  assert.deepEqual(advanceBandits(s, 10 * 60 * 1000 - 1, 0), []);
+  assert.deepEqual(advanceBandits(s, 10 * 60 * 1000 - 1, 0), { captured: [], expired: [], ticks: 0 });
   const saved = JSON.parse(JSON.stringify(s));
   assert.equal(saved.tiles['1,0'].type, 'feld');
-  assert.equal(advanceBandits(saved, 1, 0).length, 1);
+  assert.equal(advanceBandits(saved, 1, 0).captured.length, 1);
   assert.equal(saved.banditElapsed, 0);
 });
 

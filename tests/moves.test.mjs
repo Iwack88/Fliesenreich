@@ -55,7 +55,7 @@ test('swapping neighbours costs 50 gold, free moves are used first and banditen 
   const s = world();
   const a = addTile(s, 'werkzeugschmiede', 0, 0);
   const b = addTile(s, 'haus', 1, 0);
-  const camp = addTile(s, 'banditen', 0, 1);
+  const camp = addTile(s, 'banditen', 0, 3);
   assert.deepEqual(moveOptions(s, camp), { moves: [], swaps: [] });
   assert.ok(!moveOptions(s, a).swaps.some(swap => swap.tile === camp));
   const record = swapTiles(s, a, b);

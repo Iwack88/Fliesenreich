@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=34';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, hasTileProtection, fortifyTile, isActiveGuard, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=41';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=35';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=42';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -54,7 +54,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=6');
+    const response = await fetch('assets/card-art.svg?v=7');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -268,9 +268,10 @@ function onTap(sx, sy) {
 function refreshTargets() {
   if (moveMode) {
     const tile = moveMode.tile;
-    if (state.hand || tileAt(state, tile.x, tile.y) !== tile || tile.type === 'banditen') {
+    if (state.hand || tileAt(state, tile.x, tile.y) !== tile || tile.type === 'banditen' || isBanditAdjacent(state, tile) || isActiveGuard(tile)) {
       moveMode = null;
       movePreview = null;
+      if (!state.hand && tileAt(state, tile.x, tile.y) === tile) selected = tile;
     } else {
       moveMode = { tile, ...moveOptions(state, tile) };
       if (movePreview) movePreview = [...moveMode.moves, ...moveMode.swaps].find(o => o.x === movePreview.x && o.y === movePreview.y) || null;
@@ -288,6 +289,12 @@ function startMove(tile) {
     selected = tile;
     updatePanel();
     toast('Aktivierte Wachtürme können nicht verschoben werden');
+    return;
+  }
+  if (isBanditAdjacent(state, tile)) {
+    selected = tile;
+    updatePanel();
+    toast('Neben einem Banditencamp kann dieses Tile nicht bewegt werden');
     return;
   }
   moveMode = { tile, ...moveOptions(state, tile) };
@@ -518,7 +525,10 @@ function updatePanel() {
       const target = movePreview.kind === 'swap' ? `Tausch mit ${TILES[movePreview.tile.type].name}` : `Nach (${movePreview.x}, ${movePreview.y}) · ${movePreview.distance} ${movePreview.distance === 1 ? 'Feld' : 'Felder'}`;
       const from = tileRarity(tile), to = upgradedRarity(from);
       const special = !movePreview.special ? '' : from === to ? '<br>✨ Spezial-Bauplatz · bereits Epic' : `<br>✨ Spezial-Bauplatz: ${RARITY[from].name} → ${RARITY[to].name}`;
-      message = `${target} · <b>${price}</b> · ${canPayMove(state, movePreview.cost) ? 'erneut antippen zum Bestätigen' : 'nicht genug Gold'}${special}<br>${previewBuffText()}`;
+      const simulation = previewSimulation();
+      const threatened = simulation && [...simulation.copies.values()].some(t => isBanditAdjacent(simulation.sim, t));
+      const warning = threatened ? '<br>⚠️ Ein Tile grenzt danach an Banditen und kann nicht bewegt werden.' : '';
+      message = `${target} · <b>${price}</b> · ${canPayMove(state, movePreview.cost) ? 'erneut antippen zum Bestätigen' : 'nicht genug Gold'}${special}${warning}<br>${previewBuffText()}`;
     } else {
       message = moveMode.moves.length || moveMode.swaps.length
         ? 'Ziel antippen – der Preis steht auf dem Feld · 🔁 tauscht mit dem Nachbarn · ✨ erhöht die Seltenheit'
@@ -541,9 +551,12 @@ function updateTilePopup() {
   if (selected.type === 'wachturm' && !isActiveGuard(selected)) {
     html += '<button id="guard-activate" class="tile-fortify">🛡️ Schützen · Gratis</button><div>Danach ist der Turm unbeweglich.</div>';
   }
-  if (selected.type !== 'banditen' && !isActiveGuard(selected)) {
+  if (selected.type !== 'banditen' && !isActiveGuard(selected) && !isBanditAdjacent(state, selected)) {
     const free = state.freeMoves || 0;
     html += `<button id="tile-move" class="tile-move">↔ Verschieben · ${free ? `🧭 ${free} frei` : `${moveStepCost(selected)} ${GOLD_ICON}/Feld`}</button>`;
+  }
+  if (selected.type !== 'banditen' && isBanditAdjacent(state, selected)) {
+    html += '<div>⚠️ Neben Banditen: Verschieben und Tauschen gesperrt.</div>';
   }
   if (selected.type !== 'banditen') {
     if (hasTileProtection(selected)) html += '<div>🛡️ Dieses Tile ist dauerhaft vor Banditen geschützt.</div>';
@@ -573,7 +586,7 @@ function updateTilePopup() {
     goldlager: `Erhöht das Goldlager um ${STORAGE_BONUS * tileStrength(selected)}.`,
     werkzeugschmiede: 'Produziert allein nichts. Versorgt benachbarte Workshops; höhere Seltenheit erhöht deren Ertrag.',
     wachturm: `Schutzradius: ${guardRadius(selected) * 2 + 1}×${guardRadius(selected) * 2 + 1} Felder. Nur eigene Tiles werden geschützt; freie Felder nicht.`,
-    banditen: 'Breitet sich bei jedem Banditen-Timer auf ein ungeschütztes Nachbarfeld aus. Joker wirken nicht.',
+    banditen: 'Verbraucht bei jedem Banditen-Tick eine Aufladung und verschwindet nach der letzten. Angrenzende Tiles können nicht verschoben oder getauscht werden.',
   };
   html += `<div>${descriptions[selected.type] || 'Keine Produktion.'}</div>`;
   const { base, bonus, supply } = tileProduction(state, selected);
@@ -603,6 +616,7 @@ function updateTilePopup() {
     html += `<div>Aktuelle Gesamtkapazität: ${storageCapacity(state)[def.storage]} ${resourceNames[def.storage]}</div>`;
   } else if (selected.type === 'banditen') {
     const target = selected.target && tileAt(state, selected.target.x, selected.target.y);
+    html += `<div>🏴 Aufladungen: <b>${selected.charges}/${BANDIT_CHARGES}</b></div>`;
     html += selected.target ? `<div>Nächstes Ziel: <b>${target ? TILES[target.type].name : 'Freies Feld'} (${selected.target.x}, ${selected.target.y})</b></div>` :
       '<div>Kein ungeschütztes Ziel in Reichweite.</div>';
   }
@@ -652,7 +666,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=6#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=7#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const heldTile = TILES[state.hand] && state.hand !== 'banditen';
@@ -722,6 +736,13 @@ function drawNextCard() {
     refreshTargets();
     save();
     toast(`⏳ Banditen-Timer auf ${formatTime(BANDIT_INTERVAL)} zurückgesetzt`);
+    return;
+  }
+  if (card === 'joker_banditenschwaeche') {
+    selected = null;
+    refreshTargets();
+    save();
+    toast('⚔️ Alle Banditencamps haben nur noch eine Aufladung');
     return;
   }
   if (card === 'joker_shop') {
@@ -1089,7 +1110,7 @@ function showShop() {
       const card = CARDS[offer.card];
       const row = document.createElement('div');
       row.className = 'pack';
-      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : offer.card === 'joker_shop' ? '<br>Erneuert das Shop-Angebot beim Ziehen sofort.' : offer.card === 'joker_freizug' ? '<br>Gibt beim Ziehen sofort 5 kostenlose Züge.' : ''}</span>`;
+      row.innerHTML = `<span><b>${card.icon} ${card.name}</b> · <s>${SHOP_PRICES[card.shopTier || card.rarity]} ${GOLD_ICON}</s> → ${offer.price} ${GOLD_ICON}${HAZARDS[offer.card] ? '<br>Vorsicht: Diese Niete lässt Banditen erscheinen!' : offer.card === 'joker_banditenzeit' ? '<br>Setzt den Banditen-Timer beim Ziehen sofort zurück.' : offer.card === 'joker_banditenschwaeche' ? '<br>Setzt alle Banditen-Aufladungen beim Ziehen auf 1.' : offer.card === 'joker_shop' ? '<br>Erneuert das Shop-Angebot beim Ziehen sofort.' : offer.card === 'joker_freizug' ? '<br>Gibt beim Ziehen sofort 5 kostenlose Züge.' : ''}</span>`;
       const button = document.createElement('button');
       button.dataset.shopCard = offer.card;
       button.onclick = () => {
@@ -1398,11 +1419,11 @@ function syncBandits() {
   activeSince = now;
   if (!elapsed) return;
   if (state.banditElapsed + elapsed >= BANDIT_INTERVAL) syncProduction();
-  const captured = advanceBandits(state, elapsed);
+  const { captured, expired, ticks } = advanceBandits(state, elapsed);
   advanceShop(state, elapsed);
   updateShopView();
   save();
-  if (!captured.length) return;
+  if (!ticks) return;
   if (selected && tileAt(state, selected.x, selected.y) !== selected) selected = null;
   refreshTargets();
   if (overlayView === 'workshops' || overlayView === 'archive') {
@@ -1414,7 +1435,12 @@ function syncBandits() {
   }
   const losses = {};
   for (const result of captured) for (const [id, amount] of Object.entries(result.losses || {})) losses[id] = (losses[id] || 0) + amount;
-  toast(`Banditen breiten sich auf ${captured.length} ${captured.length === 1 ? 'Feld' : 'Felder'} aus!${lossText(losses)}`);
+  if (captured.length || expired.length) {
+    const parts = [];
+    if (captured.length) parts.push(`Banditen breiten sich auf ${captured.length} ${captured.length === 1 ? 'Feld' : 'Felder'} aus`);
+    if (expired.length) parts.push(`${expired.length} ${expired.length === 1 ? 'Camp verschwindet' : 'Camps verschwinden'}`);
+    toast(`${parts.join(' · ')}${lossText(losses)}`);
+  }
 }
 
 let archiveFilter = 'all';
@@ -1451,9 +1477,10 @@ const CARD_DESCRIPTIONS = {
   joker_verwandeln: 'Verwandelt ein angetipptes Tile zufällig in einen anderen Tile-Typ außer Banditencamps. Die Seltenheit bleibt erhalten. Gleiche Einschränkungen wie beim Lösch-Joker.',
   joker_schutz: 'Schützt ein freies oder belegtes Feld dauerhaft vor Banditen, auch wenn sich das Tile darauf später ändert. Nicht auf Banditencamps oder bereits dauerhaft geschützten Feldern.',
   joker_banditenzeit: `Wirkt sofort beim Ziehen: Setzt den Banditen-Countdown auf ${formatTime(BANDIT_INTERVAL)} zurück. Angekündigte Ziele bleiben erhalten.`,
+  joker_banditenschwaeche: 'Wirkt sofort beim Ziehen: Setzt die verbleibenden Aufladungen aller vorhandenen Banditencamps auf 1. Neue Camps starten weiterhin mit 3.',
   joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
   joker_freizug: 'Wirkt sofort beim Ziehen: Gibt 5 Freizüge. Jeder Zug – egal wie weit – oder jeder Tausch verbraucht dann einen Freizug statt Gold.',
-  banditen_niete: 'Erscheint beim Ziehen sofort als Banditencamp auf einem zufälligen ungeschützten freien Feld, sonst auf einem ungeschützten Tile. Camps breiten sich alle 10 Minuten aus und lassen sich nicht mit Jokern entfernen – nur ein Wachturm vertreibt sie.',
+  banditen_niete: `Erscheint beim Ziehen als Banditencamp mit ${BANDIT_CHARGES} Aufladungen. Pro Banditen-Tick wird eine verbraucht; danach verschwindet das Camp. Angrenzende Tiles sind unbeweglich.`,
 };
 
 function catalogCategory(id) {
@@ -1859,6 +1886,12 @@ function draw() {
     const pos = animatedPosition(t, animNow);
     if (pos) { animated.push([t, pos]); continue; }
     drawTile(t, t.x * TILE, t.y * TILE);
+    if (t.type === 'banditen') {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${TILE * 0.22}px sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`⚔${t.charges}`, t.x * TILE + 6, t.y * TILE + 4);
+    }
     const partners = displayPartners(t).length;
     const supply = SUPPLY_CHAINS[t.type] ? tileProduction(state, t).supply : null;
     if (partners || supply) {

@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=34';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=35';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -140,6 +140,12 @@ export function migrateState(s, now = Date.now()) {
     s.deck.push('banditen_niete');
     changed = true;
   }
+  for (const tile of Object.values(s.tiles)) {
+    if (tile.type === 'banditen' && tile.charges == null) {
+      tile.charges = BANDIT_CHARGES;
+      changed = true;
+    }
+  }
   if (!Array.isArray(s.deckRarities) || s.deckRarities.length !== s.deck.length) {
     s.deckRarities = s.deck.map(baseRarity);
     changed = true;
@@ -161,6 +167,7 @@ export function migrateState(s, now = Date.now()) {
 
 export function addTile(s, type, x, y, rarity = baseRarity(type)) {
   const t = { id: s.nextId++, type, x, y, rarity, earned: 0 };
+  if (type === 'banditen') t.charges = BANDIT_CHARGES;
   s.tiles[key(x, y)] = t;
   return t;
 }
@@ -294,6 +301,10 @@ export function drawCard(s) {
   const rarity = s.deckRarities.shift();
   const slots = s.deckPlacementSlots.shift();
   if (card === 'joker_banditenzeit') { s.banditElapsed = 0; s.handRarity = null; }
+  else if (card === 'joker_banditenschwaeche') {
+    for (const tile of Object.values(s.tiles)) if (tile.type === 'banditen') tile.charges = 1;
+    s.handRarity = null;
+  }
   else if (card === 'joker_shop') { refreshShop(s); s.handRarity = null; }
   else if (card === 'joker_freizug') { s.freeMoves = (s.freeMoves || 0) + FREE_MOVE_JOKER; s.handRarity = null; }
   else {
@@ -355,6 +366,7 @@ export function placeHand(s, x, y, now = Date.now()) {
 }
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);
+export const isBanditAdjacent = (s, tile) => !!tile && NEIGHBORS.some(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy)?.type === 'banditen');
 
 export const hasTileProtection = tile => !!tile && (tile.type === 'rathaus' || tile.type === 'wachturm' || tile.fortified === true);
 export const isActiveGuard = tile => tile?.type === 'wachturm' && tile.guardActive === true;
@@ -453,27 +465,44 @@ export function planBandits(s) {
   return changed;
 }
 
-export function spreadBandits(s, now = Date.now()) {
+function banditTick(s, now) {
   planBandits(s);
-  const cells = Object.values(s.tiles).filter(tile => tile.type === 'banditen' && tile.target)
+  const camps = Object.values(s.tiles).filter(tile => tile.type === 'banditen');
+  const cells = camps.filter(tile => tile.target)
     .map(tile => [tile.target.x, tile.target.y]);
-  const results = replaceWithBandits(s, cells, now);
+  const captured = replaceWithBandits(s, cells, now);
+  const expired = [];
+  for (const camp of camps) {
+    camp.charges = (camp.charges ?? BANDIT_CHARGES) - 1;
+    if (camp.charges <= 0) {
+      delete s.tiles[key(camp.x, camp.y)];
+      expired.push(camp);
+    }
+  }
   planBandits(s);
-  return results;
+  return { captured, expired };
+}
+
+export function spreadBandits(s, now = Date.now()) {
+  return banditTick(s, now).captured;
 }
 
 export function advanceBandits(s, elapsed, now = Date.now()) {
   s.banditElapsed += Math.max(0, elapsed);
-  const captured = [];
+  const captured = [], expired = [];
+  let ticks = 0;
   while (s.banditElapsed >= BANDIT_INTERVAL) {
     s.banditElapsed -= BANDIT_INTERVAL;
-    captured.push(...spreadBandits(s, now));
+    const result = banditTick(s, now);
+    captured.push(...result.captured);
+    expired.push(...result.expired);
+    ticks++;
     if (!Object.values(s.tiles).some(tile => tile.type === 'banditen')) {
       s.banditElapsed %= BANDIT_INTERVAL;
       break;
     }
   }
-  return captured;
+  return { captured, expired, ticks };
 }
 
 // Stärke eines Nachbar-Paares.
@@ -683,7 +712,7 @@ function freePaths(others, tile, half) {
 
 // Ziele für ein Tile: alle über freie Felder erreichbaren Positionen.
 export function moveOptions(s, tile) {
-  if (!tile || tile.type === 'banditen' || isActiveGuard(tile) || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
+  if (!tile || tile.type === 'banditen' || isActiveGuard(tile) || isBanditAdjacent(s, tile) || s.tiles[key(tile.x, tile.y)] !== tile) return { moves: [], swaps: [] };
   const all = new Set(Object.keys(s.tiles));
   all.delete(key(tile.x, tile.y));
   const half = s.size / 2;
@@ -697,7 +726,7 @@ export function moveOptions(s, tile) {
     moves.push({ kind: 'move', x, y, distance, path, cost: distance * step, special: isSpecialSlot(s, x, y) });
   }
   const swaps = DIRS4.map(([dx, dy]) => tileAt(s, tile.x + dx, tile.y + dy))
-    .filter(other => other && other.type !== 'banditen' && !isActiveGuard(other))
+    .filter(other => other && other.type !== 'banditen' && !isActiveGuard(other) && !isBanditAdjacent(s, other))
     .map(other => ({ kind: 'swap', x: other.x, y: other.y, tile: other, cost: SWAP_COST }));
   return { moves, swaps };
 }
@@ -755,10 +784,10 @@ export function undoMove(s, record, now = Date.now()) {
   if (!record || record.cleared) return false;
   const { from, to } = record;
   const tile = tileAt(s, to.x, to.y);
-  if (tile?.id !== record.tile.id || isActiveGuard(tile)) return false;
+  if (tile?.id !== record.tile.id || isActiveGuard(tile) || isBanditAdjacent(s, tile)) return false;
   if (record.kind === 'swap') {
     const other = tileAt(s, from.x, from.y);
-    if (other?.id !== record.other.id || isActiveGuard(other)) return false;
+    if (other?.id !== record.other.id || isActiveGuard(other) || isBanditAdjacent(s, other)) return false;
     relocate(s, tile, from.x, from.y);
     relocate(s, other, to.x, to.y);
   } else {
