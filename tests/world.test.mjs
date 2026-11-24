@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAND_TYPES, START_DECK, START_LAND_TILES, EXPANSION_LAND_TILES } from '../src/config.js';
-import { newState, addTile, drawCard, inBounds, placeCells, placeHand, placeRandomTile, expandWorld, returnHand } from '../src/logic.js';
+import { LAND_TYPES, START_DECK, START_LAND_TILES, EXPANSION_LAND_TILES, PLACEMENT_SHARE } from '../src/config.js';
+import { newState, addTile, availablePlacementSlots, drawCard, inBounds, placeCells, placeHand, expandWorld, returnHand, migrateState, shuffleDeck } from '../src/logic.js';
 
 test('new worlds spawn random landscape anywhere without replacing start buildings', t => {
   let seed = 42;
@@ -21,7 +21,7 @@ test('new worlds spawn random landscape anywhere without replacing start buildin
   assert.equal(state.tiles['1,0'].type, 'wachturm');
 });
 
-test('free placement only allows unoccupied neighboring cells within the world', () => {
+test('placement accepts only selected free cells within the world', () => {
   const state = newState();
   state.tiles = {};
   addTile(state, 'feld', 3, 0);
@@ -30,9 +30,11 @@ test('free placement only allows unoccupied neighboring cells within the world',
   assert.ok(!placeCells(state).some(([x, y]) => x === 4 && y === 0));
   assert.equal(placeHand(state, 4, 0), null);
   assert.equal(placeHand(state, 3, 0), null);
-  assert.equal(placeHand(state, -4, -4), null);
+  const unavailable = placeCells(state).find(([x, y]) => !state.handPlacementSlots.some(([a, b]) => a === x && b === y));
+  assert.equal(placeHand(state, ...unavailable), null);
   const gold = state.gold;
-  assert.equal(placeHand(state, 2, 0).pairs.length, 1);
+  const [x, y] = availablePlacementSlots(state)[0];
+  assert.ok(placeHand(state, x, y));
   assert.equal(state.gold, gold);
 });
 
@@ -57,31 +59,31 @@ test('expansion costs gold once and adds landscape only in the new area', () => 
   assert.equal(expandWorld(state), false);
 });
 
-test('land cards are placed at a valid random neighboring cell with their rarity', t => {
-  const state = newState();
-  state.tiles = {};
-  addTile(state, 'workshop', 3, 0);
-  t.mock.method(Math, 'random', () => 0.99);
-  for (const type of LAND_TYPES) {
-    state.hand = type;
-    state.handRarity = 'epic';
-    const valid = placeCells(state).map(cell => cell.join(','));
-    const result = placeRandomTile(state);
-    assert.ok(valid.includes(`${result.tile.x},${result.tile.y}`));
-    assert.ok(inBounds(state.size, result.tile.x, result.tile.y));
-    assert.equal(result.tile.type, type);
-    assert.equal(result.tile.rarity, 'epic');
-    assert.equal(state.hand, null);
+test('rarity determines the number of randomly selected free cells, with at least one', () => {
+  for (const [rarity, share] of Object.entries(PLACEMENT_SHARE)) {
+    const state = newState();
+    state.tiles = {};
+    addTile(state, 'haus', 0, 0);
+    state.deck = ['wald'];
+    state.deckRarities = [rarity];
+    drawCard(state);
+    const slots = availablePlacementSlots(state);
+    assert.equal(slots.length, Math.ceil(63 * share));
+    assert.equal(new Set(slots.map(cell => cell.join(','))).size, slots.length);
+    assert.ok(slots.every(([x, y]) => inBounds(8, x, y) && !state.tiles[`${x},${y}`]));
+    assert.ok(slots.some(([x, y]) => Math.abs(x) > 1 || Math.abs(y) > 1));
   }
-  state.hand = 'joker_schutz';
-  assert.equal(placeRandomTile(state), null);
-  assert.equal(state.hand, 'joker_schutz');
-  state.hand = 'windmuehle';
-  state.handRarity = 'common';
-  assert.equal(placeRandomTile(state).tile.type, 'windmuehle');
+  const state = newState();
+  state.size = 2;
+  state.tiles = {};
+  for (const [x, y] of [[-1, -1], [0, -1], [-1, 0]]) addTile(state, 'gras', x, y);
+  state.deck = ['wald'];
+  state.deckRarities = ['common'];
+  drawCard(state);
+  assert.deepEqual(availablePlacementSlots(state), [[0, 0]]);
 });
 
-test('a land card with no available neighboring cell can return to the deck unchanged', () => {
+test('a card with no free cells can return and select slots when space is available', () => {
   const state = newState();
   state.size = 2;
   state.tiles = {};
@@ -89,17 +91,20 @@ test('a land card with no available neighboring cell can return to the deck unch
   state.deck = ['gras'];
   state.deckRarities = ['rare'];
   assert.equal(drawCard(state), 'gras');
-  assert.equal(placeRandomTile(state), null);
+  assert.deepEqual(availablePlacementSlots(state), []);
   assert.equal(returnHand(state), true);
   assert.deepEqual(state.deck, ['gras']);
   assert.deepEqual(state.deckRarities, ['rare']);
+  delete state.tiles['0,0'];
+  drawCard(state);
+  assert.deepEqual(availablePlacementSlots(state), [[0, 0]]);
 });
 
 test('starting decks do not contain landscape cards', () => {
   for (const type of LAND_TYPES) assert.equal(START_DECK[type], undefined);
 });
 
-test('special slots avoid the start area, raise rarity once and are skipped by land cards', () => {
+test('special slots avoid the start area and raise placed card rarity once', () => {
   const state = newState();
   const slots = Object.keys(state.specialSlots);
   assert.ok(slots.length > 0);
@@ -112,20 +117,49 @@ test('special slots avoid the start area, raise rarity once and are skipped by l
   addTile(state, 'gras', 3, 0);
   state.hand = 'windmuehle';
   state.handRarity = 'rare';
+  state.handPlacementSlots = [[3, 1]];
   const result = placeHand(state, 3, 1);
   assert.equal(result.special, true);
   assert.equal(result.tile.rarity, 'epic');
   assert.deepEqual(state.specialSlots, {});
-  state.specialSlots = { '2,0': true };
-  for (let i = 0; i < 20; i++) {
-    state.tiles = {};
-    addTile(state, 'gras', 3, 0);
-    state.hand = 'erde';
-    state.handRarity = 'common';
-    const { tile } = placeRandomTile(state);
-    assert.notEqual(`${tile.x},${tile.y}`, '2,0');
+});
+
+test('chosen fields survive reload, rejected placements, returning and shuffling', () => {
+  const s = newState();
+  s.deck = ['haus', 'feld'];
+  s.deckRarities = ['common', 'rare'];
+  s.deckPlacementSlots = [null, null];
+  drawCard(s);
+  const chosen = structuredClone(s.handPlacementSlots);
+  assert.equal(placeHand(s, 100, 100), null);
+  const loaded = JSON.parse(JSON.stringify(s));
+  migrateState(loaded);
+  assert.deepEqual(loaded.handPlacementSlots, chosen);
+  assert.equal(returnHand(loaded), true);
+  assert.equal(shuffleDeck(loaded), true);
+  while (loaded.deck[0] !== 'haus') {
+    drawCard(loaded);
+    returnHand(loaded);
   }
-  assert.ok(state.specialSlots['2,0']);
+  drawCard(loaded);
+  assert.deepEqual(loaded.handPlacementSlots, chosen);
+  const [x, y] = chosen[0];
+  addTile(loaded, 'banditen', x, y);
+  assert.equal(placeHand(loaded, x, y), null);
+  assert.deepEqual(loaded.handPlacementSlots, chosen);
+});
+
+test('older saves with a tile in hand receive one persistent set of choices', () => {
+  const s = newState();
+  s.hand = 'wald';
+  s.handRarity = 'rare';
+  delete s.handPlacementSlots;
+  delete s.deckPlacementSlots;
+  assert.equal(migrateState(s), true);
+  const chosen = structuredClone(s.handPlacementSlots);
+  assert.equal(chosen.length, Math.ceil(placeCells(s).length * PLACEMENT_SHARE.rare));
+  assert.equal(migrateState(s), false);
+  assert.deepEqual(s.handPlacementSlots, chosen);
 });
 
 test('expanding adds special slots only in the new area', () => {

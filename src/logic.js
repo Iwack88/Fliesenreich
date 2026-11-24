@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=30';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=31';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -24,12 +24,16 @@ function ensureDeckRarities(s) {
   if (!Array.isArray(s.deckRarities) || s.deckRarities.length !== s.deck.length) {
     s.deckRarities = s.deck.map(baseRarity);
   }
+  if (!Array.isArray(s.deckPlacementSlots) || s.deckPlacementSlots.length !== s.deck.length) {
+    s.deckPlacementSlots = s.deck.map(() => null);
+  }
 }
 
 function addCards(s, cards) {
   ensureDeckRarities(s);
   s.deck.push(...cards);
   s.deckRarities.push(...cards.map(rollRarity));
+  s.deckPlacementSlots.push(...cards.map(() => null));
 }
 
 function shuffled(arr) {
@@ -44,6 +48,7 @@ function shuffled(arr) {
 export function newState() {
   const s = { gold: START_GOLD, resources: { ...START_RESOURCES }, productionAt: Date.now(), banditElapsed: 0, packs: {}, crafting: [], size: START_SIZE, nextId: 1, tiles: {}, hand: null, deck: shuffled(Object.entries(START_DECK).flatMap(([id, n]) => Array(n).fill(id))) };
   s.deckRarities = s.deck.map(rollRarity);
+  s.deckPlacementSlots = s.deck.map(() => null);
   s.shop = { elapsed: 0, round: 0, offers: [] };
   refreshShop(s);
   s.protectedFields = {};
@@ -140,6 +145,14 @@ export function migrateState(s, now = Date.now()) {
     s.handRarity = baseRarity(s.hand);
     changed = true;
   }
+  if (!Array.isArray(s.deckPlacementSlots) || s.deckPlacementSlots.length !== s.deck.length) {
+    s.deckPlacementSlots = s.deck.map(() => null);
+    changed = true;
+  }
+  if (TILES[s.hand] && s.hand !== 'banditen' && !Array.isArray(s.handPlacementSlots)) {
+    s.handPlacementSlots = choosePlacementSlots(s, s.handRarity);
+    changed = true;
+  }
   return planBandits(s) || changed;
 }
 
@@ -183,14 +196,22 @@ export function expandWorld(s) {
 }
 
 export function placeCells(s) {
-  const cells = new Map();
-  for (const t of Object.values(s.tiles)) {
-    for (const [dx, dy] of DIRS4) {
-      const x = t.x + dx, y = t.y + dy;
-      if (inBounds(s.size, x, y) && !s.tiles[key(x, y)]) cells.set(key(x, y), [x, y]);
-    }
+  const cells = [];
+  for (let x = -s.size / 2; x < s.size / 2; x++) for (let y = -s.size / 2; y < s.size / 2; y++) {
+    if (!s.tiles[key(x, y)]) cells.push([x, y]);
   }
-  return [...cells.values()];
+  return cells;
+}
+
+function choosePlacementSlots(s, rarity) {
+  const free = placeCells(s);
+  const count = free.length ? Math.max(1, Math.ceil(free.length * PLACEMENT_SHARE[rarity])) : 0;
+  return shuffled(free).slice(0, count);
+}
+
+export function availablePlacementSlots(s) {
+  if (!TILES[s.hand] || s.hand === 'banditen' || !Array.isArray(s.handPlacementSlots)) return [];
+  return s.handPlacementSlots.filter(([x, y]) => inBounds(s.size, x, y) && !tileAt(s, x, y));
 }
 
 function pickWeighted(entries) {
@@ -258,10 +279,15 @@ export function drawCard(s) {
   ensureDeckRarities(s);
   const card = s.deck.shift();
   const rarity = s.deckRarities.shift();
+  const slots = s.deckPlacementSlots.shift();
   if (card === 'joker_banditenzeit') { s.banditElapsed = 0; s.handRarity = null; }
   else if (card === 'joker_shop') { refreshShop(s); s.handRarity = null; }
   else if (card === 'joker_freizug') { s.freeMoves = (s.freeMoves || 0) + FREE_MOVE_JOKER; s.handRarity = null; }
-  else { s.hand = card; s.handRarity = rarity; }
+  else {
+    s.hand = card;
+    s.handRarity = rarity;
+    if (TILES[card] && card !== 'banditen') s.handPlacementSlots = slots?.length ? slots : choosePlacementSlots(s, rarity);
+  }
   return card;
 }
 
@@ -270,8 +296,10 @@ export function returnHand(s) {
   ensureDeckRarities(s);
   s.deck.push(s.hand);
   s.deckRarities.push(s.handRarity || baseRarity(s.hand));
+  s.deckPlacementSlots.push(s.handPlacementSlots || null);
   s.hand = null;
   s.handRarity = null;
+  delete s.handPlacementSlots;
   return true;
 }
 
@@ -283,6 +311,7 @@ export function deleteNextCard(s) {
   ensureDeckRarities(s);
   const card = s.deck.shift();
   s.deckRarities.shift();
+  s.deckPlacementSlots.shift();
   s.gold = Math.max(s.gold, Math.min(s.gold + DELETE_CARD_REWARD, storageCapacity(s).gold));
   return card;
 }
@@ -291,15 +320,16 @@ export function shuffleDeck(s) {
   if (s.gold < SHUFFLE_COST || s.deck.length < 2) return false;
   s.gold -= SHUFFLE_COST;
   ensureDeckRarities(s);
-  const cards = shuffled(s.deck.map((type, i) => ({ type, rarity: s.deckRarities[i] })));
+  const cards = shuffled(s.deck.map((type, i) => ({ type, rarity: s.deckRarities[i], slots: s.deckPlacementSlots[i] })));
   s.deck = cards.map(card => card.type);
   s.deckRarities = cards.map(card => card.rarity);
+  s.deckPlacementSlots = cards.map(card => card.slots);
   return true;
 }
 
 export function placeHand(s, x, y, now = Date.now()) {
   if (!TILES[s.hand] || s.hand === 'banditen') return null;
-  const valid = placeCells(s).some(c => c[0] === x && c[1] === y);
+  const valid = availablePlacementSlots(s).some(c => c[0] === x && c[1] === y);
   if (!valid) return null;
   const special = isSpecialSlot(s, x, y);
   const tile = addTile(s, s.hand, x, y, placementRarity(s, s.hand, s.handRarity, x, y));
@@ -308,18 +338,8 @@ export function placeHand(s, x, y, now = Date.now()) {
   planBandits(s);
   s.hand = null;
   s.handRarity = null;
+  delete s.handPlacementSlots;
   return { tile, cleared, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
-}
-
-// Platziert die Tile-Karte auf der Hand zufällig neben einem bestehenden Tile.
-export function placeRandomTile(s) {
-  if (!TILES[s.hand] || s.hand === 'banditen') return null;
-  const all = placeCells(s);
-  if (!all.length) return null;
-  const plain = all.filter(([x, y]) => !isSpecialSlot(s, x, y));
-  const cells = plain.length ? plain : all;
-  const [x, y] = cells[Math.floor(Math.random() * cells.length)];
-  return placeHand(s, x, y);
 }
 
 const NEIGHBORS = [-1, 0, 1].flatMap(dx => [-1, 0, 1].map(dy => [dx, dy])).filter(([dx, dy]) => dx || dy);

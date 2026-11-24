@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=30';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeRandomTile, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=35';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=31';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, isProtected, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=36';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -14,10 +14,6 @@ backgroundImage.src = 'assets/game-background.jpg';
 const loadedState = load();
 let state = loadedState || newState();
 if (loadedState && migrateState(state)) save();
-if (TILES[state.hand] && state.hand !== 'banditen') {
-  if (!placeRandomTile(state)) returnHand(state);
-  save();
-}
 if (updateProduction(state)) save();
 function initialCamera() {
   return { x: 0, y: 0, zoom: Math.max(0.4, Math.min(1, (innerHeight - 130) / (START_SIZE * TILE), (innerWidth - 40) / (START_SIZE * TILE))) };
@@ -235,6 +231,10 @@ function onTap(sx, sy) {
   syncBandits();
   syncProduction();
   const c = toCell(sx, sy);
+  if (TILES[state.hand] && state.hand !== 'banditen') {
+    placeSelectedCard(c.x, c.y);
+    return;
+  }
   if (JOKERS[state.hand]) {
     const result = useJoker(state, c.x, c.y);
     if (!result) {
@@ -482,11 +482,12 @@ function updatePanel() {
   if (hand) {
     panel.classList.remove('hidden');
     const blockedDelete = state.hand === 'joker_loeschen' && Object.keys(state.tiles).length <= 1;
-    $('btn-return-card').hidden = !JOKERS[state.hand];
+    $('btn-return-card').hidden = !JOKERS[state.hand] && !(TILES[state.hand] && availablePlacementSlots(state).length === 0);
     const message = blockedDelete ? 'Das letzte Tile kann nicht gelöscht werden.' :
       state.hand === 'joker_loeschen' ? 'Tile antippen, um es zu löschen' :
       state.hand === 'joker_verwandeln' ? 'Tile antippen, um es zufällig zu verwandeln' :
-      state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' : '';
+      state.hand === 'joker_schutz' ? 'Freies oder belegtes Feld antippen, um es dauerhaft vor Banditen zu schützen' :
+      TILES[state.hand] ? (availablePlacementSlots(state).length ? 'Karte auf ein markiertes Feld ziehen oder Feld antippen.' : 'Kein ausgewähltes Feld frei. Karte ans Deckende legen.') : '';
     $('panel-info').innerHTML = `<b>${hand.icon} ${hand.name}</b><br>${message}`;
   } else if (moveMode) {
     panel.classList.remove('hidden');
@@ -596,15 +597,18 @@ function cardArt(id) {
   return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=5#${id}"></use></svg></span>`;
 }
 function renderQueue() {
-  const key = `${state.deck[0] || 'empty'}:${state.deckRarities[0]}:${state.deck.length}`;
-  $('queue').disabled = !!state.hand || !state.deck.length;
+  const heldTile = TILES[state.hand] && state.hand !== 'banditen';
+  const id = heldTile ? state.hand : state.deck[0];
+  const rarity = heldTile ? state.handRarity : state.deckRarities[0];
+  const key = `${id || 'empty'}:${rarity}:${state.deck.length}:${!!heldTile}`;
+  $('queue').disabled = !!state.hand && !heldTile || !state.hand && !state.deck.length;
   $('btn-delete-card').disabled = !canDeleteCard(state);
   if (key === queueKey) return;
   queueKey = key;
-  const card = CARDS[state.deck[0]];
-  $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[state.deck[0]] ? `, ${RARITY[state.deckRarities[0]].name}` : ''} ziehen` : 'Deck leer');
+  const card = CARDS[id];
+  $('queue').setAttribute('aria-label', card ? `${card.name}${TILES[id] ? `, ${RARITY[rarity].name}` : ''}${heldTile ? ', zum markierten Feld ziehen' : ' ziehen'}` : 'Deck leer');
   $('queue').innerHTML = card
-    ? `<span class="queue-label">Als Nächstes · ${state.deck.length} Karten · antippen</span>${cardArt(state.deck[0])}<b>${card.name}</b>${TILES[state.deck[0]] ? `<span class="rarity-label" style="color:${RARITY[state.deckRarities[0]].color}">${RARITY[state.deckRarities[0]].name}</span>` : ''}${INSTANT_JOKERS.includes(state.deck[0]) ? '<span>Wirkt sofort</span>' : TILES[state.deck[0]] ? '<span>Erscheint zufällig</span>' : ''}`
+    ? `<span class="queue-label">${heldTile ? 'Ausgewählt' : `Deck · ${state.deck.length} Karten`}</span>${cardArt(id)}<b>${card.name}</b>${TILES[id] ? `<span class="rarity-label" style="color:${RARITY[rarity].color}">${RARITY[rarity].name}</span>` : ''}${INSTANT_JOKERS.includes(id) ? '<span>Wirkt sofort</span>' : TILES[id] ? '<span>Ziehen oder antippen</span>' : ''}`
     : '<span class="queue-label">Deck leer</span>';
 }
 
@@ -676,20 +680,11 @@ function drawNextCard() {
     return;
   }
   if (TILES[card] && !HAZARDS[card]) {
-    const result = placeRandomTile(state);
-    if (result) {
-      const land = LAND_TYPES.includes(card);
-      selected = land ? null : result.tile;
-      flashPairs(result.pairs);
-      focusNewTile(result.tile);
-      toast(`${TILES[card].name} bei (${result.tile.x}, ${result.tile.y}) erschienen${land ? '' : ' · ↔ Verschieben im Tile-Info'}`);
-    } else {
-      returnHand(state);
-      selected = null;
-      toast('Kein freies Nachbarfeld – Karte ans Deckende gelegt');
-    }
+    selected = null;
     refreshTargets();
     save();
+    renderQueue();
+    if (!availablePlacementSlots(state).length) toast('Kein ausgewähltes Feld frei – Karte ans Deckende legen');
     return;
   }
   if (HAZARDS[card]) {
@@ -712,14 +707,83 @@ function drawNextCard() {
   refreshTargets();
   save();
 }
-$('queue').onclick = drawNextCard;
+function placeSelectedCard(x, y) {
+  const result = placeHand(state, x, y);
+  if (!result) { toast('Wähle ein markiertes freies Feld'); return false; }
+  selected = LAND_TYPES.includes(result.tile.type) ? null : result.tile;
+  flashPairs(result.pairs);
+  focusNewTile(result.tile);
+  toast(`${TILES[result.tile.type].name} bei (${x}, ${y}) platziert`);
+  refreshTargets();
+  save();
+  renderQueue();
+  return true;
+}
+
+let cardDrag = null;
+let suppressQueueClick = false;
+const queue = $('queue');
+queue.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || cardDrag || (!TILES[state.hand] && (state.hand || !TILES[state.deck[0]])) || state.hand === 'banditen') return;
+  e.preventDefault();
+  if (!state.hand) drawNextCard();
+  if (!TILES[state.hand] || state.hand === 'banditen') return;
+  queue.setPointerCapture(e.pointerId);
+  cardDrag = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, ghost: null };
+});
+queue.addEventListener('pointermove', e => {
+  if (!cardDrag || cardDrag.pointerId !== e.pointerId) return;
+  if (!cardDrag.ghost && Math.hypot(e.clientX - cardDrag.startX, e.clientY - cardDrag.startY) >= 8) {
+    const ghost = document.createElement('div');
+    ghost.className = 'card-drag-ghost';
+    ghost.innerHTML = `${cardArt(state.hand)}<b>${CARDS[state.hand].name}</b><span style="color:${RARITY[state.handRarity].color}">${RARITY[state.handRarity].name}</span>`;
+    document.body.appendChild(ghost);
+    cardDrag.ghost = ghost;
+  }
+  if (cardDrag.ghost) {
+    cardDrag.ghost.style.left = `${e.clientX}px`;
+    cardDrag.ghost.style.top = `${e.clientY}px`;
+  }
+});
+function finishCardDrag(e, cancelled = false) {
+  if (!cardDrag || cardDrag.pointerId !== e.pointerId) return;
+  const { ghost } = cardDrag;
+  cardDrag = null;
+  suppressQueueClick = true;
+  setTimeout(() => { suppressQueueClick = false; }, 0);
+  if (!ghost) return;
+  let placed = false;
+  if (!cancelled && document.elementFromPoint(e.clientX, e.clientY) === canvas) {
+    syncBandits();
+    syncProduction();
+    const cell = toCell(e.clientX, e.clientY);
+    placed = placeSelectedCard(cell.x, cell.y);
+  }
+  if (placed) ghost.remove();
+  else {
+    const rect = queue.getBoundingClientRect();
+    ghost.classList.add('returning');
+    ghost.style.left = `${rect.left + rect.width / 2}px`;
+    ghost.style.top = `${rect.top + rect.height / 2}px`;
+    setTimeout(() => ghost.remove(), 220);
+  }
+}
+queue.addEventListener('pointerup', e => finishCardDrag(e));
+queue.addEventListener('pointercancel', e => finishCardDrag(e, true));
+queue.addEventListener('lostpointercapture', e => finishCardDrag(e, true));
+
+$('queue').onclick = () => {
+  if (suppressQueueClick) { suppressQueueClick = false; return; }
+  if (!state.hand) drawNextCard();
+};
 
 $('btn-return-card').onclick = () => {
-  if (!JOKERS[state.hand]) return;
+  if (!JOKERS[state.hand] && !(TILES[state.hand] && !availablePlacementSlots(state).length)) return;
   returnHand(state);
   refreshTargets();
   save();
-  toast('Joker ans Deckende gelegt');
+  renderQueue();
+  toast('Karte ans Deckende gelegt');
 };
 
 let overlayView = '';
@@ -939,7 +1003,7 @@ function showInventory() {
     const rarity = state.deckRarities[i];
     const el = document.createElement('div');
     el.className = `card ${rarity}`;
-    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${INSTANT_JOKERS.includes(id) ? '<span class="card-effect">Wirkt sofort</span>' : TILES[id] ? '<span class="card-effect">Erscheint zufällig</span>' : ''}`;
+    el.innerHTML = `<span class="card-number">#${i + 1}</span>${cardArt(id)}<b class="card-name">${d.name}</b><span class="card-rarity">${RARITY[rarity].name}</span>${INSTANT_JOKERS.includes(id) ? '<span class="card-effect">Wirkt sofort</span>' : TILES[id] ? '<span class="card-effect">Auf markiertes Feld platzieren</span>' : ''}`;
     body.appendChild(el);
   });
 }
@@ -1294,7 +1358,7 @@ function catalogCategory(id) {
 
 function showCatalog() {
   const body = openOverlay('Karten-Browser', 'catalog');
-  body.innerHTML = '<p class="catalog-intro">Alle Karten und Landschafts-Tiles im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Gezogene Tiles erscheinen auf einem zufälligen freien Feld neben einem bestehenden Tile und lassen sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen. Gras, Erde, Wasser und Berge entstehen beim Weltstart und der Erweiterung.</p>';
+  body.innerHTML = '<p class="catalog-intro">Alle Karten und Landschafts-Tiles im Spiel. Tile-Karten erhalten beim Erhalt eine zufällige Seltenheit (Stärke 1–4); Joker und Nieten nicht. Gezogene Tiles werden auf einem zufällig ausgewählten markierten Feld platziert und lassen sich danach gegen Gold verschieben oder mit einem Nachbarn tauschen. Gras, Erde, Wasser und Berge entstehen beim Weltstart und der Erweiterung.</p>';
   const ids = Object.keys(CARDS).filter(id => id !== 'banditen');
   for (const [category, label] of CATALOG_CATEGORIES) {
     const cards = ids.filter(id => catalogCategory(id) === category);
@@ -1646,7 +1710,7 @@ function draw() {
   const half = state.size / 2;
   ctx.fillStyle = 'rgba(37, 91, 47, .12)';
   ctx.fillRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
-  if (moveMode) drawGrid(half);
+  if (moveMode || TILES[state.hand]) drawGrid(half);
 
   const tiles = Object.values(state.tiles);
   const townHallCount = tiles.filter(t => t.type === 'rathaus').length;
@@ -1680,6 +1744,16 @@ function draw() {
     ctx.shadowBlur = 16;
     drawTile(t, pos.x * TILE, pos.y * TILE);
     ctx.restore();
+  }
+
+  for (const [x, y] of availablePlacementSlots(state)) {
+    const special = state.specialSlots?.[`${x},${y}`];
+    ctx.fillStyle = special ? 'rgba(255,205,70,.55)' : 'rgba(120,205,255,.4)';
+    ctx.fillRect(x * TILE + 3, y * TILE + 3, TILE - 6, TILE - 6);
+    ctx.strokeStyle = special ? '#fff3c4' : '#dcf5ff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x * TILE + 5, y * TILE + 5, TILE - 10, TILE - 10);
+    if (special) drawBadge((x + 0.5) * TILE, (y + 0.5) * TILE, '✨ +', '#7a5200');
   }
 
   if (state.hand === 'joker_schutz') {
@@ -1855,7 +1929,7 @@ function draw() {
     const [x, y] = field.split(',').map(Number);
     drawShield({ x, y }, true);
   }
-  if (showGrid && !moveMode) drawGrid(half);
+  if (showGrid && !moveMode && !TILES[state.hand]) drawGrid(half);
 }
 
 function frame() {

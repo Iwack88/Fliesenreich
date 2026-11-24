@@ -4,6 +4,7 @@ import { addTile, placeHand, productionRates } from '../src/logic.js';
 
 function placeNextTo(first, second, diagonal = false) {
   const state = { gold: 0, size: 8, tiles: {}, nextId: 1, hand: second };
+  state.handPlacementSlots = [[1, diagonal ? 1 : 0]];
   addTile(state, first, 0, 0);
   if (diagonal) addTile(state, 'gras', 1, 0);
   const result = placeHand(state, 1, diagonal ? 1 : 0);

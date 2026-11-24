@@ -10,7 +10,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1e5aa8; fon
 #queue-wrap { position: absolute; right: 10px; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 110px; }
 #btn-delete-card { margin: 0; padding: 5px 4px; font-size: 12px; background: rgba(110,40,40,.92); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; cursor: pointer; box-shadow: 0 3px 8px #0006; }
 #btn-delete-card:disabled { opacity: .5; cursor: default; }
-#queue { position: static; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; margin: 0; padding: 7px; background: rgba(15,30,25,.94); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; cursor: pointer; box-shadow: 0 3px 8px #0006; }
+#queue { position: static; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; margin: 0; padding: 7px; background: rgba(15,30,25,.94); border: 1px solid rgba(232,222,190,.65); border-radius: 9px; color: #fff; text-align: center; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; cursor: grab; touch-action: none; box-shadow: 3px 3px 0 #846f54, 6px 6px 0 #443d30, 0 3px 8px #0006; }
+.card-drag-ghost { position: fixed; z-index: 1000; left: 0; top: 0; width: 82px; padding: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 2px solid #eee0b9; border-radius: 9px; background: rgba(15,30,25,.95); color: white; font-size: 12px; text-align: center; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 6px 16px #0009; }
+.card-drag-ghost .card-art { width: 48px; height: 48px; }
+.card-drag-ghost.returning { transition: left .2s ease, top .2s ease, opacity .2s ease; opacity: .25; }
 #queue:disabled { background: rgba(15,30,25,.94); color: #e5e5e5; opacity: .78; cursor: default; }
 .queue-label { color: #d7e5d9; }
 #queue .card-art { width: 48px; height: 48px; margin: 4px auto; }

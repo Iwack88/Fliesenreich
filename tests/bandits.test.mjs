@@ -24,6 +24,7 @@ test('guard shields all cells within its square and clears existing camps when p
   addTile(s, 'banditen', 3, 3);
   addTile(s, 'banditen', 5, 0);
   s.hand = 'wachturm';
+  s.handPlacementSlots = [[1, 0]];
   const result = placeHand(s, 1, 0);
   assert.equal(result.cleared, 1);
   assert.equal(s.tiles['3,3'], undefined);
@@ -63,6 +64,7 @@ test('protection joker saves a field, reroutes attacks, and survives changing th
   s.hand = 'joker_loeschen';
   assert.equal(useJoker(s, 1, 0).kind, 'deleted');
   s.hand = 'feld';
+  s.handPlacementSlots = [[1, 0]];
   assert.equal(placeHand(s, 1, 0).tile.type, 'feld');
   const loaded = JSON.parse(JSON.stringify(s));
   assert.equal(isProtected(loaded, 1, 0), true);
@@ -176,12 +178,14 @@ test('a target remains on the same field when its tile is removed and rebuilt', 
   const s = emptyWorld();
   const camp = addTile(s, 'banditen', 0, 0);
   s.hand = 'feld';
+  s.handPlacementSlots = [[1, 0]];
   placeHand(s, 1, 0);
   assert.deepEqual(camp.target, { x: 1, y: 0 });
   s.hand = 'joker_loeschen';
   useJoker(s, 1, 0);
   assert.deepEqual(camp.target, { x: 1, y: 0 });
   s.hand = 'wald';
+  s.handPlacementSlots = [[1, 0]];
   placeHand(s, 1, 0);
   assert.deepEqual(camp.target, { x: 1, y: 0 });
   assert.equal(spreadBandits(s, 0)[0].previous.type, 'wald');
@@ -208,6 +212,7 @@ test('building on an announced empty target does not change it before the attack
   const camp = addTile(s, 'banditen', 0, 0);
   camp.target = { x: 1, y: 0 };
   s.hand = 'haus';
+  s.handPlacementSlots = [[1, 0]];
   placeHand(s, 1, 0);
   assert.deepEqual(camp.target, { x: 1, y: 0 });
   const captured = spreadBandits(s, 0);
@@ -242,6 +247,7 @@ test('a guard protects an announced target and forces a different target immedia
   addTile(s, 'gras', 3, 0);
   camp.target = { x: 1, y: 0 };
   s.hand = 'wachturm';
+  s.handPlacementSlots = [[4, 0]];
   placeHand(s, 4, 0);
   assert.deepEqual(camp.target, { x: -1, y: 0 });
   assert.equal(spreadBandits(s, 0)[0].previous.type, 'wald');

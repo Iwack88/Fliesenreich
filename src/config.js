@@ -19,6 +19,7 @@ export const SWAP_COST = 50;
 export const FREE_MOVE_JOKER = 5;
 export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_shop', 'joker_freizug'];
 export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
+export const PLACEMENT_SHARE = { common: 0.1, uncommon: 0.2, rare: 0.35, epic: 0.5 };
 
 // Start-Deck (Karten pro Typ, wird beim ersten Start gemischt).
 export const START_DECK = { wald: 2, feld: 2, holzfaeller: 1, windmuehle: 1, lagerhalle: 1, joker_loeschen: 1, joker_verwandeln: 1 };

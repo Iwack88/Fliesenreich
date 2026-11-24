@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GUARD_RADIUS, SHOP_INTERVAL, TILES, LAND_TYPES } from '../src/config.js';
-import { addTile, advanceShop, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
+import { addTile, advanceShop, availablePlacementSlots, buyShopCard, drawCard, guardRadius, isProtected, migrateState, newState, openPack, pairValue, placeHand, productionRates, returnHand, rollRarity, shuffleDeck, storageCapacity, tileProduction, useJoker } from '../src/logic.js';
 
 test('tile rarity rolls use the agreed thresholds and leave jokers unchanged', t => {
   let value = 0;
@@ -16,6 +16,7 @@ test('tile rarity rolls use the agreed thresholds and leave jokers unchanged', t
 test('rarity is rolled on pack opening, survives shuffle, return, reload and placement', t => {
   const s = newState();
   s.tiles = { '0,0': s.tiles['0,0'] };
+  s.specialSlots = {};
   s.deck = [];
   s.deckRarities = [];
   s.packs.starthilfe = 1;
@@ -42,7 +43,8 @@ test('rarity is rolled on pack opening, survives shuffle, return, reload and pla
   drawCard(restored);
   restored = JSON.parse(JSON.stringify(restored));
   assert.equal(restored.handRarity, rarity);
-  assert.equal(placeHand(restored, 1, 0).tile.rarity, rarity);
+  const [x, y] = availablePlacementSlots(restored)[0];
+  assert.equal(placeHand(restored, x, y).tile.rarity, rarity);
 });
 
 test('old saves keep their existing production and gain common tile rarities', () => {
@@ -85,10 +87,12 @@ test('rarity strengthens storage, workshops, forges and guards', () => {
   s.resources = { holz: 100, korn: 100 };
   s.hand = 'werkzeugschmiede';
   s.handRarity = 'uncommon';
+  s.handPlacementSlots = [[1, 0]];
   placeHand(s, 1, 0, 96000);
   assert.equal(tileProduction(s, workshop).base.werkzeug, 3, 'rare workshop in emergency mode');
   s.hand = 'werkzeugschmiede';
   s.handRarity = 'rare';
+  s.handPlacementSlots = [[-1, 0]];
   placeHand(s, -1, 0);
   const { base, bonus } = tileProduction(s, workshop);
   assert.equal(base.werkzeug, 2 * 3 * 2);
