@@ -44,6 +44,8 @@ Beim Antippen eines Tiles bleiben es und seine direkten Bonus-Partner hervorgeho
 
 **Warehouse** zeigt den Bestand aller Ressourcen (Gold, Holz, Korn, Werkzeuge und Forschungspunkte). Forschungspunkte haben kein Lagerlimit. Das Grundlimit beträgt 300 Gold sowie je 100 Holz, Korn und Werkzeuge. Ein Holz-, Korn- oder Goldlager erhöht das Limit der jeweiligen Ressource je nach Seltenheit um 50, 100, 150 oder 200, unabhängig von seiner Position. Lager erhalten selbst keine Nachbarschaftsboni. Wird ein Lager gelöscht, verwandelt oder von Banditen übernommen, verfällt sofort der Bestand über dem neuen Limit; der Verlust wird angezeigt. Bisherige Lagerhallen und Karten werden zu Holzlagern. Vorhandenes Gold über dem neuen Limit bleibt bei der Umstellung erhalten, weitere Produktion wird erst wieder unterhalb des Limits gespeichert.
 
+Ein kleines Schloss unten links kennzeichnet unbewegliche Tiles: Banditencamps, Rathaus, Wachtürme, verstärkte Tiles und direkte oder diagonale Banditen-Nachbarn. Der Toolbar-Schalter **🔒 Bewegungssperren** blendet diese Symbole rein optisch ein oder aus; die Einstellung bleibt im Browser gespeichert. Verschwindet eine vorübergehende Banditensperre, verschwindet auch das Schloss.
+
 ## Forschung
 
 Die **🏫 Schule** gibt es im HumanCity-Pack und im zufälligen Karten-Shop. Mit mindestens einem benachbarten Haus (auch diagonal) erzeugt sie alle 10 Sekunden je Haus 2 Forschungspunkte × Seltenheitsstufe der Schule; jede Seltenheitsstufe des Hauses über Common bringt zusätzlich 1 Punkt. Ohne Haus produziert sie nichts. Häuser behalten ihre normale Goldproduktion.

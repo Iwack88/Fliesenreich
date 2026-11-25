@@ -32,6 +32,8 @@ const FLASH_MS = 900;
 let dragButton = null;
 let activeSince = document.visibilityState === 'visible' ? performance.now() : null;
 let showShields = true;
+const LOCKS_KEY = 'fliesenreich-show-movement-locks';
+let showLocks = localStorage.getItem(LOCKS_KEY) !== 'false';
 let showGrid = false;
 const CLUSTERS_KEY = 'fliesenreich-show-production-clusters';
 let showClusters = localStorage.getItem(CLUSTERS_KEY) !== 'false';
@@ -1644,6 +1646,12 @@ $('btn-shields').onclick = () => {
   showShields = !showShields;
   $('btn-shields').setAttribute('aria-pressed', String(showShields));
 };
+$('btn-locks').setAttribute('aria-pressed', String(showLocks));
+$('btn-locks').onclick = () => {
+  showLocks = !showLocks;
+  localStorage.setItem(LOCKS_KEY, String(showLocks));
+  $('btn-locks').setAttribute('aria-pressed', String(showLocks));
+};
 $('btn-delete-card').onclick = () => {
   const name = CARDS[state.deck[0]]?.name;
   const card = deleteNextCard(state);
@@ -1766,6 +1774,26 @@ function drawTile(tile, x, y, alpha = 1) {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+function drawMovementLock(tile) {
+  const x = tile.x * TILE + 6, y = tile.y * TILE + TILE - 30;
+  ctx.save();
+  ctx.fillStyle = 'rgba(15,30,25,.85)';
+  ctx.fillRect(x - 2, y - 2, 26, 28);
+  ctx.strokeStyle = '#ffe09a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x + 11, y + 9, 6, Math.PI, 0);
+  ctx.lineTo(x + 17, y + 13);
+  ctx.moveTo(x + 5, y + 9);
+  ctx.lineTo(x + 5, y + 13);
+  ctx.stroke();
+  ctx.fillStyle = '#ffe09a';
+  ctx.fillRect(x + 2, y + 11, 18, 13);
+  ctx.fillStyle = '#3a3528';
+  ctx.fillRect(x + 10, y + 15, 3, 5);
   ctx.restore();
 }
 
@@ -2175,6 +2203,13 @@ function draw() {
       drawShield({ x, y }, true);
     }
     for (const tile of tiles) if (hasTileProtection(tile) && !state.protectedFields[`${tile.x},${tile.y}`]) drawShield(animatedPosition(tile, animNow) || tile, true);
+  }
+  if (showLocks) {
+    for (const tile of tiles) {
+      if (tile.type === 'banditen' || hasTileProtection(tile) || isBanditAdjacent(state, tile)) {
+        drawMovementLock(animatedPosition(tile, animNow) || tile);
+      }
+    }
   }
   if (showGrid && !moveMode && !TILES[state.hand]) drawGrid(half);
 }

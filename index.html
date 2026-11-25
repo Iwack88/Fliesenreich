@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -35,6 +35,7 @@
       <button id="btn-grid" aria-label="Grid umschalten" aria-pressed="false" title="Raster außerhalb des Baumodus anzeigen"><span class="action-icon" aria-hidden="true">▦</span><span class="action-label">Grid</span></button>
       <button id="btn-clusters" aria-label="Produktionsketten hervorheben" aria-pressed="true" title="Farbige Rahmen um Produktionsketten ein- oder ausblenden"><span class="action-icon" aria-hidden="true">🔗</span><span class="action-label">Produktionsketten</span></button>
       <button id="btn-shields" aria-label="Schutz anzeigen" aria-pressed="true" title="Schutzschilde ein- oder ausblenden"><span class="action-icon" aria-hidden="true">🛡️</span><span class="action-label">Schutz</span></button>
+      <button id="btn-locks" aria-label="Bewegungssperren anzeigen" aria-pressed="true" title="Schlösser auf unbeweglichen Tiles ein- oder ausblenden"><span class="action-icon" aria-hidden="true">🔒</span><span class="action-label">Bewegungssperren</span></button>
       <button id="btn-follow" aria-label="Zu neuen Tiles springen" aria-pressed="false" title="Kamera springt nach dem Erstellen zum neuen Tile"><span class="action-icon" aria-hidden="true">🎯</span><span class="action-label">Folgen</span></button>
       <button id="btn-filter" aria-label="Tile-Filter öffnen" aria-haspopup="dialog" title="Tile-Filter öffnen"><span class="action-icon" aria-hidden="true">🔎</span><span class="action-label">Filter</span></button>
       <button id="filter-clear" aria-label="Filter ausschalten" title="Filter ausschalten" hidden>✕</button>
@@ -80,6 +81,6 @@
 <button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=67"></script>
+<script type="module" src="src/main.js?v=68"></script>
 </body>
 </html>
