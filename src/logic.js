@@ -597,8 +597,10 @@ export function tileProduction(s, tile) {
 }
 
 export function productionClusters(s) {
-  const links = new Map();
-  const connect = (a, b) => {
+  const linksByResource = new Map();
+  const connect = (resource, a, b) => {
+    if (!linksByResource.has(resource)) linksByResource.set(resource, new Map());
+    const links = linksByResource.get(resource);
     if (!links.has(a)) links.set(a, new Set());
     if (!links.has(b)) links.set(b, new Set());
     links.get(a).add(b);
@@ -608,22 +610,25 @@ export function productionClusters(s) {
     const chain = SUPPLY_CHAINS[tile.type];
     if (chain) {
       const suppliers = suppliersOf(s, tile, chain);
-      if (suppliers.length >= (chain.required ?? MIN_SUPPLIERS)) for (const supplier of suppliers) connect(tile, supplier);
+      if (suppliers.length >= (chain.required ?? MIN_SUPPLIERS)) for (const supplier of suppliers) connect(chain.resource, tile, supplier);
     } else if (tile.type === 'haus' || tile.type === 'taverne') {
-      for (const partner of partnersOf(s, tile)) connect(tile, partner);
+      for (const partner of partnersOf(s, tile)) connect('gold', tile, partner);
     }
   }
-  const visited = new Set(), clusters = [];
-  for (const tile of links.keys()) {
-    if (visited.has(tile)) continue;
-    const cluster = [tile];
-    visited.add(tile);
-    for (let i = 0; i < cluster.length; i++) {
-      for (const neighbor of links.get(cluster[i])) {
-        if (!visited.has(neighbor)) { visited.add(neighbor); cluster.push(neighbor); }
+  const clusters = [];
+  for (const [resource, links] of linksByResource) {
+    const visited = new Set();
+    for (const tile of links.keys()) {
+      if (visited.has(tile)) continue;
+      const tiles = [tile];
+      visited.add(tile);
+      for (let i = 0; i < tiles.length; i++) {
+        for (const neighbor of links.get(tiles[i])) {
+          if (!visited.has(neighbor)) { visited.add(neighbor); tiles.push(neighbor); }
+        }
       }
+      clusters.push({ resource, tiles });
     }
-    clusters.push(cluster);
   }
   return clusters;
 }

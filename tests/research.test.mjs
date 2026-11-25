@@ -15,7 +15,7 @@ test('schools require neighboring houses and produce research without changing g
   assert.equal(tileProduction(s, school).bonus.forschung, 2);
   assert.equal(productionRates(s).forschung, 6);
   assert.equal(productionRates(s).gold, 0);
-  assert.ok(productionClusters(s).some(cluster => cluster.includes(school) && cluster.includes(house)));
+  assert.ok(productionClusters(s).some(cluster => cluster.resource === 'forschung' && cluster.tiles.includes(school) && cluster.tiles.includes(house)));
   s.productionAt = 0;
   updateProduction(s, 200000);
   assert.equal(s.resources.forschung, 120, 'research has no storage cap');

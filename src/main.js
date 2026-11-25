@@ -1,5 +1,5 @@
 import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=36';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=43';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=44';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -1831,28 +1831,43 @@ function drawGrid(half) {
   ctx.strokeRect(-half * TILE, -half * TILE, state.size * TILE, state.size * TILE);
 }
 
-let clusterKey = '', clusterCache = [];
+const CLUSTER_COLORS = { korn: '#ffdf31', holz: '#48e477', gold: '#c87aff', werkzeug: '#ff944d', forschung: '#53d9ff' };
+let clusterKey = '', clusterEdges = [];
 function drawProductionClusters(tiles) {
   const currentKey = tiles.map(tile => `${tile.id}:${tile.type}:${tile.x},${tile.y}`).join('|');
   if (clusterKey !== currentKey) {
     clusterKey = currentKey;
-    clusterCache = productionClusters(state);
+    const edges = new Map();
+    const addEdge = (x, y, horizontal, resource) => {
+      const key = `${x},${y},${horizontal}`;
+      if (!edges.has(key)) edges.set(key, { x, y, horizontal, resources: new Set() });
+      edges.get(key).resources.add(resource);
+    };
+    for (const cluster of productionClusters(state)) {
+      const cells = new Set(cluster.tiles.map(tile => `${tile.x},${tile.y}`));
+      for (const tile of cluster.tiles) {
+        const { x, y } = tile;
+        if (!cells.has(`${x},${y - 1}`)) addEdge(x, y, true, cluster.resource);
+        if (!cells.has(`${x + 1},${y}`)) addEdge(x + 1, y, false, cluster.resource);
+        if (!cells.has(`${x},${y + 1}`)) addEdge(x, y + 1, true, cluster.resource);
+        if (!cells.has(`${x - 1},${y}`)) addEdge(x, y, false, cluster.resource);
+      }
+    }
+    clusterEdges = [...edges.values()];
   }
   ctx.save();
-  ctx.strokeStyle = '#ffdf31';
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
-  for (const cluster of clusterCache) {
-    const cells = new Set(cluster.map(tile => `${tile.x},${tile.y}`));
-    ctx.beginPath();
-    for (const tile of cluster) {
-      const x = tile.x * TILE, y = tile.y * TILE;
-      if (!cells.has(`${tile.x},${tile.y - 1}`)) { ctx.moveTo(x, y); ctx.lineTo(x + TILE, y); }
-      if (!cells.has(`${tile.x + 1},${tile.y}`)) { ctx.moveTo(x + TILE, y); ctx.lineTo(x + TILE, y + TILE); }
-      if (!cells.has(`${tile.x},${tile.y + 1}`)) { ctx.moveTo(x, y + TILE); ctx.lineTo(x + TILE, y + TILE); }
-      if (!cells.has(`${tile.x - 1},${tile.y}`)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TILE); }
-    }
-    ctx.stroke();
+  for (const { x, y, horizontal, resources } of clusterEdges) {
+    const colors = [...resources];
+    colors.forEach((resource, i) => {
+      const offset = (i - (colors.length - 1) / 2) * 5;
+      ctx.strokeStyle = CLUSTER_COLORS[resource];
+      ctx.beginPath();
+      ctx.moveTo(x * TILE + (horizontal ? 0 : offset), y * TILE + (horizontal ? offset : 0));
+      ctx.lineTo((x + (horizontal ? 1 : 0)) * TILE + (horizontal ? 0 : offset), (y + (horizontal ? 0 : 1)) * TILE + (horizontal ? offset : 0));
+      ctx.stroke();
+    });
   }
   ctx.restore();
 }

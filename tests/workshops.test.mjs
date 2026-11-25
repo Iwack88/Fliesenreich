@@ -17,12 +17,12 @@ test('active production clusters merge shared suppliers and include diagonal nei
   const forest = addTile(s, 'wald', -3, 0);
   const logger = addTile(s, 'holzfaeller', -3, 1);
   const forest2 = addTile(s, 'wald', -2, 1);
-  const clusters = productionClusters(s).map(group => new Set(group));
+  const clusters = productionClusters(s).map(group => ({ resource: group.resource, tiles: new Set(group.tiles) }));
   assert.equal(clusters.length, 2);
-  assert.ok(clusters.some(group => group.size === 5 && [mill, field, diagonal, otherMill, third].every(tile => group.has(tile))));
-  assert.ok(clusters.some(group => group.size === 3 && [forest, logger, forest2].every(tile => group.has(tile))));
+  assert.ok(clusters.some(group => group.resource === 'korn' && group.tiles.size === 5 && [mill, field, diagonal, otherMill, third].every(tile => group.tiles.has(tile))));
+  assert.ok(clusters.some(group => group.resource === 'holz' && group.tiles.size === 3 && [forest, logger, forest2].every(tile => group.tiles.has(tile))));
   delete s.tiles['1,1'];
-  assert.ok(!productionClusters(s).some(group => group.includes(mill)));
+  assert.ok(!productionClusters(s).some(group => group.tiles.includes(mill)));
 });
 
 test('gold pairs and forge chains form separate clusters, excluding unrelated tiles', () => {
@@ -36,9 +36,22 @@ test('gold pairs and forge chains form separate clusters, excluding unrelated ti
   const forge2 = addTile(s, 'werkzeugschmiede', 0, 5);
   const clusters = productionClusters(s);
   assert.equal(clusters.length, 2);
-  assert.ok(clusters.some(group => group.length === 3 && [house, tavern, house2].every(tile => group.includes(tile))));
-  assert.ok(clusters.some(group => group.length === 3 && [workshop, forge1, forge2].every(tile => group.includes(tile))));
-  assert.ok(clusters.every(group => !group.includes(isolated)));
+  assert.ok(clusters.some(group => group.resource === 'gold' && group.tiles.length === 3 && [house, tavern, house2].every(tile => group.tiles.includes(tile))));
+  assert.ok(clusters.some(group => group.resource === 'werkzeug' && group.tiles.length === 3 && [workshop, forge1, forge2].every(tile => group.tiles.includes(tile))));
+  assert.ok(clusters.every(group => !group.tiles.includes(isolated)));
+});
+
+test('shared houses belong to separate research and gold clusters', () => {
+  const s = { tiles: {}, nextId: 1 };
+  const school = addTile(s, 'schule', 0, 0);
+  const house = addTile(s, 'haus', 1, 0);
+  const tavern = addTile(s, 'taverne', 1, 1);
+  const clusters = productionClusters(s);
+  assert.equal(clusters.length, 2);
+  assert.deepEqual(new Set(clusters.find(group => group.resource === 'forschung').tiles), new Set([school, house]));
+  assert.deepEqual(new Set(clusters.find(group => group.resource === 'gold').tiles), new Set([house, tavern]));
+  delete s.tiles['0,0'];
+  assert.deepEqual(productionClusters(s).map(group => group.resource), ['gold']);
 });
 
 test('suppliers produce nothing alone and activate producers from two neighbors, including diagonals', () => {
