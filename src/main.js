@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, QUESTS, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=37';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, advanceQuest, collectQuestRewards, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=45';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, QUESTS, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=38';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, advanceQuest, collectQuestRewards, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=46';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -574,8 +574,8 @@ function updateTilePopup() {
     holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Forste (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
     feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen; höhere Seltenheit erhöht deren Ertrag.',
     windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
-    haus: 'Erzeugt Gold durch benachbarte Häuser und Tavernen.',
-    taverne: 'Erzeugt Gold mit benachbarten Häusern.',
+    haus: 'Produziert selbst nichts. Versorgt benachbarte Tavernen und Schulen, auch diagonal.',
+    taverne: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Häuser (auch diagonal). Sonst keine Goldproduktion.`,
     schule: 'Erzeugt Forschungspunkte mit benachbarten Häusern, auch diagonal. Ohne Haus produziert sie nichts.',
     rathaus: `Das Start-Gebäude: erzeugt automatisch ${TOWN_HALL_OUTPUT.gold} Gold und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug pro 10 Sekunden.`,
     workshop: `Produziert Werkzeuge. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal), sonst Notbetrieb mit ${EMERGENCY_RATE * 100} %.`,
@@ -593,7 +593,7 @@ function updateTilePopup() {
     const supplierName = TILES[supply.supplier].name;
     html += supply.active
       ? `<div>✅ Aktiv: <b>${supply.count} ${supplierName}-Nachbarn</b></div>`
-      : selected.type === 'schule'
+      : (SUPPLY_CHAINS[selected.type].emergencyRate ?? EMERGENCY_RATE) === 0
         ? `<div>⚠️ Inaktiv: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b></div>`
         : `<div>⚠️ Notbetrieb: <b>${supply.count}/${supply.required} ${supplierName}-Nachbarn</b> · ${EMERGENCY_RATE * 100} % Leistung</div>`;
   }
@@ -602,9 +602,8 @@ function updateTilePopup() {
     const label = supply ? (supply.active ? `${base[id]} aus Nachbarn + ${bonus[id]} Seltenheit der Nachbarn` : 'Notbetrieb') : `${base[id]} Basis + ${bonus[id]} Nachbarschaftsbonus`;
     html += `<div>Aktueller Ertrag: <b>${fmt(base[id] + bonus[id])} ${resourceNames[id]} / 10 Sek.</b><br><span class="dim">${label}</span></div>`;
   }
-  if (selected.type === 'haus' || selected.type === 'taverne') {
-    if (!bonus.gold) html += '<div>Aktueller Ertrag: <b>0 Gold / 10 Sek.</b></div>';
-    html += '<div class="dim">Gold zählt gemeinsam pro Paar, nicht doppelt pro Gebäude.</div>';
+  if ((selected.type === 'haus' || selected.type === 'taverne') && !base.gold && !bonus.gold) {
+    html += '<div>Aktueller Ertrag: <b>0 Gold / 10 Sek.</b></div>';
   }
   if (selected.type === 'workshop') {
     html += `<div class="dim">Aufträge laufen gemeinsam über alle Workshops; Packs startest du im Workshop-Menü.</div>`;
@@ -1524,8 +1523,8 @@ const CARD_DESCRIPTIONS = {
   feld: 'Produziert allein nichts. Versorgt benachbarte Windmühlen, auch diagonal. Jede Seltenheitsstufe des Feldes über Common bringt der Windmühle +1 Korn pro 10 Sekunden.',
   holzfaeller: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Forste (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Forst ${SUPPLIER_OUTPUT} Holz × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Forsten läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Holz).`,
   windmuehle: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Felder (auch diagonal). Aktiv erzeugt sie pro 10 Sekunden je Feld ${SUPPLIER_OUTPUT} Korn × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Feldern läuft sie im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Korn).`,
-  haus: 'Erzeugt Gold mit benachbarten Gebäuden, auch diagonal: Haus + Haus 1 Gold, Haus + Taverne 2 Gold pro 10 Sekunden. Jedes Paar zählt einmal und wird mit der höheren Seltenheitsstufe der beiden multipliziert.',
-  taverne: 'Erzeugt mit jedem benachbarten Haus 2 Gold pro 10 Sekunden, auch diagonal. Zwei Tavernen erzeugen zusammen nichts. Das Paar wird mit der höheren Seltenheitsstufe multipliziert.',
+  haus: 'Produziert selbst nichts. Versorgt benachbarte Tavernen und Schulen, auch diagonal. Jede Seltenheitsstufe des Hauses über Common erhöht deren Ertrag um 1 pro 10 Sekunden.',
+  taverne: `Braucht mindestens ${MIN_SUPPLIERS} benachbarte Häuser (auch diagonal). Aktiv erzeugt sie je Haus ${SUPPLIER_OUTPUT} Gold × eigene Seltenheitsstufe pro 10 Sekunden, zusätzlich +1 je Seltenheitsstufe des Hauses über Common. Mit weniger Häusern keine Goldproduktion.`,
   schule: `Erzeugt Forschungspunkte 🔬 mit benachbarten Häusern, auch diagonal. Je Haus ${SUPPLIER_OUTPUT} Punkte × Seltenheitsstufe der Schule und +1 je Seltenheitsstufe des Hauses über Common. Ohne Haus keine Produktion.`,
   rathaus: `Das Start-Gebäude. Erzeugt ohne Nachbarn automatisch ${TOWN_HALL_OUTPUT.gold} Gold 🪙 und ${TOWN_HALL_OUTPUT.werkzeug} Werkzeug 🔨 pro 10 Sekunden, damit du auch bei schlechten Kartenziehungen immer Grundressourcen hast. Kann nicht gelöscht werden; der Lösch-Joker verschont das letzte Rathaus.`,
   workshop: `Produziert Werkzeuge 🔨, mit denen Packs hergestellt werden. Braucht mindestens ${MIN_SUPPLIERS} benachbarte Werkzeugschmieden (auch diagonal). Aktiv erzeugt er pro 10 Sekunden je Schmiede ${SUPPLIER_OUTPUT} Werkzeuge × eigene Seltenheitsstufe (Common 1 bis Epic 4). Mit weniger Schmieden läuft er im Notbetrieb mit ${EMERGENCY_RATE * 100} % der Mindestleistung (Common: 1 Werkzeug).`,

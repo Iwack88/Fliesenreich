@@ -75,7 +75,12 @@ test('production and pair buffs use rarity without extending adjacency or double
   const house = addTile(s, 'haus', 0, 3, 'rare');
   const tavern = addTile(s, 'taverne', 1, 3, 'uncommon');
   assert.equal(pairValue(house, tavern), 6);
-  assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 6, werkzeug: 0, forschung: 0 });
+  assert.equal(productionRates(s).gold, 0);
+  addTile(s, 'haus', 2, 4, 'epic');
+  assert.equal(tileProduction(s, tavern).base.gold, 8);
+  assert.equal(tileProduction(s, tavern).bonus.gold, 5);
+  assert.equal(tileProduction(s, house).bonus.gold, 0);
+  assert.deepEqual(productionRates(s), { holz: 0, korn: 20, gold: 13, werkzeug: 0, forschung: 0 });
 });
 
 test('rarity strengthens storage, workshops and forges but does not extend guard range', () => {

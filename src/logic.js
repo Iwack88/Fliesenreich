@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, GUARD_RADIUS, QUESTS, QUEST_REWARD, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=37';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, GUARD_RADIUS, QUESTS, QUEST_REWARD, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=38';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -661,9 +661,6 @@ export function tileProduction(s, tile) {
     base.werkzeug = TOWN_HALL_OUTPUT.werkzeug;
     return { base, bonus };
   }
-  for (const other of partnersOf(s, tile)) {
-    if (tile.type === 'haus' || tile.type === 'taverne') bonus.gold += pairValue(tile, other);
-  }
   return { base, bonus };
 }
 
@@ -682,8 +679,6 @@ export function productionClusters(s) {
     if (chain) {
       const suppliers = suppliersOf(s, tile, chain);
       if (suppliers.length >= (chain.required ?? MIN_SUPPLIERS)) for (const supplier of suppliers) connect(chain.resource, tile, supplier);
-    } else if (tile.type === 'haus' || tile.type === 'taverne') {
-      for (const partner of partnersOf(s, tile)) connect('gold', tile, partner);
     }
   }
   const clusters = [];
@@ -712,8 +707,7 @@ export function productionRates(s) {
     rates.korn += base.korn + bonus.korn;
     rates.werkzeug += base.werkzeug + bonus.werkzeug;
     rates.forschung += base.forschung + bonus.forschung;
-    // Gold belongs to a pair, which appears in both tiles' detail views.
-    rates.gold += (base.gold + bonus.gold) / (tile.type === 'rathaus' ? 1 : 2);
+    rates.gold += base.gold + bonus.gold;
   }
   return rates;
 }

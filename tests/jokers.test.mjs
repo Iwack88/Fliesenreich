@@ -112,7 +112,7 @@ test('transformation keeps the card on an empty target and never deducts lost bo
   const pool = Object.keys(TILES).filter(type => type !== 'taverne' && type !== 'banditen');
   t.mock.method(Math, 'random', () => (pool.indexOf('haus') + 0.5) / pool.length);
   const result = useJoker(state, 0, 0);
-  assert.deepEqual(result.pairs, [{ tile: house, value: 1 }]);
+  assert.deepEqual(result.pairs, []);
   assert.equal(state.gold, 7);
   assert.equal(tile.earned, 2);
   assert.equal(house.earned, 2);

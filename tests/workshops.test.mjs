@@ -46,10 +46,11 @@ test('shared houses belong to separate research and gold clusters', () => {
   const school = addTile(s, 'schule', 0, 0);
   const house = addTile(s, 'haus', 1, 0);
   const tavern = addTile(s, 'taverne', 1, 1);
+  const house2 = addTile(s, 'haus', 2, 1);
   const clusters = productionClusters(s);
   assert.equal(clusters.length, 2);
   assert.deepEqual(new Set(clusters.find(group => group.resource === 'forschung').tiles), new Set([school, house]));
-  assert.deepEqual(new Set(clusters.find(group => group.resource === 'gold').tiles), new Set([house, tavern]));
+  assert.deepEqual(new Set(clusters.find(group => group.resource === 'gold').tiles), new Set([house, house2, tavern]));
   delete s.tiles['0,0'];
   assert.deepEqual(productionClusters(s).map(group => group.resource), ['gold']);
 });
@@ -157,7 +158,7 @@ test('Joker pack charges gold and tools once and delivers only jokers', () => {
   assert.ok(!cards.includes('banditen_niete'));
 });
 
-test('production uses adjacent buffs, counts gold pairs once and caps resources', () => {
+test('production uses adjacent suppliers, counts tavern gold once and caps resources', () => {
   const s = newState();
   s.tiles = {};
   s.productionAt = 1000;
@@ -169,15 +170,15 @@ test('production uses adjacent buffs, counts gold pairs once and caps resources'
   addTile(s, 'windmuehle', 5, 0);
   addTile(s, 'haus', 0, 4);
   addTile(s, 'haus', 1, 4);
-  addTile(s, 'taverne', 2, 4);
-  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 3, werkzeug: 0, forschung: 0 });
+  addTile(s, 'taverne', 1, 5);
+  assert.deepEqual(productionRates(s), { holz: 1, korn: 1, gold: 4, werkzeug: 0, forschung: 0 });
   assert.equal(updateProduction(s, 30999), true);
   assert.deepEqual(s.resources, { holz: 100, korn: 2, werkzeug: 0, forschung: 0 });
-  assert.equal(s.gold, 6);
+  assert.equal(s.gold, 8);
   assert.equal(s.productionAt, 21000);
   assert.equal(updateProduction(s, 30999), false);
   updateProduction(s, 31000);
-  assert.equal(s.gold, 9);
+  assert.equal(s.gold, 12);
 });
 
 test('migration moves per-workshop jobs into the shared queue and grants start tools once', () => {

@@ -58,6 +58,7 @@ export const QUESTS = {
 export const QUEST_REWARD = { gold: 30, holz: 30, korn: 30, werkzeug: 30, forschung: 30 };
 // Produzenten benötigen passende Nachbarn; ohne diese laufen sie im Notbetrieb.
 export const SUPPLY_CHAINS = {
+  taverne: { supplier: 'haus', resource: 'gold', emergencyRate: 0 },
   holzfaeller: { supplier: 'wald', resource: 'holz' },
   windmuehle: { supplier: 'feld', resource: 'korn' },
   workshop: { supplier: 'werkzeugschmiede', resource: 'werkzeug' },
@@ -116,7 +117,7 @@ export const TILES = {
   holzfaeller:  { name: 'Holzfäller',  color: '#a1662f', icon: '🪓', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { wald: 1 } },
   windmuehle:   { name: 'Windmühle',   color: '#c9b8a0', icon: '🌬️', rarity: 'common', shopTier: 'uncommon', category: 'industrie', gives: { feld: 1 } },
   rathaus:      { name: 'Rathaus',    color: '#c8a45c', icon: '🏛️', rarity: 'common', category: 'siedlung' },
-  haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung', gives: { haus: 1 } },
+  haus:         { name: 'Haus',        color: '#d3a97b', icon: '🏠', rarity: 'common',   category: 'siedlung' },
   taverne:      { name: 'Taverne',     color: '#ad714a', icon: '🍺', rarity: 'common', shopTier: 'uncommon', category: 'siedlung', gives: { haus: 2 } },
   schule:       { name: 'Schule',      color: '#d3b47d', icon: '🏫', rarity: 'common', shopTier: 'uncommon', category: 'siedlung' },
   workshop:     { name: 'Workshop',    color: '#b67b50', icon: '🛠️', rarity: 'common', category: 'industrie' },
