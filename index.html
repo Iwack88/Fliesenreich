@@ -6,7 +6,7 @@
 <title>Fliesenreich</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e5aa8">
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -55,12 +55,19 @@
   <button id="btn-cancel-move" hidden>Abbrechen</button>
 </div>
 
-<aside id="crafting-panel" class="closed" aria-label="Laufende Herstellungsaufträge">
+<aside id="crafting-panel" class="side-panel closed" aria-label="Laufende Herstellungsaufträge">
   <div id="crafting-content" inert>
     <b>🛠️ Laufende Herstellung</b>
     <div id="crafting-jobs"></div>
   </div>
-  <button id="crafting-toggle" aria-expanded="false" aria-controls="crafting-content" aria-label="Herstellungsübersicht öffnen">❯</button>
+  <button id="crafting-toggle" class="side-toggle" aria-expanded="false" aria-controls="crafting-content" aria-label="Herstellungsübersicht öffnen" title="Herstellung">🔨</button>
+</aside>
+<aside id="quest-panel" class="side-panel closed" aria-label="Aktuelle Quest">
+  <div id="quest-content" inert>
+    <b>📜 Aktuelle Quest</b>
+    <div id="quest-details"></div>
+  </div>
+  <button id="quest-toggle" class="side-toggle" aria-expanded="false" aria-controls="quest-content" aria-label="Questübersicht öffnen" title="Quests">📜<span id="quest-notice" hidden>●</span></button>
 </aside>
 
 <button id="ready-packs" hidden aria-label="Fertige Packs öffnen" title="Fertige Packs öffnen">📦 <span id="ready-packs-count"></span></button>
@@ -73,6 +80,6 @@
 <button id="undo-move" hidden></button>
 <div id="rotate">Bitte Handy ins Querformat drehen 🔄</div>
 
-<script type="module" src="src/main.js?v=65"></script>
+<script type="module" src="src/main.js?v=66"></script>
 </body>
 </html>

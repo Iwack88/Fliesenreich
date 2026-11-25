@@ -1,5 +1,5 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=36';
-import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=44';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_TYPES, QUESTS, PACKS, GOLD_ICON, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SWAP_COST, INSTANT_JOKERS, MAX_CRAFT_JOBS, TOWN_HALL_OUTPUT } from './config.js?v=37';
+import { newState, migrateState, tileAt, drawCard, returnHand, placeHand, availablePlacementSlots, useJoker, advanceQuest, collectQuestRewards, expandWorld, startResearch, openPack, packChances, cardCount, shuffleDeck, canDeleteCard, deleteNextCard, partnersOf, pairValue, tileProduction, productionClusters, productionRates, updateProduction, storageCapacity, baseRarity, tileRarity, tileStrength, guardRadius, craftDuration, canStartPack, maxStartablePacks, startPack, canStartRecovery, startRecovery, spawnBandit, advanceBandits, hasTileProtection, fortifyTile, isActiveGuard, isBanditAdjacent, activateGuard, shopStatus, advanceShop, buyShopCard, matchesTileFilter, moveOptions, moveTile, swapTiles, undoMove, moveStepCost, canPayMove, upgradedRarity } from './logic.js?v=45';
 
 const SAVE_KEY = 'fliesenreich-save-v8';
 const TILE = 96;
@@ -54,7 +54,7 @@ for (const id of Object.keys(TILES)) {
 
 async function loadTileArt() {
   try {
-    const response = await fetch('assets/card-art.svg?v=7');
+    const response = await fetch('assets/card-art.svg?v=8');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'image/svg+xml');
     if (doc.querySelector('parsererror')) throw new Error('Ungültige SVG-Grafik');
@@ -668,7 +668,7 @@ function chip(id) {
 function cardArt(id) {
   const card = CARDS[id];
   const theme = JOKERS[id] ? 'joker' : HAZARDS[id] ? 'gefahr' : card.category;
-  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=7#${id}"></use></svg></span>`;
+  return `<span class="card-art ${theme}" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="assets/card-art.svg?v=8#${id}"></use></svg></span>`;
 }
 function renderQueue() {
   const heldTile = TILES[state.hand] && state.hand !== 'banditen';
@@ -760,6 +760,13 @@ function drawNextCard() {
     refreshTargets();
     save();
     toast(`🧭 ${state.freeMoves} Freizüge verfügbar – der nächste Zug kostet kein Gold`);
+    return;
+  }
+  if (card === 'joker_quest') {
+    selected = null;
+    refreshTargets();
+    save();
+    toast('📜 Quest abgeschlossen · eine neue Quest wartet');
     return;
   }
   if (TILES[card] && !HAZARDS[card]) {
@@ -1276,13 +1283,65 @@ $('crafting-toggle').onclick = () => {
   $('crafting-content').inert = !open;
   $('crafting-toggle').setAttribute('aria-expanded', String(open));
   $('crafting-toggle').setAttribute('aria-label', open ? 'Herstellungsübersicht schließen' : 'Herstellungsübersicht öffnen');
-  $('crafting-toggle').textContent = open ? '❯' : '❮';
   if (open) {
+    closeSidePanel('quest');
     syncBandits();
     syncProduction();
     craftingJobsKey = '';
     updateCraftingPanel();
   }
+};
+
+function closeSidePanel(id) {
+  $(`${id}-panel`).classList.add('closed');
+  $(`${id}-content`).inert = true;
+  $(`${id}-toggle`).setAttribute('aria-expanded', 'false');
+  $(`${id}-toggle`).setAttribute('aria-label', id === 'quest' ? 'Questübersicht öffnen' : 'Herstellungsübersicht öffnen');
+}
+
+const QUEST_RESOURCE_NAMES = { gold: '🪙 Gold', holz: '🪵 Holz', korn: '🌾 Korn', werkzeug: '🔨 Werkzeuge', forschung: '🔬 Forschungspunkte' };
+let questPanelKey = '';
+let lastQuestNotice = null;
+function updateQuestPanel() {
+  if (state.questLast !== lastQuestNotice) {
+    lastQuestNotice = state.questLast;
+    $('quest-notice').hidden = !lastQuestNotice || !$('quest-panel').classList.contains('closed');
+  }
+  if ($('quest-panel').classList.contains('closed')) return;
+  const quest = state.quest;
+  const definition = QUESTS[quest.id];
+  const remaining = Math.max(0, Math.ceil((quest.endsAt - Date.now()) / 1000));
+  const key = JSON.stringify([quest, state.questLast, state.questRewards, remaining]);
+  if (questPanelKey === key) return;
+  questPanelKey = key;
+  const reward = q => `${fmt(q.amount)} ${QUEST_RESOURCE_NAMES[q.resource]}`;
+  const pending = Object.entries(state.questRewards).map(([resource, amount]) => reward({ resource, amount })).join(' · ');
+  const last = state.questLast;
+  $('quest-details').innerHTML = `<b>${definition.text}</b><progress max="${definition.target}" value="${quest.progress}" aria-label="Questfortschritt"></progress><div>${quest.progress} / ${definition.target} · ⏳ ${formatTime(remaining * 1000)}</div><div>🎁 Belohnung: ${reward(quest.reward)}</div>${last ? `<p>${last.expired ? '⏰ Letzte Quest abgelaufen.' : `✅ Letzte Quest abgeschlossen: ${reward(last.reward)}`}</p>` : ''}${pending ? `<div>📦 Ausstehend: ${pending}</div><button id="quest-collect">Belohnung abholen</button>` : ''}`;
+  const button = $('quest-collect');
+  if (button) button.onclick = () => {
+    syncProduction();
+    const received = collectQuestRewards(state);
+    if (!Object.keys(received).length) { toast('Nicht genug Lagerplatz für die Belohnung'); return; }
+    save();
+    questPanelKey = '';
+    updateQuestPanel();
+    toast('📦 Quest-Belohnung abgeholt');
+  };
+}
+
+$('quest-toggle').onclick = () => {
+  const open = $('quest-panel').classList.contains('closed');
+  if (!open) { closeSidePanel('quest'); return; }
+  closeSidePanel('crafting');
+  if (advanceQuest(state)) save();
+  $('quest-panel').classList.remove('closed');
+  $('quest-content').inert = false;
+  $('quest-toggle').setAttribute('aria-expanded', 'true');
+  $('quest-toggle').setAttribute('aria-label', 'Questübersicht schließen');
+  $('quest-notice').hidden = true;
+  questPanelKey = '';
+  updateQuestPanel();
 };
 
 const COST_ICONS = { gold: '🪙', holz: '🪵', korn: '🌾', werkzeug: '🔨' };
@@ -1482,6 +1541,7 @@ const CARD_DESCRIPTIONS = {
   joker_banditenschwaeche: 'Wirkt sofort beim Ziehen: Setzt die verbleibenden Aufladungen aller vorhandenen Banditencamps auf 1. Neue Camps starten weiterhin mit 3.',
   joker_shop: 'Wirkt sofort beim Ziehen: Erneuert die vier Shop-Angebote und setzt den Shop-Timer auf 5:00 zurück.',
   joker_freizug: 'Wirkt sofort beim Ziehen: Gibt 5 Freizüge. Jeder Zug – egal wie weit – oder jeder Tausch verbraucht dann einen Freizug statt Gold.',
+  joker_quest: 'Wirkt sofort beim Ziehen: Schließt die aktuelle Quest mit ihrer Belohnung ab. Danach beginnt eine neue Quest.',
   banditen_niete: `Erscheint beim Ziehen als Banditencamp mit ${BANDIT_CHARGES} Aufladungen. Pro Banditen-Tick wird eine verbraucht; danach verschwindet das Camp. Angrenzende Tiles sind unbeweglich.`,
 };
 
@@ -2125,12 +2185,14 @@ function frame() {
   updateHud();
   updateUndo();
   updateCraftingPanel();
+  updateQuestPanel();
   requestAnimationFrame(frame);
 }
 
 refreshTargets();
 frame();
 setInterval(() => {
+  if (advanceQuest(state)) save();
   syncBandits();
   syncProduction();
   updateWarehouse();
@@ -2144,6 +2206,7 @@ document.addEventListener('visibilitychange', () => {
     activeSince = null;
   } else {
     activeSince = performance.now();
+    if (advanceQuest(state)) save();
     syncProduction();
   }
 });

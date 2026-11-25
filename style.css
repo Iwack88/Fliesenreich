@@ -35,15 +35,21 @@ button:disabled { background: #555; color: #999; }
 #panel { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: rgba(0,0,0,.6); }
 #panel.hidden { display: none; }
 #panel.has-ready-packs { padding-right: 90px; }
-#crafting-panel { position: fixed; top: 50%; right: 0; width: min(300px, calc(100vw - 48px)); transform: translate(100%, -50%); transition: transform .2s ease; z-index: 3; }
-#crafting-panel:not(.closed) { transform: translate(0, -50%); }
-#crafting-content { background: rgba(15,30,25,.96); border-radius: 10px 0 0 10px; padding: 12px; max-height: 65vh; overflow-y: auto; }
+.side-panel { position: fixed; top: 50%; right: 0; width: min(300px, calc(100vw - 48px)); transform: translate(100%, -50%); transition: transform .2s ease; z-index: 3; }
+.side-panel:not(.closed) { transform: translate(0, -50%); z-index: 4; }
+#crafting-content, #quest-content { background: rgba(15,30,25,.96); border-radius: 10px 0 0 10px; padding: 12px; max-height: 65vh; overflow-y: auto; }
+#quest-details { margin-top: 8px; line-height: 1.4; font-size: 14px; }
+#quest-details progress { display: block; width: 100%; margin: 6px 0; }
+#quest-details button { display: block; margin: 8px 0 0; }
 #crafting-jobs .workshop { margin-top: 8px; }
 #crafting-jobs .job-heading { flex-wrap: wrap; }
 #crafting-jobs .job-status { margin-top: 4px; }
 #crafting-jobs .job-timer { font-size: 16px; }
-#crafting-toggle { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 40px; height: 48px; margin: 0; padding: 0; border-radius: 8px 0 0 8px; background: var(--button-green); }
-@media (min-width: 900px) { #crafting-toggle:not(:disabled):hover, #crafting-toggle:not(:disabled):active { transform: translateY(-50%); } }
+.side-toggle { position: absolute; left: -40px; width: 40px; height: 48px; margin: 0; padding: 0; border-radius: 8px 0 0 8px; background: var(--button-green); transform: translateY(-50%); }
+#crafting-toggle { top: calc(50% - 26px); }
+#quest-toggle { top: calc(50% + 26px); }
+#quest-notice { position: absolute; top: 0; right: 3px; color: #ffdf31; font-size: 15px; }
+@media (min-width: 900px) { .side-toggle:not(:disabled):hover, .side-toggle:not(:disabled):active { transform: translateY(-50%); } }
 #ready-packs { position: fixed; bottom: 8px; min-width: 62px; min-height: 42px; margin: 0; padding: 6px 10px; background: #a76b27; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 #ready-packs { right: 10px; }
 #ready-packs[hidden] { display: none; }
@@ -97,7 +103,7 @@ button:disabled { background: #555; color: #999; }
   #tool-actions { max-width: calc(100vw - 170px); flex-wrap: wrap; }
   #panel { bottom: 100px; }
 }
-@media (prefers-reduced-motion: reduce) { #crafting-panel, #primary-actions, #hud #primary-toggle { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .side-panel, #primary-actions, #hud #primary-toggle { transition: none; } }
 @media (min-width: 900px) {
   button { transition: filter .12s, transform .12s; }
   button:not(:disabled):hover { filter: brightness(1.12); transform: translateY(-1px); }

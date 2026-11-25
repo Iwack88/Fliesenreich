@@ -159,4 +159,9 @@
     <path d="M32 77V54h15v23m9-23h13v12H56z" fill="#a87b54" stroke="#67594a" stroke-width="2.5"/>
     <path d="M37 20a20 20 0 0 1 32 2m-1-8 1 8 8-2" fill="none" stroke="#ad8b51" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
+  <symbol id="joker_quest" viewBox="0 0 100 100">
+    <path d="M25 21h49v58H25c-5 0-8-4-8-9V30c0-5 3-9 8-9z" fill="#e1cfaa" stroke="#745437" stroke-width="3"/>
+    <path d="M30 37l4 4 7-8m5 5h19M30 56l4 4 7-8m5 5h19" fill="none" stroke="#647b58" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m75 60 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#e2c986" stroke="#a99265" stroke-width="2"/>
+  </symbol>
 </svg>

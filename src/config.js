@@ -22,7 +22,7 @@ export const SPECIAL_SLOT_CLEARANCE = 2;
 export const MOVE_STEP_COST = { common: 10, uncommon: 15, rare: 20, epic: 30 };
 export const SWAP_COST = 50;
 export const FREE_MOVE_JOKER = 5;
-export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_banditenschwaeche', 'joker_shop', 'joker_freizug'];
+export const INSTANT_JOKERS = ['joker_banditenzeit', 'joker_banditenschwaeche', 'joker_shop', 'joker_freizug', 'joker_quest'];
 export const LAND_TYPES = ['gras', 'erde', 'wasser', 'berge'];
 export const PLACEMENT_SHARE = { common: 0.1, uncommon: 0.2, rare: 0.35, epic: 0.5 };
 
@@ -44,6 +44,18 @@ export const PRODUCTION_INTERVAL = 10000;
 export const BANDIT_INTERVAL = 10 * 60 * 1000;
 export const BANDIT_CHARGES = 3;
 export const GUARD_RADIUS = 1;
+export const QUESTS = {
+  forst: { text: 'Spiele 3 Forst-Karten', event: 'place', tile: 'wald', target: 3, duration: 60 * 60000 },
+  felder: { text: 'Spiele 3 Feld-Karten', event: 'place', tile: 'feld', target: 3, duration: 60 * 60000 },
+  haeuser: { text: 'Spiele 3 Haus-Karten', event: 'place', tile: 'haus', target: 3, duration: 60 * 60000 },
+  bauen: { text: 'Platziere 4 Karten', event: 'place', target: 4, duration: 60 * 60000 },
+  joker: { text: 'Benutze einen Joker', event: 'joker', target: 1, duration: 60 * 60000 },
+  holzfaeller: { text: 'Baue einen Holzfäller mit mindestens 3 angrenzenden Forsten', event: 'place', tile: 'holzfaeller', suppliers: 3, target: 1, duration: 60 * 60000 },
+  windmuehle: { text: 'Baue eine Windmühle mit mindestens 3 angrenzenden Feldern', event: 'place', tile: 'windmuehle', suppliers: 3, target: 1, duration: 60 * 60000 },
+  workshop: { text: 'Baue einen Workshop mit mindestens 2 angrenzenden Werkzeugschmieden', event: 'place', tile: 'workshop', suppliers: 2, target: 1, duration: 60 * 60000 },
+  pack: { text: 'Starte einen Herstellungsauftrag', event: 'craft', target: 1, duration: 60 * 60000 },
+};
+export const QUEST_REWARD = { gold: 30, holz: 30, korn: 30, werkzeug: 30, forschung: 30 };
 // Produzenten benötigen passende Nachbarn; ohne diese laufen sie im Notbetrieb.
 export const SUPPLY_CHAINS = {
   holzfaeller: { supplier: 'wald', resource: 'holz' },
@@ -80,7 +92,7 @@ export const PACKS = {
   joker: {
     name: 'Joker-Pack', cost: { werkzeug: 100, gold: 350 }, duration: 8 * 60000,
     extraChance: 0.4, hazardChance: 0,
-    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_banditenschwaeche: 1, joker_shop: 1, joker_freizug: 1 },
+    weights: { joker_loeschen: 1, joker_verwandeln: 1, joker_schutz: 1, joker_banditenzeit: 1, joker_banditenschwaeche: 1, joker_shop: 1, joker_freizug: 1, joker_quest: 1 },
   },
 };
 
@@ -124,6 +136,7 @@ export const JOKERS = {
   joker_banditenschwaeche: { name: 'Banditen-Schwächungs-Joker', icon: '⚔️', color: '#b88bdb', rarity: 'rare' },
   joker_shop: { name: 'Shop-Refresh-Joker', icon: '🔄', color: '#b88bdb', rarity: 'rare' },
   joker_freizug: { name: 'Freizug-Joker', icon: '🧭', color: '#b88bdb', rarity: 'rare' },
+  joker_quest: { name: 'Quest-Joker', icon: '📜', color: '#b88bdb', rarity: 'rare' },
 };
 
 export const HAZARDS = {

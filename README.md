@@ -12,7 +12,7 @@ Mit **Neues Spiel** lässt sich nach einer Bestätigung der aktuelle Spielstand 
 
 Der Kartenstapel oben rechts zeigt die nächste Karte. Eine Tile-Karte wird per Drag-and-drop auf ein markiertes Feld gezogen oder erst angetippt und dann durch Antippen eines markierten Feldes platziert. Die Felder werden beim Ziehen zufällig aus allen freien Feldern ausgewählt: Common 10 %, Uncommon 20 %, Rare 35 %, Epic 50 %, aufgerundet und mindestens eines, sofern Platz frei ist. Ein Ablegen außerhalb eines markierten Feldes lässt die Karte zurückspringen; ihre Auswahl bleibt auch nach Neuladen erhalten. Werden alle ausgewählten Felder belegt, kann die Karte ans Deckende gelegt werden; beim erneuten Ziehen behält sie ihre Auswahl. War beim ersten Ziehen das ganze Spielfeld voll, wird bei erneutem Ziehen eine Auswahl aus den dann freien Feldern getroffen. Joker und Banditen-Nieten behalten ihre bisherigen Wirkungen. Unter dem Stapel löscht **🗑️ Löschen** die nächste Karte endgültig und bringt 10 Gold (begrenzt durch die Lagerkapazität); Gras, Erde, Wasser, Berge sowie Banditen-Nieten und -camps sind davon ausgenommen. Mit **🎯 Folgen** springt die Kamera nach dem Platzieren automatisch zum Tile; die Option ist standardmäßig aus. Neue Gebäude werden direkt ausgewählt. Das Inventar zeigt Karten in Ziehreihenfolge mit Illustration und Seltenheit.
 
-Auf Mobilgeräten und im Browser zeigt die obere Leiste nur die Ressourcen und den Banditen-Timer. Häufige Ansichten liegen in einer einklappbaren Icon-Leiste links; der Pfeil öffnet und schließt sie. Raster, Schutz, Shop, neues Spiel und Mischen sind als kompakte Aktionsleiste unten links angeordnet. Fertige Packs und untätige Workshops sitzen unten rechts nebeneinander; die Herstellungsübersicht öffnet sich vom rechten Bildschirmrand.
+Auf Mobilgeräten und im Browser zeigt die obere Leiste nur die Ressourcen und den Banditen-Timer. Häufige Ansichten liegen in einer einklappbaren Icon-Leiste links; der Pfeil öffnet und schließt sie. Raster, Schutz, Shop, neues Spiel und Mischen sind als kompakte Aktionsleiste unten links angeordnet. Fertige Packs sitzen unten rechts; Herstellungs- und Questübersicht öffnen sich vom rechten Bildschirmrand.
 
 Der **📖 Karten**-Browser im linken Menü zeigt alle Karten des Spiels nach Kategorien (Landschaft, Industrie, Siedlung, Verteidigung, Joker, Gefahren) im Kartenstil des Inventars, jeweils mit genauer Beschreibung, Pack-Vorkommen und Shop-Preis.
 
@@ -56,7 +56,7 @@ Workshops produzieren keine Packs mehr, sondern **🔨 Werkzeuge** (siehe oben; 
 
 Die Workshop-Übersicht zeigt Werkzeugbestand, Ertrag und laufende Aufträge, listet alle Workshops mit Schmiedestatus (**Anzeigen** springt zu ihnen auf der Karte) und darunter die Pack-Rezepte. Bereits laufende Aufträge älterer Spielstände wandern in die gemeinsame Warteschlange und behalten ihre Restzeit; Bestandsspiele erhalten einmalig 30 Werkzeuge.
 
-Der Pfeil rechts öffnet eine Schnellübersicht aller laufenden Herstellungsaufträge mit Pack, Restzeit und Fortschritt. Sie aktualisiert sich automatisch und lässt sich mit dem Pfeil wieder schließen.
+Der 🔨-Reiter rechts öffnet eine Schnellübersicht aller laufenden Herstellungsaufträge mit Pack, Restzeit und Fortschritt. Sie aktualisiert sich automatisch und lässt sich mit dem Reiter wieder schließen.
 
 In der Pack-Auswahl stehen die möglichen Karten mit Symbol, Name und Chance pro Karte. Farbige Kästchen kennzeichnen Karten ohne eigenes Symbol.
 
@@ -67,7 +67,7 @@ Jedes normale Pack enthält zwei garantierte Karten und höchstens eine dritte K
 - **Landschafts-Pack:** Vor allem Forst und Feld, außerdem Häuser, Lager, Werkzeugschmiede, Joker und mit zusammen ca. 9 % je Karte Gras, Erde, Wasser oder Berge.
 - **Entdecker-Pack:** Vor allem Holzfäller und Windmühle, dazu Forst, Feld, Werkzeugschmiede, Workshop, Lager, Taverne, Joker und mit zusammen ca. 9 % je Karte Gras, Erde, Wasser oder Berge.
 - **HumanCity-Pack:** Häuser, Tavernen, Schulen, Wachtürme, Goldlager sowie Schutz-, Banditenzeit- und Banditen-Schwächungs-Joker. Die genauen Chancen stehen im Workshop-Menü.
-- **Joker-Pack:** Alle sieben Joker gleich häufig, ohne Banditen-Nieten.
+- **Joker-Pack:** Alle acht Joker gleich häufig, ohne Banditen-Nieten.
 
 Die Workshop-Übersicht zeigt die Chancen pro Karte. Wenn keine platzierbaren Karten oder Packs vorhanden sind und die benötigten Rohstoffe nicht produziert werden können, bietet das Spiel ein kostenloses Starthilfe-Pack mit Holzfäller, Windmühle und einem Forst oder Feld an.
 
@@ -96,3 +96,11 @@ Der **Banditen-Schwächungs-Joker** wird sofort beim Ziehen verbraucht und setzt
 Der **Shop-Refresh-Joker** wird sofort beim Ziehen verbraucht, erneuert die vier Angebote und setzt den Shop-Timer auf fünf Minuten zurück.
 
 Der **Freizug-Joker** wird sofort beim Ziehen verbraucht und gibt 5 Freizüge. Jeder Zug oder Tausch – egal wie weit – verbraucht dann zuerst einen Freizug statt Gold.
+
+Der **Quest-Joker** schließt beim Ziehen die aktuelle Quest sofort ab und gewährt ihre Belohnung. Anschließend beginnt eine neue Quest. Er ist im Joker-Pack und im zufälligen Karten-Shop erhältlich.
+
+## Quests
+
+Der 📜-Reiter rechts zeigt die eine aktive Quest mit Fortschritt, Restzeit und zufällig ausgewählter Belohnung (30 Gold, Holz, Korn, Werkzeuge oder Forschungspunkte). Aufgaben umfassen unter anderem das Platzieren bestimmter Karten, das Benutzen eines Jokers und das Starten eines Herstellungsauftrags. Bei Aufgaben mit Zulieferern müssen diese bereits beim Platzieren des Gebäudes angrenzen; diagonale Nachbarn zählen. Bestehende Tiles und frühere Aktionen zählen nicht rückwirkend.
+
+Quests laufen 60 Minuten in Echtzeit, auch offline. Nach Abschluss gibt es die Belohnung und sofort eine neue Quest; nach Ablauf wird die verpasste Quest ohne Strafe beim nächsten Öffnen oder während des Spiels ersetzt. Fortschritt und Zeit bleiben gespeichert. Passt eine Belohnung nicht vollständig ins Lager, bleibt der Rest im Quest-Reiter und kann abgeholt werden, sobald Platz frei ist.

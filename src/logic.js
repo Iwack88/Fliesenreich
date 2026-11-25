@@ -1,4 +1,4 @@
-import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, GUARD_RADIUS, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=36';
+import { TILES, JOKERS, HAZARDS, CARDS, RARITY, RESOURCE_CHAINS, LAND_WEIGHTS, PLACEMENT_SHARE, START_LAND_TILES, EXPANSION_LAND_TILES, START_GOLD, START_TILE, TOWN_HALL_OUTPUT, START_DECK, START_RESOURCES, BASE_CAPACITY, STORAGE_BONUS, PRODUCTION_INTERVAL, BANDIT_INTERVAL, BANDIT_CHARGES, GUARD_RADIUS, QUESTS, QUEST_REWARD, PACKS, SHUFFLE_COST, DELETE_CARD_REWARD, FORTIFY_COST, UNDELETABLE_CARDS, START_SIZE, EXPANDED_SIZE, EXPANSION_COST, RESEARCHED_SIZE, RESEARCHED_EXPANSION_COST, RESEARCH_COST, RESEARCH_DURATION, SHOP_INTERVAL, SHOP_OFFER_COUNT, SHOP_PRICES, SHOP_DISCOUNT, SUPPLY_CHAINS, MIN_SUPPLIERS, SUPPLIER_OUTPUT, EMERGENCY_RATE, SPECIAL_SLOT_SHARE, SPECIAL_SLOT_CLEARANCE, MOVE_STEP_COST, SWAP_COST, FREE_MOVE_JOKER, MAX_CRAFT_JOBS } from './config.js?v=37';
 
 const key = (x, y) => `${x},${y}`;
 export const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -57,7 +57,60 @@ export function newState() {
   s.specialSlots = {};
   addLandTiles(s, 0, START_LAND_TILES);
   addSpecialSlots(s);
+  s.questRewards = {};
+  s.quest = newQuest(Date.now());
   return s;
+}
+
+function newQuest(now, previousId) {
+  const ids = Object.keys(QUESTS).filter(id => id !== previousId);
+  const id = ids[Math.floor(Math.random() * ids.length)];
+  const resources = Object.keys(QUEST_REWARD);
+  const resource = resources[Math.floor(Math.random() * resources.length)];
+  return { id, progress: 0, endsAt: now + QUESTS[id].duration, reward: { resource, amount: QUEST_REWARD[resource] } };
+}
+
+export function advanceQuest(s, now = Date.now()) {
+  if (!s.quest || now < s.quest.endsAt) return false;
+  s.questLast = { id: s.quest.id, expired: true };
+  s.quest = newQuest(now, s.quest.id);
+  return true;
+}
+
+export function collectQuestRewards(s) {
+  const received = {};
+  const caps = storageCapacity(s);
+  for (const [resource, amount] of Object.entries(s.questRewards || {})) {
+    const current = resource === 'gold' ? s.gold : s.resources[resource];
+    const available = Math.max(0, (caps[resource] ?? Infinity) - current);
+    const added = Math.min(amount, available);
+    if (!added) continue;
+    if (resource === 'gold') s.gold += added;
+    else s.resources[resource] += added;
+    s.questRewards[resource] -= added;
+    if (!s.questRewards[resource]) delete s.questRewards[resource];
+    received[resource] = added;
+  }
+  return received;
+}
+
+function completeQuest(s, now) {
+  const { id, reward } = s.quest;
+  if (!s.questRewards) s.questRewards = {};
+  s.questRewards[reward.resource] = (s.questRewards[reward.resource] || 0) + reward.amount;
+  collectQuestRewards(s);
+  s.questLast = { id, reward };
+  s.quest = newQuest(now, id);
+}
+
+function recordQuestEvent(s, event, now, tile) {
+  if (!s.quest) return;
+  advanceQuest(s, now);
+  const quest = QUESTS[s.quest.id];
+  if (quest.event !== event || (quest.tile && quest.tile !== tile?.type)) return;
+  if (quest.suppliers && suppliersOf(s, tile, SUPPLY_CHAINS[tile.type]).length < quest.suppliers) return;
+  s.quest.progress++;
+  if (s.quest.progress >= quest.target) completeQuest(s, now);
 }
 
 const RARITY_IDS = Object.keys(RARITY);
@@ -132,6 +185,15 @@ export function migrateState(s, now = Date.now()) {
     s.research = { completed: false, endsAt: null };
     changed = true;
   }
+  if (!s.quest) {
+    s.quest = newQuest(now);
+    changed = true;
+  }
+  if (!s.questRewards) {
+    s.questRewards = {};
+    changed = true;
+  }
+  if (advanceQuest(s, now)) changed = true;
   if (s.banditElapsed == null) {
     s.banditElapsed = 0;
     if (!Object.values(s.tiles).some(tile => tile.type === 'wachturm') && s.hand !== 'wachturm' && !s.deck.includes('wachturm')) {
@@ -296,7 +358,7 @@ export function buyShopCard(s, card, round) {
   return true;
 }
 
-export function drawCard(s) {
+export function drawCard(s, now = Date.now()) {
   if (s.hand || !s.deck.length) return null;
   ensureDeckRarities(s);
   const card = s.deck.shift();
@@ -309,11 +371,16 @@ export function drawCard(s) {
   }
   else if (card === 'joker_shop') { refreshShop(s); s.handRarity = null; }
   else if (card === 'joker_freizug') { s.freeMoves = (s.freeMoves || 0) + FREE_MOVE_JOKER; s.handRarity = null; }
+  else if (card === 'joker_quest') {
+    if (s.quest) { advanceQuest(s, now); completeQuest(s, now); }
+    s.handRarity = null;
+  }
   else {
     s.hand = card;
     s.handRarity = rarity;
     if (TILES[card] && card !== 'banditen') s.handPlacementSlots = slots?.length ? slots : choosePlacementSlots(s, rarity);
   }
+  if (JOKERS[card] && !s.hand && card !== 'joker_quest') recordQuestEvent(s, 'joker', now);
   return card;
 }
 
@@ -364,6 +431,7 @@ export function placeHand(s, x, y, now = Date.now()) {
   s.hand = null;
   s.handRarity = null;
   delete s.handPlacementSlots;
+  recordQuestEvent(s, 'place', now, tile);
   return { tile, cleared: 0, special, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -535,6 +603,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     planBandits(s);
     s.hand = null;
     s.handRarity = null;
+    recordQuestEvent(s, 'joker', now);
     return { kind: 'protected', tile, x, y };
   }
   if (!tile || tile.type === 'banditen') return null;
@@ -547,6 +616,7 @@ export function useJoker(s, x, y, now = Date.now()) {
     planBandits(s);
     s.hand = null;
     s.handRarity = null;
+    recordQuestEvent(s, 'joker', now);
     return { kind: 'deleted', tile, losses };
   }
   if (s.hand !== 'joker_verwandeln') return null;
@@ -559,6 +629,7 @@ export function useJoker(s, x, y, now = Date.now()) {
   planBandits(s);
   s.hand = null;
   s.handRarity = null;
+  recordQuestEvent(s, 'joker', now);
   return { kind: 'transformed', tile, oldType, cleared: 0, losses, pairs: partnersOf(s, tile).map(o => ({ tile: o, value: pairValue(tile, o) })) };
 }
 
@@ -847,6 +918,7 @@ export function startPack(s, packId, now = Date.now()) {
   }
   const duration = craftDuration(packId);
   s.crafting.push({ pack: packId, duration, endsAt: now + duration });
+  recordQuestEvent(s, 'craft', now);
   return true;
 }
 
@@ -863,6 +935,7 @@ export function startRecovery(s, now = Date.now()) {
   if (!canStartRecovery(s)) return false;
   const duration = craftDuration('starthilfe');
   s.crafting.push({ pack: 'starthilfe', duration, endsAt: now + duration });
+  recordQuestEvent(s, 'craft', now);
   return true;
 }
 
